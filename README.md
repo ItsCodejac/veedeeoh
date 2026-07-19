@@ -36,9 +36,22 @@ Environment knobs: `TVLC_PORT` (default 8321), `TVLC_HOST` (default 127.0.0.1),
 
 ## Development
 
+Backend (Python / FastAPI):
+
 ```sh
 uv run pytest        # tests
 uv run ruff check .  # lint
+```
+
+Frontend (TypeScript / Vite, in `frontend/`). The built bundle is committed to
+`src/tvlc/static/`, so Python-only users never need node — rebuild it when you
+change frontend code:
+
+```sh
+cd frontend
+npm install
+npm run dev    # dev server on :5173, proxies API calls to the running backend
+npm run build  # type-check + build into src/tvlc/static/
 ```
 
 Design notes live in [docs/plans/](docs/plans/).
