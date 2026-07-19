@@ -127,7 +127,13 @@ function play(url: string): void {
   status.textContent = "Loading stream…";
   const src = `/proxy?url=${encodeURIComponent(url)}`;
   if (Hls.isSupported()) {
-    hls = new Hls({ maxBufferLength: 15 });
+    // generous timeouts: ad-stitched FAST streams can take 20s+ to start
+    hls = new Hls({
+      maxBufferLength: 15,
+      manifestLoadingTimeOut: 30000,
+      levelLoadingTimeOut: 30000,
+      fragLoadingTimeOut: 30000,
+    });
     hls.loadSource(src);
     hls.attachMedia(video);
     hls.on(Hls.Events.MANIFEST_PARSED, () => (status.textContent = ""));
