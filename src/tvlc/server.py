@@ -14,7 +14,7 @@ from fastapi.responses import PlainTextResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import captions, catalog, health, m3u, proxy
+from . import captions, catalog, health, m3u, proxy, thumbs
 from .store import Favorites, HealthCache
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -144,6 +144,23 @@ async def captions_ws(ws: WebSocket, url: str, translate: bool = False) -> None:
             await ws.close()
         except RuntimeError:
             pass
+
+
+@app.get("/thumb")
+async def thumb(url: str = Query(...)) -> Response:
+    """A real captured frame from the stream — what's on this channel right now."""
+    if not url.startswith(("http://", "https://")):
+        raise HTTPException(400, "bad url")
+    if not captions.ffmpeg_available():
+        raise HTTPException(404, "ffmpeg not available")
+    data = await thumbs.grab(url)
+    if not data:
+        raise HTTPException(404, "no frame")
+    return Response(
+        data,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "public, max-age=300"},
+    )
 
 
 @app.get("/logo")

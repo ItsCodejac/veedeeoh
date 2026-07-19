@@ -1,6 +1,6 @@
 import Hls from "hls.js";
 import { checkStream } from "./api";
-import { card, setLogo } from "./cards";
+import { card, stopHoverPreview } from "./cards";
 import { openPlayer } from "./player";
 import { categoryNames, chMeta, countryNames, filters, isDead, rank, state, visible } from "./state";
 import type { Channel } from "./types";
@@ -12,6 +12,7 @@ const grid = () => $("grid");
 export function applyFilters(): void {
   const f = filters();
   destroyHero();
+  stopHoverPreview();
   if (!f.q && !f.country && !f.category && !f.favorites) {
     renderExplore();
     return;
@@ -40,7 +41,7 @@ export function applyFilters(): void {
 
 export function renderMore(): void {
   const slice = state.filtered.slice(state.rendered, state.rendered + BATCH);
-  for (const ch of slice) grid().append(card(ch));
+  for (const ch of slice) grid().append(card(ch, state.filtered));
   state.rendered += slice.length;
 }
 
@@ -95,14 +96,20 @@ const COLLECTIONS: Collection[] = [
   { title: "🧘 Screensaver Mode", tagline: "television as furniture", categories: ["relax", "ambiance", "travel", "weather"], primetime: [9, 10, 11, 14] },
 ];
 
-const hero: {
+// ---- the video wall: a 3x3 bank of live muted feeds ----
+const WALL_SIZE = 9;
+
+interface WallCell {
   hls: Hls | null;
   ch: Channel | null;
-  tries: number;
   token: number;
-  watchdog: number | undefined;
-  glow: number | undefined;
-} = { hls: null, ch: null, tries: 0, token: 0, watchdog: undefined, glow: undefined };
+  tries: number;
+  el: HTMLElement | null;
+}
+
+const wall: WallCell[] = Array.from({ length: WALL_SIZE }, () => ({
+  hls: null, ch: null, token: 0, tries: 0, el: null,
+}));
 
 function renderExplore(): void {
   const all = visible();
@@ -112,9 +119,8 @@ function renderExplore(): void {
   grid().replaceChildren();
   $("stats").textContent = "";
 
-  grid().append(buildHero());
-  void tuneHero();
-  fillHeroSide();
+  grid().append(buildWall());
+  retuneAll();
 
   const favs = all.filter((ch) => state.favorites.has(ch.id));
   if (favs.length) {
@@ -149,16 +155,29 @@ function renderExplore(): void {
   const lineup = [...COLLECTIONS].sort(
     (a, b) => Number(b.primetime.includes(hour)) - Number(a.primetime.includes(hour))
   );
+  const collectionRails: HTMLElement[] = [];
   for (const col of lineup) {
     const seen = new Set<string>();
     const chans = col.categories
       .flatMap((id) => byCat.get(id) || [])
       .filter((ch) => !seen.has(ch.id) && seen.add(ch.id));
     if (chans.length >= 8) {
-      grid().append(rail(col.title, chans, () => setFilter("category", col.categories[0]!), {
+      collectionRails.push(rail(col.title, chans, () => setFilter("category", col.categories[0]!), {
         tagline: col.primetime.includes(hour) ? `${col.tagline} · on now` : col.tagline,
       }));
     }
+  }
+  // keep the landing tight: on-now collections up front, the rest one click away
+  for (const railEl of collectionRails.slice(0, 4)) grid().append(railEl);
+  const rest = collectionRails.slice(4);
+  if (rest.length) {
+    const more = document.createElement("button");
+    more.id = "moreRails";
+    more.textContent = `▾ ${rest.length} more collections`;
+    more.addEventListener("click", () => {
+      more.replaceWith(...rest);
+    });
+    grid().append(more);
   }
 
   // Passport: a different country spotlight every visit
@@ -215,44 +234,33 @@ function renderExplore(): void {
   grid().append(strip);
 }
 
-// The signature: a live channel playing on the landing page, OSD chrome and all,
-// with an "on now" sidebar of channels to hop between (Twitch-style).
-function buildHero(): HTMLElement {
+// The signature: nine live feeds at once — the wall of TVs at the store.
+function buildWall(): HTMLElement {
   const el = document.createElement("section");
   el.id = "hero";
   el.innerHTML = `
-    <div id="heroWrap">
-      <div id="heroScreen">
-        <video id="heroVideo" muted autoplay playsinline></video>
-        <div class="heroLogoFallback" hidden></div>
-        <div class="heroStatic">
-          <span class="tuningText">TUNING ···</span>
-        </div>
-        <div class="scanlines"></div>
-        <div class="osd osdTop">
-          <span class="liveDot">●</span> LIVE
-          <span class="chNum"></span>
-        </div>
-        <div class="osd osdBottom">
-          <div class="osdInfo">
-            <div class="osdName"></div>
-            <div class="osdMeta"></div>
-          </div>
-          <div class="osdActions">
-            <button id="heroWatch">Watch</button>
-            <button id="heroSurf" title="Another random channel">⏭ Surf</button>
-          </div>
-        </div>
-      </div>
-      <aside id="heroSide">
-        <div class="sideTitle">ON NOW</div>
-        <div id="heroSideList"></div>
-      </aside>
-    </div>`;
-  el.querySelector("#heroWatch")!.addEventListener("click", () => {
-    if (hero.ch) openPlayer(hero.ch);
-  });
-  el.querySelector("#heroSurf")!.addEventListener("click", () => void tuneHero());
+    <div class="wallHead">
+      <span class="wallTitle"><span class="liveDot">●</span> THE WALL</span>
+      <span class="wallSub">${WALL_SIZE} live feeds</span>
+      <button id="wallRetune">↻ Retune all</button>
+    </div>
+    <div id="wall"></div>`;
+  const wallEl = el.querySelector<HTMLElement>("#wall")!;
+  for (let i = 0; i < WALL_SIZE; i++) {
+    const cell = document.createElement("div");
+    cell.className = "wallCell";
+    cell.innerHTML = `
+      <video muted autoplay playsinline></video>
+      <div class="heroStatic"><span class="tuningText">TUNING</span></div>
+      <div class="cellLabel"><span class="cellName"></span><span class="cellMeta"></span></div>`;
+    cell.addEventListener("click", () => {
+      const ch = wall[i]!.ch;
+      if (ch) openPlayer(ch);
+    });
+    wall[i]!.el = cell;
+    wallEl.append(cell);
+  }
+  el.querySelector("#wallRetune")!.addEventListener("click", retuneAll);
   return el;
 }
 
@@ -260,54 +268,38 @@ function heroPool(): Channel[] {
   const alive = visible().filter(
     (ch) => ch.logo && ch.streams[0] && state.health.get(ch.streams[0].url) === true
   );
-  if (alive.length >= 12) return alive;
+  if (alive.length >= WALL_SIZE * 3) return alive;
   return visible().filter((ch) => ch.logo && !isDead(ch));
 }
 
-function fillHeroSide(): void {
-  const list = document.getElementById("heroSideList");
-  if (!list) return;
-  list.replaceChildren();
-  const pool = heroPool().filter((ch) => ch !== hero.ch);
-  for (let i = 0; i < 6 && pool.length; i++) {
-    const ch = pool.splice(Math.floor(Math.random() * pool.length), 1)[0]!;
-    const item = document.createElement("button");
-    item.className = "sideItem";
-    item.innerHTML = `
-      <span class="sideLogo"></span>
-      <span class="sideInfo">
-        <span class="sideName">${escapeHtml(ch.name)}</span>
-        <span class="sideMeta">${escapeHtml(chMeta(ch))}</span>
-      </span>`;
-    setLogo(item.querySelector<HTMLElement>(".sideLogo")!, ch);
-    item.addEventListener("click", () => void tuneHero(ch));
-    list.append(item);
-  }
+function wallUsed(): Set<string> {
+  return new Set(wall.map((c) => c.ch?.id).filter((id): id is string => !!id));
 }
 
-async function tuneHero(target?: Channel, retry = false): Promise<void> {
-  const screen = document.getElementById("heroScreen");
-  if (!screen) return;
-  if (!retry) hero.tries = 0;
-  const token = ++hero.token;
-  clearTimeout(hero.watchdog);
-  clearInterval(hero.glow);
+function retuneAll(): void {
+  for (let i = 0; i < WALL_SIZE; i++) void tuneCell(i);
+}
 
-  const pool = heroPool();
-  const ch = target ?? pool[Math.floor(Math.random() * pool.length)];
+async function tuneCell(i: number, retry = false): Promise<void> {
+  const cell = wall[i]!;
+  const el = cell.el;
+  if (!el || !el.isConnected) return;
+  if (!retry) cell.tries = 0;
+  const token = ++cell.token;
+
+  const used = wallUsed();
+  const pool = heroPool().filter((ch) => !used.has(ch.id));
+  const ch = pool[Math.floor(Math.random() * pool.length)];
   if (!ch) return;
-  hero.ch = ch;
-  screen.classList.remove("playing");
-  screen.querySelector(".chNum")!.textContent =
-    `CH ${String(state.channels.indexOf(ch) + 1).padStart(4, "0")}`;
-  screen.querySelector(".osdName")!.textContent = ch.name;
-  screen.querySelector(".osdMeta")!.textContent = chMeta(ch);
-  screen.querySelector<HTMLElement>(".heroLogoFallback")!.hidden = true;
-  hero.hls?.destroy();
-  hero.hls = null;
+  cell.ch = ch;
+  el.classList.remove("playing");
+  el.querySelector(".cellName")!.textContent = ch.name;
+  el.querySelector(".cellMeta")!.textContent = chMeta(ch);
+  cell.hls?.destroy();
+  cell.hls = null;
 
   const url = ch.streams[0]!.url;
-  // verify before tuning in: a black hero is worse than a short static burst
+  // verify before tuning in: static is a state, black is a bug
   if (state.health.get(url) === undefined) {
     try {
       const v = await checkStream(url);
@@ -316,88 +308,44 @@ async function tuneHero(target?: Channel, retry = false): Promise<void> {
       state.health.set(url, false);
     }
   }
-  if (token !== hero.token) return; // user surfed away while we probed
-  if (state.health.get(url) === false) {
-    retune(ch);
+  if (token !== cell.token || !el.isConnected) return;
+  if (state.health.get(url) === false || !Hls.isSupported()) {
+    retuneFailed(i, token);
     return;
   }
 
-  const video = screen.querySelector<HTMLVideoElement>("#heroVideo")!;
-  if (!Hls.isSupported()) {
-    showHeroFallback(ch);
-    return;
-  }
-  hero.hls = new Hls({ maxBufferLength: 10, capLevelToPlayerSize: true });
-  hero.hls.loadSource(`/proxy?url=${encodeURIComponent(url)}`);
-  hero.hls.attachMedia(video);
-  hero.hls.on(Hls.Events.ERROR, (_evt, data) => {
-    if (data.fatal && token === hero.token) retune(ch);
+  const video = el.querySelector<HTMLVideoElement>("video")!;
+  cell.hls = new Hls({ maxBufferLength: 8, capLevelToPlayerSize: true });
+  cell.hls.loadSource(`/proxy?url=${encodeURIComponent(url)}`);
+  cell.hls.attachMedia(video);
+  cell.hls.on(Hls.Events.ERROR, (_evt, data) => {
+    if (data.fatal && token === cell.token) retuneFailed(i, token);
   });
-  // watchdog: if no frames render within 12s, surf on
-  hero.watchdog = window.setTimeout(() => {
-    if (token === hero.token && !screen.classList.contains("playing")) retune(ch);
-  }, 12000);
+  window.setTimeout(() => {
+    if (token === cell.token && !el.classList.contains("playing")) retuneFailed(i, token);
+  }, 15000);
   video.onplaying = () => {
-    if (token !== hero.token) return;
-    screen.classList.add("playing");
-    clearTimeout(hero.watchdog);
-    startGlow(video, screen);
+    if (token === cell.token) el.classList.add("playing");
   };
 }
 
-function retune(failed: Channel): void {
-  hero.hls?.destroy();
-  hero.hls = null;
-  hero.tries++;
-  if (hero.tries < 7) void tuneHero(undefined, true);
-  else showHeroFallback(failed);
-}
-
-// Ambilight: sample the playing frame and glow the screen's shadow with it.
-const glowCanvas = document.createElement("canvas");
-glowCanvas.width = glowCanvas.height = 8;
-
-function startGlow(video: HTMLVideoElement, screen: HTMLElement): void {
-  clearInterval(hero.glow);
-  const ctx = glowCanvas.getContext("2d", { willReadFrequently: true });
-  if (!ctx || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  const sample = () => {
-    try {
-      ctx.drawImage(video, 0, 0, 8, 8);
-      const px = ctx.getImageData(0, 0, 8, 8).data;
-      let r = 0, g = 0, b = 0;
-      for (let i = 0; i < px.length; i += 4) {
-        r += px[i]!; g += px[i + 1]!; b += px[i + 2]!;
-      }
-      const n = px.length / 4;
-      screen.style.boxShadow =
-        `0 0 120px rgba(${Math.round(r / n)}, ${Math.round(g / n)}, ${Math.round(b / n)}, .35),` +
-        ` 0 20px 50px rgba(0, 0, 0, .5)`;
-    } catch {
-      /* canvas tainted or video gone — keep the default glow */
-    }
-  };
-  sample();
-  hero.glow = window.setInterval(sample, 4000);
-}
-
-function showHeroFallback(ch: Channel): void {
-  const screen = document.getElementById("heroScreen");
-  const fallback = screen?.querySelector<HTMLElement>(".heroLogoFallback");
-  if (!screen || !fallback) return;
-  screen.classList.add("playing"); // hide the static overlay
-  fallback.hidden = false;
-  fallback.innerHTML = "";
-  setLogo(fallback, ch);
+function retuneFailed(i: number, token: number): void {
+  const cell = wall[i]!;
+  if (token !== cell.token) return;
+  cell.hls?.destroy();
+  cell.hls = null;
+  cell.tries++;
+  if (cell.tries < 5) void tuneCell(i, true);
 }
 
 function destroyHero(): void {
-  hero.hls?.destroy();
-  hero.hls = null;
-  hero.ch = null;
-  hero.token++;
-  clearTimeout(hero.watchdog);
-  clearInterval(hero.glow);
+  for (const cell of wall) {
+    cell.hls?.destroy();
+    cell.hls = null;
+    cell.ch = null;
+    cell.el = null;
+    cell.token++;
+  }
 }
 
 function rail(
@@ -406,9 +354,9 @@ function rail(
   seeAll: () => void,
   opts: { tagline?: string; linkLabel?: string } = {}
 ): HTMLElement {
-  const pool = [...channels]
-    .sort((a, b) => (b.logo ? 1 : 0) - (a.logo ? 1 : 0) || rank(a) - rank(b))
-    .slice(0, 25);
+  const sorted = [...channels]
+    .sort((a, b) => (b.logo ? 1 : 0) - (a.logo ? 1 : 0) || rank(a) - rank(b));
+  const pool = sorted.slice(0, 25);
   const el = document.createElement("section");
   el.className = "rail";
   const head = document.createElement("div");
@@ -423,7 +371,7 @@ function rail(
   el.append(head);
   const scroller = document.createElement("div");
   scroller.className = "railScroll";
-  for (const ch of pool) scroller.append(card(ch));
+  for (const ch of pool) scroller.append(card(ch, sorted));
   el.append(scroller);
   return el;
 }

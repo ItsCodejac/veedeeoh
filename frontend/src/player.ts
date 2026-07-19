@@ -61,8 +61,42 @@ function startCaptions(): void {
   };
 }
 
-export function openPlayer(ch: Channel, streamIdx = 0): void {
+// The list we zap through with prev/next — whatever context the channel was
+// opened from (a rail's collection, search results, a filtered grid).
+let zapContext: Channel[] = [];
+
+function neighbors(ch: Channel): { prev: Channel | null; next: Channel | null } {
+  const pool = zapContext.length > 1 ? zapContext : [];
+  const idx = pool.findIndex((c) => c.id === ch.id);
+  if (idx === -1) return { prev: null, next: null };
+  return {
+    prev: pool[(idx - 1 + pool.length) % pool.length] ?? null,
+    next: pool[(idx + 1) % pool.length] ?? null,
+  };
+}
+
+function updateZapButtons(ch: Channel): void {
+  const { prev, next } = neighbors(ch);
+  const prevBtn = $<HTMLButtonElement>("pPrev");
+  const nextBtn = $<HTMLButtonElement>("pNext");
+  prevBtn.hidden = !prev;
+  nextBtn.hidden = !next;
+  if (prev) prevBtn.querySelector(".zapName")!.textContent = prev.name;
+  if (next) nextBtn.querySelector(".zapName")!.textContent = next.name;
+}
+
+function zap(dir: -1 | 1): void {
+  if (!state.current) return;
+  const { prev, next } = neighbors(state.current);
+  const target = dir === -1 ? prev : next;
+  if (target) openPlayer(target, 0, zapContext);
+}
+
+export function openPlayer(ch: Channel, streamIdx = 0, context?: Channel[]): void {
+  if (context) zapContext = context;
+  else if (!zapContext.some((c) => c.id === ch.id)) zapContext = [];
   state.current = ch;
+  updateZapButtons(ch);
   $("playerOverlay").hidden = false;
   $("pName").textContent = ch.name;
   $("pMeta").textContent = chMeta(ch);
@@ -133,8 +167,14 @@ export function wirePlayer(): void {
     if (e.target === $("playerOverlay")) closePlayer();
   });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !$("playerOverlay").hidden) closePlayer();
+    if ($("playerOverlay").hidden) return;
+    if (e.key === "Escape") closePlayer();
+    else if (e.key === "ArrowLeft") zap(-1);
+    else if (e.key === "ArrowRight") zap(1);
   });
+
+  $("pPrev").addEventListener("click", () => zap(-1));
+  $("pNext").addEventListener("click", () => zap(1));
 
   $<HTMLSelectElement>("pStreams").addEventListener("change", (e) => {
     const idx = Number((e.target as HTMLSelectElement).value);
