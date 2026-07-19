@@ -11,6 +11,7 @@ dependencies = [
     "fastapi>=0.139.2",
     "faster-whisper>=1.2.1",
     "httpx>=0.28.1",
+    "pillow>=12.3.0",
     "platformdirs>=4.10.1",
     "uvicorn[standard]>=0.51.0",
 ]

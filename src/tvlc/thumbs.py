@@ -23,8 +23,37 @@ def _path(url: str) -> Path:
     return THUMB_DIR / f"{hashlib.sha1(url.encode()).hexdigest()}.jpg"
 
 
-async def grab(url: str) -> bytes | None:
-    """Return a JPEG frame for the stream, from cache when fresh."""
+def is_pluto_url(url: str) -> bool:
+    return "jmp2.uk/plu-" in url or "pluto.tv" in url
+
+
+def looks_like_pluto_bumper(jpeg: bytes) -> bool:
+    """Detect Pluto's geo-block loop: a mostly black frame with the yellow logo."""
+    import io
+
+    from PIL import Image
+
+    try:
+        img = Image.open(io.BytesIO(jpeg)).convert("RGB").resize((64, 36))
+    except OSError:
+        return False
+    pixels = list(img.getdata())
+    black = sum(1 for r, g, b in pixels if max(r, g, b) < 45)
+    yellow = sum(1 for r, g, b in pixels if r > 190 and g > 170 and b < 120)
+    n = len(pixels)
+    return black / n > 0.55 and 0.004 < yellow / n < 0.35
+
+
+async def grab(url: str) -> tuple[bytes | None, bool]:
+    """Return (JPEG frame or None, is_geo_block_bumper) for the stream."""
+    frame = await _grab_frame(url)
+    if frame and is_pluto_url(url) and looks_like_pluto_bumper(frame):
+        _negative[url] = time.time()
+        return None, True
+    return frame, False
+
+
+async def _grab_frame(url: str) -> bytes | None:
     path = _path(url)
     stale: bytes | None = None
     if path.exists():

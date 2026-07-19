@@ -148,3 +148,26 @@ https://jmp2.uk/stvp-USNEWS
     news = next(c for c in cat["channels"] if c["id"] == "News.us")
     assert [s["source"] for s in news["streams"]] == ["iptv-org", "iptv-org", "Samsung TV Plus"]
     assert news["streams"][-1]["url"] == "https://jmp2.uk/stvp-USNEWS"
+
+
+def test_pluto_bumper_detection():
+    import io
+
+    from PIL import Image
+
+    from tvlc.thumbs import is_pluto_url, looks_like_pluto_bumper
+
+    def jpeg(draw_yellow: bool) -> bytes:
+        img = Image.new("RGB", (480, 270), (5, 5, 5))
+        if draw_yellow:
+            for x in range(200, 280):
+                for y in range(100, 170):
+                    img.putpixel((x, y), (255, 224, 0))
+        buf = io.BytesIO()
+        img.save(buf, "JPEG")
+        return buf.getvalue()
+
+    assert looks_like_pluto_bumper(jpeg(draw_yellow=True))
+    assert not looks_like_pluto_bumper(jpeg(draw_yellow=False))  # plain black frame
+    assert is_pluto_url("https://jmp2.uk/plu-abc123")
+    assert not is_pluto_url("https://example.com/live.m3u8")

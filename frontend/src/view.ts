@@ -265,11 +265,17 @@ function buildWall(): HTMLElement {
 }
 
 function heroPool(): Channel[] {
-  const alive = visible().filter(
-    (ch) => ch.logo && ch.streams[0] && state.health.get(ch.streams[0].url) === true
-  );
+  // foreign Pluto streams are usually a geo-blocked logo loop, not content
+  const home = homeCountry();
+  const eligible = visible().filter((ch) => {
+    const url = ch.streams[0]?.url;
+    if (!ch.logo || !url) return false;
+    if (url.includes("jmp2.uk/plu-") && ch.country !== home) return false;
+    return true;
+  });
+  const alive = eligible.filter((ch) => state.health.get(ch.streams[0]!.url) === true);
   if (alive.length >= WALL_SIZE * 3) return alive;
-  return visible().filter((ch) => ch.logo && !isDead(ch));
+  return eligible.filter((ch) => !isDead(ch));
 }
 
 function wallUsed(): Set<string> {

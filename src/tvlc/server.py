@@ -153,7 +153,11 @@ async def thumb(url: str = Query(...)) -> Response:
         raise HTTPException(400, "bad url")
     if not captions.ffmpeg_available():
         raise HTTPException(404, "ffmpeg not available")
-    data = await thumbs.grab(url)
+    data, bumper = await thumbs.grab(url)
+    if bumper:
+        # geo-blocked Pluto loop: alive at the transport level, dead as content
+        app.state.health.set(url, False)
+        raise HTTPException(404, "geo-block bumper")
     if not data:
         raise HTTPException(404, "no frame")
     return Response(
