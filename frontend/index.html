@@ -34,11 +34,15 @@
       </div>
       <button id="pClose" title="Close">✕</button>
     </div>
-    <video id="video" controls autoplay playsinline></video>
+    <div id="videoWrap">
+      <video id="video" controls autoplay playsinline></video>
+      <div id="pCaptions" hidden></div>
+    </div>
     <div id="pStatus"></div>
     <div id="playerActions">
       <button id="pVlc">▶ Open in VLC</button>
       <button id="pFav">★ Favorite</button>
+      <button id="pCc" title="Live captions (local Whisper)">CC</button>
       <select id="pStreams" hidden></select>
     </div>
   </div>

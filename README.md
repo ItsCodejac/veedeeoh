@@ -18,6 +18,11 @@ instant in-page previews, with **VLC one click away** for proper watching.
 - ⤓ **Export M3U** — download whatever your current filters show as a clean playlist with
   `group-title` folders and logos, ready for plain VLC or any IPTV app; or subscribe
   directly to e.g. `http://localhost:8321/playlist.m3u?favorites=true&alive=true`
+- 💬 **Live captions & translation** — a CC button in the player runs the stream's audio
+  through a local Whisper model ([faster-whisper](https://github.com/SYSTRAN/faster-whisper)):
+  one click for original-language captions, another for live translation to English.
+  Needs `ffmpeg` (`brew install ffmpeg`); the model (~500 MB) downloads on first use.
+  Set `TVLC_WHISPER_MODEL` (`tiny`/`base`/`small`/`medium`) to trade accuracy for speed.
 - 🔞 NSFW channels hidden by default
 
 ## Run it

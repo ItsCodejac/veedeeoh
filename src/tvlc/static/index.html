@@ -7,8 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
-  <script type="module" crossorigin src="/assets/index-BgbmMkpd.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-E1zHmMKP.css">
+  <script type="module" crossorigin src="/assets/index-DQDakd65.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-CTrifFwt.css">
 </head>
 <body>
 <header>
@@ -36,11 +36,15 @@
       </div>
       <button id="pClose" title="Close">✕</button>
     </div>
-    <video id="video" controls autoplay playsinline></video>
+    <div id="videoWrap">
+      <video id="video" controls autoplay playsinline></video>
+      <div id="pCaptions" hidden></div>
+    </div>
     <div id="pStatus"></div>
     <div id="playerActions">
       <button id="pVlc">▶ Open in VLC</button>
       <button id="pFav">★ Favorite</button>
+      <button id="pCc" title="Live captions (local Whisper)">CC</button>
       <select id="pStreams" hidden></select>
     </div>
   </div>

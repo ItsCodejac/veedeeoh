@@ -9,12 +9,12 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import httpx
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.responses import PlainTextResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import catalog, health, m3u, proxy
+from . import captions, catalog, health, m3u, proxy
 from .store import Favorites, HealthCache
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -117,6 +117,33 @@ async def open_in_vlc(body: UrlBody) -> dict:
     except OSError as exc:
         raise HTTPException(500, f"could not launch VLC: {exc}") from exc
     return {"ok": True}
+
+
+@app.websocket("/ws/captions")
+async def captions_ws(ws: WebSocket, url: str, translate: bool = False) -> None:
+    """Stream live Whisper captions for a stream url as JSON messages."""
+    await ws.accept()
+    if not url.startswith(("http://", "https://")):
+        await ws.close(code=4000, reason="bad url")
+        return
+    if not captions.ffmpeg_available():
+        await ws.send_json({"error": "ffmpeg not found — install it (brew install ffmpeg)"})
+        await ws.close()
+        return
+    try:
+        await ws.send_json({"status": "loading model"})
+        async for seg in captions.caption_stream(url, translate):
+            await ws.send_json(seg)
+        await ws.send_json({"error": "stream audio ended"})
+        await ws.close()
+    except WebSocketDisconnect:
+        pass
+    except Exception as exc:  # noqa: BLE001 - report all failures to the client
+        try:
+            await ws.send_json({"error": f"captions failed: {exc}"})
+            await ws.close()
+        except RuntimeError:
+            pass
 
 
 @app.get("/logo")

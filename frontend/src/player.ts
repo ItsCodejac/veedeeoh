@@ -6,6 +6,61 @@ import { $ } from "./util";
 
 let hls: Hls | null = null;
 
+// ---- live captions: off -> original language -> translate to English ----
+type CcMode = "off" | "cc" | "en";
+let ccMode: CcMode = "off";
+let ccSocket: WebSocket | null = null;
+let ccUrl: string | null = null;
+
+function ccLabel(): string {
+  return ccMode === "off" ? "CC" : ccMode === "cc" ? "CC ●" : "CC→EN ●";
+}
+
+function cycleCc(): void {
+  ccMode = ccMode === "off" ? "cc" : ccMode === "cc" ? "en" : "off";
+  $("pCc").textContent = ccLabel();
+  $("pCc").classList.toggle("on", ccMode !== "off");
+  startCaptions();
+}
+
+function stopCaptions(): void {
+  ccSocket?.close();
+  ccSocket = null;
+  const box = $("pCaptions");
+  box.hidden = true;
+  box.textContent = "";
+}
+
+function startCaptions(): void {
+  stopCaptions();
+  if (ccMode === "off" || !ccUrl) return;
+  const box = $("pCaptions");
+  box.hidden = false;
+  box.textContent = "· · ·";
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  const ws = new WebSocket(
+    `${proto}://${location.host}/ws/captions?url=${encodeURIComponent(ccUrl)}` +
+      (ccMode === "en" ? "&translate=true" : "")
+  );
+  ccSocket = ws;
+  const lines: string[] = [];
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data) as { text?: string; error?: string; status?: string };
+    if (msg.status) {
+      box.textContent = "· · · (loading speech model)";
+    } else if (msg.error) {
+      box.textContent = `⚠ ${msg.error}`;
+    } else if (msg.text) {
+      lines.push(msg.text);
+      while (lines.length > 2) lines.shift();
+      box.textContent = lines.join(" ");
+    }
+  };
+  ws.onerror = () => {
+    if (ccSocket === ws) box.textContent = "⚠ caption connection failed";
+  };
+}
+
 export function openPlayer(ch: Channel, streamIdx = 0): void {
   state.current = ch;
   $("playerOverlay").hidden = false;
@@ -33,6 +88,8 @@ function play(url: string): void {
   const video = $<HTMLVideoElement>("video");
   const status = $("pStatus");
   stopPlayback();
+  ccUrl = url;
+  startCaptions();
   status.textContent = "Loading stream…";
   const src = `/proxy?url=${encodeURIComponent(url)}`;
   if (Hls.isSupported()) {
@@ -57,6 +114,8 @@ function stopPlayback(): void {
   const video = $<HTMLVideoElement>("video");
   hls?.destroy();
   hls = null;
+  stopCaptions();
+  ccUrl = null;
   video.pause();
   video.removeAttribute("src");
   video.load();
@@ -90,6 +149,8 @@ export function wirePlayer(): void {
     void openInVlc(ch.streams[idx]!.url);
     $("pStatus").textContent = "Sent to VLC 📡";
   });
+
+  $("pCc").addEventListener("click", cycleCc);
 
   $("pFav").addEventListener("click", async (e) => {
     const ch = state.current;
