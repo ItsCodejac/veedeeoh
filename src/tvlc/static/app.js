@@ -14,6 +14,15 @@ const BATCH = 120;
 const $ = (id) => document.getElementById(id);
 const grid = $("grid");
 const countryNames = new Map();
+const categoryNames = new Map();
+
+function chMeta(ch) {
+  return [
+    countryNames.get(ch.country) || ch.country,
+    ...ch.categories.map((c) => categoryNames.get(c) || c),
+    ch.source !== "iptv-org" ? ch.source : null,
+  ].filter(Boolean).join(" · ");
+}
 
 async function boot() {
   const res = await fetch("/api/catalog");
@@ -29,6 +38,7 @@ async function boot() {
     $("country").append(new Option(`${c.flag} ${c.name}`, c.code));
   }
   for (const c of state.categories) {
+    categoryNames.set(c.id, c.name);
     $("category").append(new Option(c.name, c.id));
   }
   applyFilters();
@@ -159,7 +169,7 @@ function card(ch) {
   const logo = ch.logo
     ? `<img loading="lazy" src="${ch.logo}" onerror="this.outerHTML='<div class=noLogo>📺</div>'">`
     : `<div class="noLogo">📺</div>`;
-  const meta = [countryNames.get(ch.country) || ch.country, ...ch.categories].filter(Boolean).join(" · ");
+  const meta = chMeta(ch);
   el.innerHTML = `
     <div class="dot ${health === true ? "alive" : health === false ? "dead" : ""}"></div>
     <button class="star ${state.favorites.has(ch.id) ? "on" : ""}" title="Favorite">★</button>
@@ -247,7 +257,7 @@ function openPlayer(ch, streamIdx = 0) {
   state.current = ch;
   $("playerOverlay").hidden = false;
   $("pName").textContent = ch.name;
-  $("pMeta").textContent = [countryNames.get(ch.country) || ch.country, ...ch.categories].filter(Boolean).join(" · ");
+  $("pMeta").textContent = chMeta(ch);
   $("pLogo").src = ch.logo || "";
   $("pLogo").hidden = !ch.logo;
   $("pFav").classList.toggle("on", state.favorites.has(ch.id));

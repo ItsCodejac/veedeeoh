@@ -10,6 +10,8 @@ from typing import Any
 import httpx
 from platformdirs import user_cache_dir
 
+from . import sources
+
 API_BASE = "https://iptv-org.github.io/api"
 DATASETS = ("channels", "streams", "logos", "countries", "categories")
 CACHE_DIR = Path(user_cache_dir("tvlc"))
@@ -29,9 +31,30 @@ async def fetch_dataset(name: str, client: httpx.AsyncClient) -> list[dict]:
     return data
 
 
-async def load_raw() -> dict[str, list[dict]]:
+async def fetch_text(name: str, url: str, client: httpx.AsyncClient) -> str:
+    """Fetch a text file with the same cache policy as the API datasets."""
+    cache_file = CACHE_DIR / name
+    if cache_file.exists() and time.time() - cache_file.stat().st_mtime < CACHE_TTL:
+        return cache_file.read_text()
+    resp = await client.get(url, timeout=60)
+    resp.raise_for_status()
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    cache_file.write_text(resp.text)
+    return resp.text
+
+
+async def load_raw() -> dict[str, Any]:
     async with httpx.AsyncClient(follow_redirects=True) as client:
-        return {name: await fetch_dataset(name, client) for name in DATASETS}
+        raw: dict[str, Any] = {name: await fetch_dataset(name, client) for name in DATASETS}
+        extras = []
+        for source in sources.SOURCES:
+            try:
+                text = await fetch_text(f"source_{source['key']}.m3u", source["url"], client)
+                extras.append((source, sources.parse_m3u(text)))
+            except (httpx.HTTPError, OSError):
+                continue  # a broken extra source shouldn't take the app down
+        raw["extras"] = extras
+        return raw
 
 
 def build_catalog(raw: dict[str, list[dict]]) -> dict[str, Any]:
@@ -66,8 +89,20 @@ def build_catalog(raw: dict[str, list[dict]]) -> dict[str, Any]:
                 "nsfw": bool(ch.get("is_nsfw")),
                 "logo": logo_by_channel.get(ch["id"]),
                 "streams": streams,
+                "source": "iptv-org",
             }
         )
+
+    extra_category_names: dict[str, str] = {}
+    seen_urls = {s["url"] for c in channels for s in c["streams"]}
+    for source, entries in raw.get("extras", []):
+        extra_category_names.update(sources.category_names(entries))
+        for ch in sources.to_channels(source, entries):
+            if ch["streams"][0]["url"] in seen_urls:
+                continue
+            seen_urls.add(ch["streams"][0]["url"])
+            channels.append(ch)
+
     channels.sort(key=lambda c: c["name"].lower())
 
     used_countries = {c["country"] for c in channels}
@@ -79,11 +114,22 @@ def build_catalog(raw: dict[str, list[dict]]) -> dict[str, Any]:
             for c in sorted(raw["countries"], key=lambda c: c["name"])
             if c["code"] in used_countries
         ],
-        "categories": [
-            {"id": c["id"], "name": c["name"]}
-            for c in sorted(raw["categories"], key=lambda c: c["name"])
-            if c["id"] in used_categories
-        ],
+        "categories": sorted(
+            (
+                [
+                    {"id": c["id"], "name": c["name"]}
+                    for c in raw["categories"]
+                    if c["id"] in used_categories
+                ]
+                + [
+                    {"id": slug, "name": name}
+                    for slug, name in extra_category_names.items()
+                    if slug in used_categories
+                    and slug not in {c["id"] for c in raw["categories"]}
+                ]
+            ),
+            key=lambda c: c["name"],
+        ),
     }
 
 

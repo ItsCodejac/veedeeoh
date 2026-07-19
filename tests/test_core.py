@@ -92,3 +92,42 @@ def test_rewrite_m3u8():
     assert '/proxy?url=https%3A%2F%2Fother.host%2Fseg2.ts' in out
     assert 'URI="/proxy?url=https%3A%2F%2Fcdn.example%2Flive%2Fkey.bin"' in out
     assert out.splitlines()[0] == "#EXTM3U"
+
+
+SAMSUNG_M3U = """#EXTM3U
+#EXTINF:-1 channel-id="US1" tvg-id="US1" tvg-logo="http://s/a.png" group-title="Anime & Gaming",Anime All Day
+https://jmp2.uk/stvp-US1
+#EXTINF:-1 tvg-id="US2" group-title="News",Dupe News
+http://x/news.m3u8
+#EXTINF:-1 group-title="Anime & Gaming",No Id Channel
+https://jmp2.uk/stvp-US3
+"""
+
+
+def test_parse_m3u():
+    from tvlc.sources import parse_m3u
+
+    entries = parse_m3u(SAMSUNG_M3U)
+    assert len(entries) == 3
+    assert entries[0] == {
+        "name": "Anime All Day",
+        "tvg_id": "US1",
+        "logo": "http://s/a.png",
+        "group": "Anime & Gaming",
+        "url": "https://jmp2.uk/stvp-US1",
+    }
+
+
+def test_extras_merge_and_dedup():
+    from tvlc.sources import parse_m3u
+
+    source = {"key": "samsung", "label": "Samsung TV Plus", "country": "US"}
+    raw = {**RAW, "extras": [(source, parse_m3u(SAMSUNG_M3U))]}
+    cat = build_catalog(raw)
+    ids = [c["id"] for c in cat["channels"]]
+    # "Dupe News" shares a stream url with News.us and is dropped
+    assert ids == ["samsung:US1", "News.us", "samsung:no-id-channel", "Spice.fr"]
+    anime = next(c for c in cat["channels"] if c["id"] == "samsung:US1")
+    assert anime["categories"] == ["anime-gaming"]
+    assert anime["source"] == "Samsung TV Plus"
+    assert {"id": "anime-gaming", "name": "Anime & Gaming"} in cat["categories"]
