@@ -166,16 +166,13 @@ function card(ch) {
   const health = state.health.get(ch.streams[0].url);
   if (health === false) el.classList.add("dead");
 
-  const logo = ch.logo
-    ? `<img loading="lazy" src="${ch.logo}" onerror="this.outerHTML='<div class=noLogo>📺</div>'">`
-    : `<div class="noLogo">📺</div>`;
-  const meta = chMeta(ch);
   el.innerHTML = `
     <div class="dot ${health === true ? "alive" : health === false ? "dead" : ""}"></div>
     <button class="star ${state.favorites.has(ch.id) ? "on" : ""}" title="Favorite">★</button>
-    <div class="logoBox">${logo}</div>
+    <div class="logoBox"></div>
     <div class="cname">${escapeHtml(ch.name)}</div>
-    <div class="cmeta">${escapeHtml(meta)}</div>`;
+    <div class="cmeta">${escapeHtml(chMeta(ch))}</div>`;
+  setLogo(el.querySelector(".logoBox"), ch);
 
   el.querySelector(".star").addEventListener("click", (e) => {
     e.stopPropagation();
@@ -184,6 +181,27 @@ function card(ch) {
   el.addEventListener("click", () => openPlayer(ch));
   healthObserver.observe(el);
   return el;
+}
+
+// Try each logo url directly, then through the /logo proxy (dodges
+// hotlink blocking), before giving up on the 📺 placeholder.
+function setLogo(box, ch) {
+  const candidates = (ch.logos || []).flatMap((u) => [u, `/logo?url=${encodeURIComponent(u)}`]);
+  if (!candidates.length) {
+    box.innerHTML = '<div class="noLogo">📺</div>';
+    return;
+  }
+  const img = document.createElement("img");
+  img.loading = "lazy";
+  img.alt = "";
+  let i = 0;
+  img.onerror = () => {
+    i++;
+    if (i < candidates.length) img.src = candidates[i];
+    else box.innerHTML = '<div class="noLogo">📺</div>';
+  };
+  img.src = candidates[0];
+  box.append(img);
 }
 
 function escapeHtml(s) {
@@ -260,6 +278,7 @@ function openPlayer(ch, streamIdx = 0) {
   $("pMeta").textContent = chMeta(ch);
   $("pLogo").src = ch.logo || "";
   $("pLogo").hidden = !ch.logo;
+  $("pLogo").onerror = () => ($("pLogo").hidden = true);
   $("pFav").classList.toggle("on", state.favorites.has(ch.id));
 
   const sel = $("pStreams");

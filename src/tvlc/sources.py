@@ -61,6 +61,7 @@ def to_channels(source: dict, entries: list[dict]) -> list[dict]:
                 "categories": [slugify(e["group"])] if e.get("group") else [],
                 "nsfw": False,
                 "logo": e.get("logo"),
+                "logos": [e["logo"]] if e.get("logo") else [],
                 "streams": [{"url": e["url"], "quality": None, "source": source["label"]}],
                 "source": source["label"],
             }

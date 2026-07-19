@@ -119,6 +119,26 @@ async def open_in_vlc(body: UrlBody) -> dict:
     return {"ok": True}
 
 
+@app.get("/logo")
+async def logo(url: str = Query(...)) -> Response:
+    """Fetch a channel logo server-side to dodge hotlink/referrer blocking."""
+    if not url.startswith(("http://", "https://")):
+        raise HTTPException(400, "bad url")
+    client: httpx.AsyncClient = app.state.client
+    try:
+        resp = await client.get(url, headers={"User-Agent": health.UA}, timeout=15)
+    except httpx.HTTPError as exc:
+        raise HTTPException(502, f"upstream error: {exc}") from exc
+    content_type = resp.headers.get("content-type", "")
+    if resp.status_code >= 400 or not content_type.startswith("image/"):
+        raise HTTPException(404, "no image there")
+    return Response(
+        resp.content,
+        media_type=content_type,
+        headers={"Cache-Control": "public, max-age=604800"},
+    )
+
+
 @app.get("/proxy")
 async def proxy_stream(url: str = Query(...)):
     if not url.startswith(("http://", "https://")):

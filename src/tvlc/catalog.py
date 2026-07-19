@@ -67,11 +67,13 @@ def build_catalog(raw: dict[str, list[dict]]) -> dict[str, Any]:
                 {"url": s["url"], "quality": s.get("quality"), "source": "iptv-org"}
             )
 
-    logo_by_channel: dict[str, str] = {}
+    logos_by_channel: dict[str, list[str]] = {}
     for logo in raw["logos"]:
         cid = logo.get("channel")
-        if cid and cid not in logo_by_channel:
-            logo_by_channel[cid] = logo["url"]
+        if cid and logo["url"] not in logos_by_channel.get(cid, ()):
+            logos_by_channel.setdefault(cid, []).append(logo["url"])
+    for urls in logos_by_channel.values():
+        urls.sort(key=lambda u: not u.startswith("https://"))  # https first
 
     channels = []
     for ch in raw["channels"]:
@@ -87,7 +89,8 @@ def build_catalog(raw: dict[str, list[dict]]) -> dict[str, Any]:
                 "country": ch.get("country"),
                 "categories": ch.get("categories") or [],
                 "nsfw": bool(ch.get("is_nsfw")),
-                "logo": logo_by_channel.get(ch["id"]),
+                "logo": (logos_by_channel.get(ch["id"]) or [None])[0],
+                "logos": logos_by_channel.get(ch["id"], []),
                 "streams": streams,
                 "source": "iptv-org",
             }
@@ -111,6 +114,7 @@ def build_catalog(raw: dict[str, list[dict]]) -> dict[str, Any]:
                 # same channel on another provider: expose it as an extra stream
                 target["streams"].extend(ch["streams"])
                 target["logo"] = target["logo"] or ch["logo"]
+                target["logos"] += [u for u in ch["logos"] if u not in target["logos"]]
                 target["categories"] = sorted({*target["categories"], *ch["categories"]})
             else:
                 by_name.setdefault(sources.normalize_name(ch["name"]), []).append(ch)
