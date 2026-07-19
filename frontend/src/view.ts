@@ -2,7 +2,7 @@ import Hls from "hls.js";
 import { checkStream } from "./api";
 import { card, setLogo } from "./cards";
 import { openPlayer } from "./player";
-import { categoryNames, chMeta, filters, isDead, rank, state, visible } from "./state";
+import { categoryNames, chMeta, countryNames, filters, isDead, rank, state, visible } from "./state";
 import type { Channel } from "./types";
 import { $, escapeHtml } from "./util";
 
@@ -59,6 +59,17 @@ export function goHome(): void {
   applyFilters();
 }
 
+/** Country inferred from the browser locale (e.g. "en-US" -> "US"). Private:
+ * no geolocation permission, no external lookups. */
+function homeCountry(): string | null {
+  try {
+    const region = new Intl.Locale(navigator.language).maximize().region;
+    return region && state.countries.some((c) => c.code === region) ? region : null;
+  } catch {
+    return null;
+  }
+}
+
 // ---- explore home: turn the TV on, then offer rails to surf ----
 const RAIL_CATEGORIES = [
   "news", "sports", "movies", "music", "kids", "animation",
@@ -103,6 +114,17 @@ function renderExplore(): void {
     }
     if (ch.country) countryCounts.set(ch.country, (countryCounts.get(ch.country) || 0) + 1);
   }
+
+  // "Near you": inferred from the browser locale — no geolocation, no lookups
+  const home = homeCountry();
+  if (home) {
+    const local = all.filter((ch) => ch.country === home);
+    if (local.length >= 8) {
+      const name = countryNames.get(home) || home;
+      grid().append(rail(`📍 ${name}`, local, () => setFilter("country", home)));
+    }
+  }
+
   for (const id of RAIL_CATEGORIES) {
     const chans = byCat.get(id);
     if (chans && chans.length >= 8) {
@@ -119,7 +141,11 @@ function renderExplore(): void {
   const chipRow = document.createElement("div");
   chipRow.className = "chipRow";
   const top = [...state.countries]
-    .sort((a, b) => (countryCounts.get(b.code) || 0) - (countryCounts.get(a.code) || 0))
+    .sort(
+      (a, b) =>
+        Number(b.code === home) - Number(a.code === home) ||
+        (countryCounts.get(b.code) || 0) - (countryCounts.get(a.code) || 0)
+    )
     .slice(0, 21);
   for (const c of top) {
     const chip = document.createElement("button");
