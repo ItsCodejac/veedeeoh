@@ -50,11 +50,18 @@ function filters() {
     country: $("country").value,
     category: $("category").value,
     favorites: $("favToggle").classList.contains("active"),
+    hideDead: $("hideDead").classList.contains("active"),
   };
 }
 
 function visible() {
   return state.channels.filter((ch) => !ch.nsfw);
+}
+
+function isDead(ch) {
+  // dead only when every stream we've checked failed (and we checked at least one)
+  const verdicts = ch.streams.map((s) => state.health.get(s.url)).filter((v) => v !== undefined);
+  return verdicts.length > 0 && verdicts.every((v) => v === false);
 }
 
 function applyFilters() {
@@ -63,16 +70,22 @@ function applyFilters() {
     renderExplore();
     return;
   }
+  let hiddenDead = 0;
   state.filtered = visible().filter((ch) => {
     if (f.country && ch.country !== f.country) return false;
     if (f.category && !ch.categories.includes(f.category)) return false;
     if (f.q && !ch.name.toLowerCase().includes(f.q)) return false;
     if (f.favorites && !state.favorites.has(ch.id)) return false;
+    if (f.hideDead && isDead(ch)) {
+      hiddenDead++;
+      return false;
+    }
     return true;
   });
   // known-dead channels sink to the bottom, favorites float to the top
   state.filtered.sort((a, b) => rank(a) - rank(b));
-  $("stats").textContent = `${state.filtered.length.toLocaleString()} channels`;
+  $("stats").textContent = `${state.filtered.length.toLocaleString()} channels` +
+    (hiddenDead ? ` (${hiddenDead.toLocaleString()} dead hidden)` : "");
   grid.replaceChildren();
   state.rendered = 0;
   renderMore();
@@ -149,7 +162,7 @@ function goHome() {
 function rank(ch) {
   let r = 0;
   if (state.favorites.has(ch.id)) r -= 2;
-  if (state.health.get(ch.streams[0].url) === false) r += 4;
+  if (isDead(ch)) r += 4;
   return r;
 }
 
@@ -164,7 +177,7 @@ function card(ch) {
   el.className = "card";
   el.dataset.id = ch.id;
   const health = state.health.get(ch.streams[0].url);
-  if (health === false) el.classList.add("dead");
+  if (isDead(ch)) el.classList.add("dead");
 
   el.innerHTML = `
     <div class="dot ${health === true ? "alive" : health === false ? "dead" : ""}"></div>
@@ -376,6 +389,12 @@ $("favToggle").addEventListener("click", (e) => {
   e.target.classList.toggle("active");
   applyFilters();
 });
+$("hideDead").addEventListener("click", (e) => {
+  const on = e.target.classList.toggle("active");
+  localStorage.setItem("tvlc.hideDead", on ? "1" : "");
+  applyFilters();
+});
+if (localStorage.getItem("tvlc.hideDead")) $("hideDead").classList.add("active");
 $("home").addEventListener("click", goHome);
 
 $("surprise").addEventListener("click", () => {
