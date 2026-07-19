@@ -40,14 +40,20 @@ function filters() {
     country: $("country").value,
     category: $("category").value,
     favorites: $("favToggle").classList.contains("active"),
-    nsfw: $("nsfw").checked,
   };
+}
+
+function visible() {
+  return state.channels.filter((ch) => !ch.nsfw);
 }
 
 function applyFilters() {
   const f = filters();
-  state.filtered = state.channels.filter((ch) => {
-    if (!f.nsfw && ch.nsfw) return false;
+  if (!f.q && !f.country && !f.category && !f.favorites) {
+    renderExplore();
+    return;
+  }
+  state.filtered = visible().filter((ch) => {
     if (f.country && ch.country !== f.country) return false;
     if (f.category && !ch.categories.includes(f.category)) return false;
     if (f.q && !ch.name.toLowerCase().includes(f.q)) return false;
@@ -60,6 +66,74 @@ function applyFilters() {
   grid.replaceChildren();
   state.rendered = 0;
   renderMore();
+}
+
+// ---- explore home: show what exists before making anyone type ----
+function renderExplore() {
+  const all = visible();
+  state.filtered = [];
+  state.rendered = 0;
+  grid.replaceChildren();
+  $("stats").textContent =
+    `${all.length.toLocaleString()} channels — pick a category or country, or just search`;
+
+  const favs = all.filter((ch) => state.favorites.has(ch.id));
+  if (favs.length) {
+    grid.append(sectionHead(`★ Your favorites (${favs.length})`));
+    for (const ch of favs) grid.append(card(ch));
+  }
+
+  const catCounts = new Map();
+  const countryCounts = new Map();
+  for (const ch of all) {
+    for (const c of ch.categories) catCounts.set(c, (catCounts.get(c) || 0) + 1);
+    if (ch.country) countryCounts.set(ch.country, (countryCounts.get(ch.country) || 0) + 1);
+  }
+
+  grid.append(sectionHead("Browse by category"));
+  for (const cat of state.categories) {
+    const n = catCounts.get(cat.id);
+    if (n) grid.append(tile(cat.name, n, () => setFilter("category", cat.id)));
+  }
+
+  grid.append(sectionHead("Browse by country"));
+  const byCount = [...state.countries].sort(
+    (a, b) => (countryCounts.get(b.code) || 0) - (countryCounts.get(a.code) || 0)
+  );
+  for (const c of byCount) {
+    const n = countryCounts.get(c.code);
+    if (n) grid.append(tile(`${c.flag} ${c.name}`, n, () => setFilter("country", c.code)));
+  }
+}
+
+function sectionHead(text) {
+  const el = document.createElement("div");
+  el.className = "sectionHead";
+  el.textContent = text;
+  return el;
+}
+
+function tile(label, count, onClick) {
+  const el = document.createElement("button");
+  el.className = "tile";
+  el.innerHTML = `<span class="tlabel">${escapeHtml(label)}</span><span class="tcount">${count.toLocaleString()}</span>`;
+  el.addEventListener("click", onClick);
+  return el;
+}
+
+function setFilter(kind, value) {
+  $(kind).value = value;
+  window.scrollTo(0, 0);
+  applyFilters();
+}
+
+function goHome() {
+  $("search").value = "";
+  $("country").value = "";
+  $("category").value = "";
+  $("favToggle").classList.remove("active");
+  window.scrollTo(0, 0);
+  applyFilters();
 }
 
 function rank(ch) {
@@ -267,16 +341,16 @@ $("search").addEventListener("input", () => {
 });
 $("country").addEventListener("change", applyFilters);
 $("category").addEventListener("change", applyFilters);
-$("nsfw").addEventListener("change", applyFilters);
 $("favToggle").addEventListener("click", (e) => {
   e.target.classList.toggle("active");
   applyFilters();
 });
+$("home").addEventListener("click", goHome);
 
 $("surprise").addEventListener("click", () => {
-  if (!state.filtered.length) return;
-  const ch = state.filtered[Math.floor(Math.random() * state.filtered.length)];
-  openPlayer(ch);
+  const pool = state.filtered.length ? state.filtered : visible();
+  if (!pool.length) return;
+  openPlayer(pool[Math.floor(Math.random() * pool.length)]);
 });
 
 $("export").addEventListener("click", () => {
@@ -286,7 +360,6 @@ $("export").addEventListener("click", () => {
   if (f.category) params.set("category", f.category);
   if (f.q) params.set("q", f.q);
   if (f.favorites) params.set("favorites", "true");
-  if (f.nsfw) params.set("nsfw", "true");
   params.set("alive", "true");
   window.location = `/playlist.m3u?${params}`;
 });
