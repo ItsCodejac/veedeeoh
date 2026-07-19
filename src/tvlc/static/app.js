@@ -66,10 +66,12 @@ function isDead(ch) {
 
 function applyFilters() {
   const f = filters();
+  destroyHero();
   if (!f.q && !f.country && !f.category && !f.favorites) {
     renderExplore();
     return;
   }
+  grid.classList.remove("explore");
   let hiddenDead = 0;
   state.filtered = visible().filter((ch) => {
     if (f.country && ch.country !== f.country) return false;
@@ -91,56 +93,181 @@ function applyFilters() {
   renderMore();
 }
 
-// ---- explore home: show what exists before making anyone type ----
+// ---- explore home: turn the TV on, then offer rails to surf ----
+const RAIL_CATEGORIES = [
+  "news", "sports", "movies", "music", "kids", "animation",
+  "anime-gaming", "documentary", "comedy", "culture", "science",
+];
+
+const hero = { hls: null, ch: null, tries: 0 };
+
 function renderExplore() {
   const all = visible();
   state.filtered = [];
   state.rendered = 0;
+  grid.classList.add("explore");
   grid.replaceChildren();
-  $("stats").textContent =
-    `${all.length.toLocaleString()} channels — pick a category or country, or just search`;
+  $("stats").textContent = "";
+
+  grid.append(buildHero());
+  tuneHero();
 
   const favs = all.filter((ch) => state.favorites.has(ch.id));
-  if (favs.length) {
-    grid.append(sectionHead(`★ Your favorites (${favs.length})`));
-    for (const ch of favs) grid.append(card(ch));
-  }
+  if (favs.length) grid.append(rail("★ Favorites", favs, () => {
+    $("favToggle").classList.add("active");
+    applyFilters();
+  }));
 
-  const catCounts = new Map();
+  const byCat = new Map();
   const countryCounts = new Map();
   for (const ch of all) {
-    for (const c of ch.categories) catCounts.set(c, (catCounts.get(c) || 0) + 1);
+    for (const c of ch.categories) {
+      if (!byCat.has(c)) byCat.set(c, []);
+      byCat.get(c).push(ch);
+    }
     if (ch.country) countryCounts.set(ch.country, (countryCounts.get(ch.country) || 0) + 1);
   }
-
-  grid.append(sectionHead("Browse by category"));
-  for (const cat of state.categories) {
-    const n = catCounts.get(cat.id);
-    if (n) grid.append(tile(cat.name, n, () => setFilter("category", cat.id)));
+  for (const id of RAIL_CATEGORIES) {
+    const chans = byCat.get(id);
+    if (chans && chans.length >= 8) {
+      grid.append(rail(categoryNames.get(id) || id, chans, () => setFilter("category", id)));
+    }
   }
 
-  grid.append(sectionHead("Browse by country"));
-  const byCount = [...state.countries].sort(
-    (a, b) => (countryCounts.get(b.code) || 0) - (countryCounts.get(a.code) || 0)
-  );
-  for (const c of byCount) {
-    const n = countryCounts.get(c.code);
-    if (n) grid.append(tile(`${c.flag} ${c.name}`, n, () => setFilter("country", c.code)));
+  const strip = document.createElement("div");
+  strip.className = "countryStrip";
+  strip.append(sectionHead("Around the world"));
+  const chipRow = document.createElement("div");
+  chipRow.className = "chipRow";
+  const top = [...state.countries]
+    .sort((a, b) => (countryCounts.get(b.code) || 0) - (countryCounts.get(a.code) || 0))
+    .slice(0, 21);
+  for (const c of top) {
+    const chip = document.createElement("button");
+    chip.className = "countryChip";
+    chip.innerHTML = `${c.flag} <span>${escapeHtml(c.name)}</span> <em>${(countryCounts.get(c.code) || 0).toLocaleString()}</em>`;
+    chip.addEventListener("click", () => setFilter("country", c.code));
+    chipRow.append(chip);
   }
+  const more = document.createElement("button");
+  more.className = "countryChip more";
+  more.textContent = `all ${state.countries.length} countries…`;
+  more.addEventListener("click", () => $("country").focus());
+  chipRow.append(more);
+  strip.append(chipRow);
+  grid.append(strip);
+}
+
+// The signature: a live channel playing on the landing page, OSD chrome and all.
+function buildHero() {
+  const el = document.createElement("section");
+  el.id = "hero";
+  el.innerHTML = `
+    <div id="heroScreen">
+      <video id="heroVideo" muted autoplay playsinline></video>
+      <div class="heroLogoFallback" hidden></div>
+      <div class="scanlines"></div>
+      <div class="osd osdTop">
+        <span class="liveDot">●</span> LIVE
+        <span class="chNum"></span>
+      </div>
+      <div class="osd osdBottom">
+        <div class="osdInfo">
+          <div class="osdName"></div>
+          <div class="osdMeta"></div>
+        </div>
+        <div class="osdActions">
+          <button id="heroWatch">Watch</button>
+          <button id="heroSurf" title="Another random channel">⏭ Surf</button>
+        </div>
+      </div>
+    </div>`;
+  el.querySelector("#heroWatch").addEventListener("click", () => hero.ch && openPlayer(hero.ch));
+  el.querySelector("#heroSurf").addEventListener("click", () => tuneHero());
+  return el;
+}
+
+function heroCandidates() {
+  return visible().filter((ch) => ch.logo && !isDead(ch));
+}
+
+function tuneHero(retry = false) {
+  const screen = document.getElementById("heroScreen");
+  if (!screen) return;
+  if (!retry) hero.tries = 0;
+  const pool = heroCandidates();
+  if (!pool.length) return;
+  const ch = pool[Math.floor(Math.random() * pool.length)];
+  hero.ch = ch;
+  screen.querySelector(".chNum").textContent =
+    `CH ${String(state.channels.indexOf(ch) + 1).padStart(4, "0")}`;
+  screen.querySelector(".osdName").textContent = ch.name;
+  screen.querySelector(".osdMeta").textContent = chMeta(ch);
+  const fallback = screen.querySelector(".heroLogoFallback");
+  fallback.hidden = true;
+
+  if (hero.hls) hero.hls.destroy();
+  const video = screen.querySelector("#heroVideo");
+  if (!Hls.isSupported()) {
+    showHeroFallback(ch);
+    return;
+  }
+  hero.hls = new Hls({ maxBufferLength: 10, capLevelToPlayerSize: true });
+  hero.hls.loadSource(`/proxy?url=${encodeURIComponent(ch.streams[0].url)}`);
+  hero.hls.attachMedia(video);
+  hero.hls.on(Hls.Events.ERROR, (_, data) => {
+    if (!data.fatal) return;
+    hero.hls.destroy();
+    hero.hls = null;
+    hero.tries++;
+    if (hero.tries < 4) tuneHero(true);
+    else showHeroFallback(ch);
+  });
+}
+
+function showHeroFallback(ch) {
+  const screen = document.getElementById("heroScreen");
+  if (!screen) return;
+  const fallback = screen.querySelector(".heroLogoFallback");
+  fallback.hidden = false;
+  fallback.innerHTML = "";
+  setLogo(fallback, ch);
+}
+
+function destroyHero() {
+  if (hero.hls) {
+    hero.hls.destroy();
+    hero.hls = null;
+  }
+  hero.ch = null;
+}
+
+function rail(title, channels, seeAll) {
+  const pool = [...channels].sort(
+    (a, b) => (b.logo ? 1 : 0) - (a.logo ? 1 : 0) || rank(a) - rank(b)
+  ).slice(0, 25);
+  const el = document.createElement("section");
+  el.className = "rail";
+  const head = document.createElement("div");
+  head.className = "railHead";
+  head.innerHTML = `<h2>${escapeHtml(title)}</h2>`;
+  const link = document.createElement("button");
+  link.className = "railAll";
+  link.textContent = `All ${channels.length.toLocaleString()} →`;
+  link.addEventListener("click", seeAll);
+  head.append(link);
+  el.append(head);
+  const scroller = document.createElement("div");
+  scroller.className = "railScroll";
+  for (const ch of pool) scroller.append(card(ch));
+  el.append(scroller);
+  return el;
 }
 
 function sectionHead(text) {
   const el = document.createElement("div");
   el.className = "sectionHead";
   el.textContent = text;
-  return el;
-}
-
-function tile(label, count, onClick) {
-  const el = document.createElement("button");
-  el.className = "tile";
-  el.innerHTML = `<span class="tlabel">${escapeHtml(label)}</span><span class="tcount">${count.toLocaleString()}</span>`;
-  el.addEventListener("click", onClick);
   return el;
 }
 
