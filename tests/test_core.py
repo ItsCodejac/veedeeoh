@@ -131,3 +131,20 @@ def test_extras_merge_and_dedup():
     assert anime["categories"] == ["anime-gaming"]
     assert anime["source"] == "Samsung TV Plus"
     assert {"id": "anime-gaming", "name": "Anime & Gaming"} in cat["categories"]
+
+
+def test_cross_source_duplicate_merges_into_stream_picker():
+    from tvlc.sources import parse_m3u
+
+    m3u = """#EXTM3U
+#EXTINF:-1 tvg-id="USNEWS" group-title="News",News
+https://jmp2.uk/stvp-USNEWS
+"""
+    source = {"key": "samsung", "label": "Samsung TV Plus", "country": "US"}
+    raw = {**RAW, "extras": [(source, parse_m3u(m3u))]}
+    cat = build_catalog(raw)
+    ids = [c["id"] for c in cat["channels"]]
+    assert "samsung:USNEWS" not in ids  # merged, not a separate card
+    news = next(c for c in cat["channels"] if c["id"] == "News.us")
+    assert [s["source"] for s in news["streams"]] == ["iptv-org", "iptv-org", "Samsung TV Plus"]
+    assert news["streams"][-1]["url"] == "https://jmp2.uk/stvp-USNEWS"

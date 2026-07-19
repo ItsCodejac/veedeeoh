@@ -265,8 +265,10 @@ function openPlayer(ch, streamIdx = 0) {
   const sel = $("pStreams");
   sel.hidden = ch.streams.length < 2;
   if (ch.streams.length > 1) {
-    sel.replaceChildren(...ch.streams.map((s, i) =>
-      new Option(`Stream ${i + 1}${s.quality ? ` (${s.quality})` : ""}`, i)));
+    sel.replaceChildren(...ch.streams.map((s, i) => {
+      const label = [s.source || "stream", s.quality].filter(Boolean).join(" · ");
+      return new Option(`${i + 1}. ${label}`, i);
+    }));
     sel.value = streamIdx;
   }
   play(ch.streams[streamIdx].url);

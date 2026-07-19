@@ -43,6 +43,11 @@ def slugify(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
 
 
+def normalize_name(name: str) -> str:
+    """Collapse a channel name for cross-source duplicate matching."""
+    return re.sub(r"[^a-z0-9]+", "", name.lower())
+
+
 def to_channels(source: dict, entries: list[dict]) -> list[dict]:
     """Convert parsed playlist entries to catalog channel dicts."""
     channels = []
@@ -56,7 +61,7 @@ def to_channels(source: dict, entries: list[dict]) -> list[dict]:
                 "categories": [slugify(e["group"])] if e.get("group") else [],
                 "nsfw": False,
                 "logo": e.get("logo"),
-                "streams": [{"url": e["url"], "quality": None}],
+                "streams": [{"url": e["url"], "quality": None, "source": source["label"]}],
                 "source": source["label"],
             }
         )

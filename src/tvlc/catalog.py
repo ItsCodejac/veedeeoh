@@ -64,7 +64,7 @@ def build_catalog(raw: dict[str, list[dict]]) -> dict[str, Any]:
         cid = s.get("channel")
         if cid:
             streams_by_channel.setdefault(cid, []).append(
-                {"url": s["url"], "quality": s.get("quality")}
+                {"url": s["url"], "quality": s.get("quality"), "source": "iptv-org"}
             )
 
     logo_by_channel: dict[str, str] = {}
@@ -95,13 +95,26 @@ def build_catalog(raw: dict[str, list[dict]]) -> dict[str, Any]:
 
     extra_category_names: dict[str, str] = {}
     seen_urls = {s["url"] for c in channels for s in c["streams"]}
+    by_name: dict[str, list[dict]] = {}
+    for c in channels:
+        by_name.setdefault(sources.normalize_name(c["name"]), []).append(c)
+
     for source, entries in raw.get("extras", []):
         extra_category_names.update(sources.category_names(entries))
         for ch in sources.to_channels(source, entries):
-            if ch["streams"][0]["url"] in seen_urls:
+            url = ch["streams"][0]["url"]
+            if url in seen_urls:
                 continue
-            seen_urls.add(ch["streams"][0]["url"])
-            channels.append(ch)
+            seen_urls.add(url)
+            target = _merge_target(by_name.get(sources.normalize_name(ch["name"]), []), ch)
+            if target:
+                # same channel on another provider: expose it as an extra stream
+                target["streams"].extend(ch["streams"])
+                target["logo"] = target["logo"] or ch["logo"]
+                target["categories"] = sorted({*target["categories"], *ch["categories"]})
+            else:
+                by_name.setdefault(sources.normalize_name(ch["name"]), []).append(ch)
+                channels.append(ch)
 
     channels.sort(key=lambda c: c["name"].lower())
 
@@ -131,6 +144,21 @@ def build_catalog(raw: dict[str, list[dict]]) -> dict[str, Any]:
             key=lambda c: c["name"],
         ),
     }
+
+
+def _merge_target(candidates: list[dict], ch: dict) -> dict | None:
+    """Pick the existing channel an extra-source channel is a duplicate of.
+
+    Same normalized name and same country is a confident match; a unique
+    name match with an unknown country is accepted too. Ambiguous names
+    (several same-named channels in different countries) stay separate.
+    """
+    same_country = [c for c in candidates if c["country"] == ch["country"]]
+    if len(same_country) == 1:
+        return same_country[0]
+    if not same_country and len(candidates) == 1 and candidates[0]["country"] is None:
+        return candidates[0]
+    return None
 
 
 def filter_channels(
