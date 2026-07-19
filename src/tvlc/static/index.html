@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TVLC</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js"></script>
+</head>
+<body>
+<header>
+  <h1>TV<span>LC</span></h1>
+  <input id="search" type="search" placeholder="Search channels…" autocomplete="off">
+  <select id="country"><option value="">All countries</option></select>
+  <select id="category"><option value="">All categories</option></select>
+  <button id="favToggle" class="chip" title="Show favorites only">★ Favorites</button>
+  <button id="surprise" class="chip" title="Random channel">🎲 Surprise me</button>
+  <button id="export" class="chip" title="Download current view as .m3u">⤓ Export M3U</button>
+  <label id="nsfwLabel" class="nsfw"><input id="nsfw" type="checkbox"> 18+</label>
+</header>
+
+<div id="stats"></div>
+<main id="grid"></main>
+<div id="sentinel"></div>
+
+<div id="playerOverlay" hidden>
+  <div id="player">
+    <div id="playerHead">
+      <img id="pLogo" alt="">
+      <div>
+        <div id="pName"></div>
+        <div id="pMeta"></div>
+      </div>
+      <button id="pClose" title="Close">✕</button>
+    </div>
+    <video id="video" controls autoplay playsinline></video>
+    <div id="pStatus"></div>
+    <div id="playerActions">
+      <button id="pVlc">▶ Open in VLC</button>
+      <button id="pFav">★ Favorite</button>
+      <select id="pStreams" hidden></select>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
