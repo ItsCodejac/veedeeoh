@@ -322,6 +322,12 @@ select { max-width: 190px; }
   font-size: 16px;
   letter-spacing: .5px;
 }
+.railTag {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--dim);
+}
 .railAll {
   background: none;
   border: none;

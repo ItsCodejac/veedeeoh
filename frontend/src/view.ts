@@ -71,9 +71,28 @@ function homeCountry(): string | null {
 }
 
 // ---- explore home: turn the TV on, then offer rails to surf ----
-const RAIL_CATEGORIES = [
-  "news", "sports", "movies", "music", "kids", "animation",
-  "anime-gaming", "documentary", "comedy", "culture", "science",
+
+// Programmed collections, not raw taxonomy: each has a personality and a
+// daypart so the lineup reorders through the day like a real network.
+interface Collection {
+  title: string;
+  tagline: string;
+  categories: string[];
+  /** hours (0-23) when this collection leads the lineup */
+  primetime: number[];
+}
+
+const COLLECTIONS: Collection[] = [
+  { title: "🌙 Insomnia Theater", tagline: "for the wide awake", categories: ["classic", "series", "western-classic-tv"], primetime: [23, 0, 1, 2, 3, 4] },
+  { title: "⛩ Anime Block", tagline: "subs, dubs, and mechs", categories: ["anime-gaming", "anime"], primetime: [22, 23, 0, 1] },
+  { title: "🧸 Saturday Mornings", tagline: "cereal not included", categories: ["kids", "animation", "animated"], primetime: [6, 7, 8, 9, 10] },
+  { title: "🗞 The Situation Room", tagline: "everything, everywhere, right now", categories: ["news"], primetime: [6, 7, 8, 17, 18] },
+  { title: "🏟 Stadium Row", tagline: "somewhere, a ball is in play", categories: ["sports", "sports-outdoors"], primetime: [12, 13, 14, 15, 16, 17] },
+  { title: "🎬 Movie Marathon", tagline: "opening credits forever", categories: ["movies"], primetime: [19, 20, 21, 22] },
+  { title: "😂 Comedy Cellar", tagline: "laugh tracks optional", categories: ["comedy", "dark-comedy"], primetime: [20, 21, 22, 23] },
+  { title: "🎸 MTV Era", tagline: "when television played music", categories: ["music"], primetime: [15, 16, 17, 18] },
+  { title: "🔬 Big Brain Hours", tagline: "accidentally learn something", categories: ["documentary", "science", "education"], primetime: [10, 11, 12, 13] },
+  { title: "🧘 Screensaver Mode", tagline: "television as furniture", categories: ["relax", "ambiance", "travel", "weather"], primetime: [9, 10, 11, 14] },
 ];
 
 const hero: {
@@ -125,12 +144,45 @@ function renderExplore(): void {
     }
   }
 
-  for (const id of RAIL_CATEGORIES) {
-    const chans = byCat.get(id);
-    if (chans && chans.length >= 8) {
-      grid().append(rail(categoryNames.get(id) || id, chans, () => setFilter("category", id)));
+  // collections whose primetime includes the current hour lead the lineup
+  const hour = new Date().getHours();
+  const lineup = [...COLLECTIONS].sort(
+    (a, b) => Number(b.primetime.includes(hour)) - Number(a.primetime.includes(hour))
+  );
+  for (const col of lineup) {
+    const seen = new Set<string>();
+    const chans = col.categories
+      .flatMap((id) => byCat.get(id) || [])
+      .filter((ch) => !seen.has(ch.id) && seen.add(ch.id));
+    if (chans.length >= 8) {
+      grid().append(rail(col.title, chans, () => setFilter("category", col.categories[0]!), {
+        tagline: col.primetime.includes(hour) ? `${col.tagline} · on now` : col.tagline,
+      }));
     }
   }
+
+  // Passport: a different country spotlight every visit
+  const eligible = state.countries.filter((c) => (countryCounts.get(c.code) || 0) >= 8);
+  const dest = eligible[Math.floor(Math.random() * eligible.length)];
+  if (dest) {
+    grid().append(rail(
+      `🌍 Passport: ${dest.flag} ${dest.name}`,
+      all.filter((ch) => ch.country === dest.code),
+      () => setFilter("country", dest.code),
+      { tagline: "tonight we're broadcasting from" }
+    ));
+  }
+
+  // Lucky Dip: pure chaos, reshuffled every visit
+  const dip = [...all].filter((ch) => ch.logo);
+  for (let i = dip.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [dip[i], dip[j]] = [dip[j]!, dip[i]!];
+  }
+  grid().append(rail("🎰 Lucky Dip", dip.slice(0, 25), () => applyFilters(), {
+    tagline: "25 channels, zero logic",
+    linkLabel: "Reshuffle ↻",
+  }));
 
   const strip = document.createElement("div");
   strip.className = "countryStrip";
@@ -348,7 +400,12 @@ function destroyHero(): void {
   clearInterval(hero.glow);
 }
 
-function rail(title: string, channels: Channel[], seeAll: () => void): HTMLElement {
+function rail(
+  title: string,
+  channels: Channel[],
+  seeAll: () => void,
+  opts: { tagline?: string; linkLabel?: string } = {}
+): HTMLElement {
   const pool = [...channels]
     .sort((a, b) => (b.logo ? 1 : 0) - (a.logo ? 1 : 0) || rank(a) - rank(b))
     .slice(0, 25);
@@ -356,10 +413,11 @@ function rail(title: string, channels: Channel[], seeAll: () => void): HTMLEleme
   el.className = "rail";
   const head = document.createElement("div");
   head.className = "railHead";
-  head.innerHTML = `<h2>${escapeHtml(title)}</h2>`;
+  head.innerHTML = `<h2>${escapeHtml(title)}</h2>` +
+    (opts.tagline ? `<span class="railTag">${escapeHtml(opts.tagline)}</span>` : "");
   const link = document.createElement("button");
   link.className = "railAll";
-  link.textContent = `All ${channels.length.toLocaleString()} →`;
+  link.textContent = opts.linkLabel ?? `All ${channels.length.toLocaleString()} →`;
   link.addEventListener("click", seeAll);
   head.append(link);
   el.append(head);
