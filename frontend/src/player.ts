@@ -2,7 +2,7 @@ import Hls from "hls.js";
 import { openInVlc, toggleFavorite } from "./api";
 import { chMeta, state } from "./state";
 import type { Channel } from "./types";
-import { $, fmtTime } from "./util";
+import { $, fmtTime, isGeoBlockBumper } from "./util";
 
 let hls: Hls | null = null;
 
@@ -147,6 +147,14 @@ function play(url: string): void {
     hls.loadSource(src);
     hls.attachMedia(video);
     hls.on(Hls.Events.MANIFEST_PARSED, () => (status.textContent = ""));
+    video.addEventListener("playing", () => {
+      window.setTimeout(() => {
+        if (state.current?.streams.some((s) => s.url === url) && isGeoBlockBumper(video)) {
+          state.health.set(url, false);
+          status.textContent = "⚠ This stream is geo-blocked in your region (Pluto “not available”).";
+        }
+      }, 5000);
+    }, { once: true });
     hls.on(Hls.Events.ERROR, (_evt, data) => {
       if (data.fatal) {
         status.textContent = "⚠ Preview failed (codec or geo-block?) — try Open in VLC.";

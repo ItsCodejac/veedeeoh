@@ -4,7 +4,7 @@ import { card, setLogo, stopHoverPreview, updateCardNow } from "./cards";
 import { openPlayer } from "./player";
 import { categoryNames, chMeta, countryNames, filters, isDead, onNow, rank, state, visible } from "./state";
 import type { Channel } from "./types";
-import { $, escapeHtml } from "./util";
+import { $, escapeHtml, isGeoBlockBumper } from "./util";
 import { appendVodSection } from "./vod";
 
 const BATCH = 120;
@@ -440,6 +440,13 @@ async function tuneCenter(retry = false): Promise<void> {
   video.onplaying = () => {
     if (token === caro.token) screen.classList.add("playing");
   };
+  // a few seconds in, check the actual frame for a geo-block bumper
+  window.setTimeout(() => {
+    if (token === caro.token && isGeoBlockBumper(video)) {
+      state.health.set(url, false); // alive at transport, dead as content
+      centerFailed(token);
+    }
+  }, 5000);
 }
 
 function centerFailed(token: number): void {
