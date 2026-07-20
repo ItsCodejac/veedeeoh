@@ -102,9 +102,12 @@ def build_catalog(raw: dict[str, list[dict]]) -> dict[str, Any]:
     for c in channels:
         by_name.setdefault(sources.normalize_name(c["name"]), []).append(c)
 
+    country_codes = {c["name"].lower(): c["code"] for c in raw["countries"]}
+    country_codes.update({c["code"].lower(): c["code"] for c in raw["countries"]})
     for source, entries in raw.get("extras", []):
-        extra_category_names.update(sources.category_names(entries))
-        for ch in sources.to_channels(source, entries):
+        if not source.get("group_is_country"):
+            extra_category_names.update(sources.category_names(entries))
+        for ch in sources.to_channels(source, entries, country_codes):
             url = ch["streams"][0]["url"]
             if url in seen_urls:
                 continue

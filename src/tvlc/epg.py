@@ -17,10 +17,10 @@ import httpx
 from .catalog import CACHE_DIR
 
 EPG_SOURCES = [
-    "https://i.mjh.nz/SamsungTVPlus/us.xml.gz",
-    "https://i.mjh.nz/Plex/us.xml.gz",
+    "https://i.mjh.nz/SamsungTVPlus/all.xml.gz",
+    "https://i.mjh.nz/Plex/all.xml.gz",
     "https://i.mjh.nz/Roku/all.xml.gz",
-    "https://i.mjh.nz/PlutoTV/us.xml.gz",
+    "https://i.mjh.nz/PlutoTV/all.xml.gz",
 ]
 EPG_TTL = 6 * 3600
 WINDOW_AHEAD = 12 * 3600  # keep programs up to 12h out

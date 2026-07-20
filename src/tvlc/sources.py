@@ -8,9 +8,10 @@ _BASE = "https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/main/
 
 # Regenerated daily by the app-m3u-generator GitHub Action. Pluto TV is omitted:
 # iptv-org already indexes ~1700 Pluto streams and it would only duplicate.
+# In the *_all playlists, group-title is the country name, not a category.
 SOURCES = [
-    {"key": "samsung", "label": "Samsung TV Plus", "url": f"{_BASE}/samsungtvplus_us.m3u", "country": "US"},
-    {"key": "plex", "label": "Plex", "url": f"{_BASE}/plex_us.m3u", "country": "US"},
+    {"key": "samsung", "label": "Samsung TV Plus", "url": f"{_BASE}/samsungtvplus_all.m3u", "group_is_country": True},
+    {"key": "plex", "label": "Plex", "url": f"{_BASE}/plex_all.m3u", "group_is_country": True},
     {"key": "roku", "label": "Roku", "url": f"{_BASE}/roku_all.m3u", "country": "US"},
 ]
 
@@ -48,17 +49,28 @@ def normalize_name(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", name.lower())
 
 
-def to_channels(source: dict, entries: list[dict]) -> list[dict]:
+def to_channels(
+    source: dict, entries: list[dict], country_codes: dict[str, str] | None = None
+) -> list[dict]:
     """Convert parsed playlist entries to catalog channel dicts."""
+    country_codes = country_codes or {}
+    group_is_country = source.get("group_is_country", False)
     channels = []
     for e in entries:
         cid = e["tvg_id"] or slugify(e["name"])
+        group = e.get("group")
+        if group_is_country:
+            country = country_codes.get(group.lower()) if group else None
+            categories: list[str] = []
+        else:
+            country = source.get("country")
+            categories = [slugify(group)] if group else []
         channels.append(
             {
                 "id": f"{source['key']}:{cid}",
                 "name": e["name"],
-                "country": source.get("country"),
-                "categories": [slugify(e["group"])] if e.get("group") else [],
+                "country": country,
+                "categories": categories,
                 "nsfw": False,
                 "logo": e.get("logo"),
                 "logos": [e["logo"]] if e.get("logo") else [],
