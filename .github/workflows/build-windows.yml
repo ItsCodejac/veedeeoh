@@ -11,6 +11,9 @@ on:
       - "tvlc.spec"
       - ".github/workflows/build-windows.yml"
 
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:
