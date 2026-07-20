@@ -58,7 +58,7 @@ jobs:
 
       - name: Package (macOS)
         if: matrix.label == 'macos'
-        run: cd dist && zip -r veedeeoh-macos.zip veedeeoh
+        run: cd dist && zip -r veedeeoh-macos.zip veedeeoh.app
 
       - name: Package (Linux)
         if: matrix.label == 'linux'
@@ -98,9 +98,8 @@ jobs:
 
             **macOS:**
             1. Download `veedeeoh-macos.zip` and unzip it
-            2. Open the `veedeeoh` folder
-            3. Double-click `veedeeoh` (or run `./veedeeoh` in Terminal)
-            4. Your browser opens automatically to `http://127.0.0.1:8321`
+            2. Double-click `veedeeoh.app`
+            3. Your browser opens automatically to `http://127.0.0.1:8321`
 
             **Linux:**
             1. Download and extract `veedeeoh-linux.tar.gz` (`tar -xzf veedeeoh-linux.tar.gz`)

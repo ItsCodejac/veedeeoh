@@ -95,3 +95,16 @@ coll = COLLECT(
     upx_exclude=[],
     name="veedeeoh",
 )
+
+import sys
+if sys.platform == "darwin":
+    app = BUNDLE(
+        coll,
+        name="veedeeoh.app",
+        icon=None,
+        bundle_identifier="com.veedeeoh.app",
+        info_plist={
+            "NSHighResolutionCapable": True,
+            "LSUIElement": False,
+        },
+    )
