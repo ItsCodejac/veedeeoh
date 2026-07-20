@@ -1,6 +1,6 @@
 import Hls from "hls.js";
 import { checkStream } from "./api";
-import { card, stopHoverPreview, updateCardNow } from "./cards";
+import { card, setLogo, stopHoverPreview, updateCardNow } from "./cards";
 import { openPlayer } from "./player";
 import { categoryNames, chMeta, countryNames, filters, isDead, onNow, rank, state, visible } from "./state";
 import type { Channel } from "./types";
@@ -78,12 +78,6 @@ export function refreshNowInfo(): void {
     const ch = byId.get(el.dataset.id!);
     if (ch) updateCardNow(el, ch);
   });
-  for (const cell of wall) {
-    if (cell.ch && cell.el?.isConnected) {
-      const prog = onNow(cell.ch);
-      if (prog) cell.el.querySelector(".cellMeta")!.textContent = `▸ ${prog.title}`;
-    }
-  }
 }
 
 export function goHome(): void {
@@ -133,20 +127,17 @@ const COLLECTIONS: Collection[] = [
   { title: "🧘 Screensaver Mode", tagline: "television as furniture", categories: ["relax", "ambiance", "travel", "weather"], primetime: [9, 10, 11, 14] },
 ];
 
-// ---- the video wall: a 3x3 bank of live muted feeds ----
-const WALL_SIZE = 9;
+// ---- the carousel: one live stream center stage, static previews around it ----
+const CARO_SIZE = 9;
+const CARO_SPREAD = 3; // cards visible on each side
 
-interface WallCell {
-  hls: Hls | null;
-  ch: Channel | null;
-  token: number;
-  tries: number;
-  el: HTMLElement | null;
-}
-
-const wall: WallCell[] = Array.from({ length: WALL_SIZE }, () => ({
-  hls: null, ch: null, token: 0, tries: 0, el: null,
-}));
+const caro = {
+  items: [] as Channel[],
+  center: 0,
+  hls: null as Hls | null,
+  token: 0,
+  tries: 0,
+};
 
 function renderExplore(): void {
   const all = visible();
@@ -156,8 +147,10 @@ function renderExplore(): void {
   grid().replaceChildren();
   $("stats").textContent = "";
 
-  grid().append(buildWall());
-  retuneAll();
+  grid().append(buildCarousel());
+  caro.items = pickCarousel();
+  caro.center = 0;
+  renderCaro();
 
   const favs = all.filter((ch) => state.favorites.has(ch.id));
   if (favs.length) {
@@ -290,33 +283,29 @@ function renderExplore(): void {
   grid().append(strip);
 }
 
-// The signature: nine live feeds at once — the wall of TVs at the store.
-function buildWall(): HTMLElement {
+// The signature, Twitch-style: one live stream center stage with an info
+// panel, static frame-capture previews fanned out beside it.
+function buildCarousel(): HTMLElement {
   const el = document.createElement("section");
   el.id = "hero";
   el.innerHTML = `
     <div class="wallHead">
-      <span class="wallTitle"><span class="liveDot">●</span> THE WALL</span>
-      <span class="wallSub">${WALL_SIZE} live feeds</span>
-      <button id="wallRetune">↻ Retune all</button>
+      <span class="wallTitle"><span class="liveDot">●</span> CHANNEL SURF</span>
+      <span class="wallSub">one live · ${CARO_SIZE - 1} on deck</span>
+      <button id="wallRetune">↻ Shuffle</button>
     </div>
-    <div id="wall"></div>`;
-  const wallEl = el.querySelector<HTMLElement>("#wall")!;
-  for (let i = 0; i < WALL_SIZE; i++) {
-    const cell = document.createElement("div");
-    cell.className = "wallCell";
-    cell.innerHTML = `
-      <video muted autoplay playsinline></video>
-      <div class="heroStatic"><span class="tuningText">TUNING</span></div>
-      <div class="cellLabel"><span class="cellName"></span><span class="cellMeta"></span></div>`;
-    cell.addEventListener("click", () => {
-      const ch = wall[i]!.ch;
-      if (ch) openPlayer(ch);
-    });
-    wall[i]!.el = cell;
-    wallEl.append(cell);
-  }
-  el.querySelector("#wallRetune")!.addEventListener("click", retuneAll);
+    <div id="caro">
+      <button class="caroArrow" id="caroPrev" title="Previous">‹</button>
+      <div id="caroStage"></div>
+      <button class="caroArrow" id="caroNext" title="Next">›</button>
+    </div>`;
+  el.querySelector("#caroPrev")!.addEventListener("click", () => rotate(-1));
+  el.querySelector("#caroNext")!.addEventListener("click", () => rotate(1));
+  el.querySelector("#wallRetune")!.addEventListener("click", () => {
+    caro.items = pickCarousel();
+    caro.center = 0;
+    renderCaro();
+  });
   return el;
 }
 
@@ -330,39 +319,97 @@ function heroPool(): Channel[] {
     return true;
   });
   const alive = eligible.filter((ch) => state.health.get(ch.streams[0]!.url) === true);
-  if (alive.length >= WALL_SIZE * 3) return alive;
+  if (alive.length >= CARO_SIZE * 3) return alive;
   return eligible.filter((ch) => !isDead(ch));
 }
 
-function wallUsed(): Set<string> {
-  return new Set(wall.map((c) => c.ch?.id).filter((id): id is string => !!id));
+function pickCarousel(): Channel[] {
+  const pool = [...heroPool()];
+  const picked: Channel[] = [];
+  while (picked.length < CARO_SIZE && pool.length) {
+    picked.push(...pool.splice(Math.floor(Math.random() * pool.length), 1));
+  }
+  return picked;
 }
 
-function retuneAll(): void {
-  for (let i = 0; i < WALL_SIZE; i++) void tuneCell(i);
+function rotate(delta: number): void {
+  const n = caro.items.length;
+  if (!n) return;
+  caro.center = ((caro.center + delta) % n + n) % n;
+  renderCaro();
 }
 
-async function tuneCell(i: number, retry = false): Promise<void> {
-  const cell = wall[i]!;
-  const el = cell.el;
-  if (!el || !el.isConnected) return;
-  if (!retry) cell.tries = 0;
-  const token = ++cell.token;
+function renderCaro(): void {
+  const stage = document.getElementById("caroStage");
+  if (!stage) return;
+  stage.replaceChildren();
+  const n = caro.items.length;
+  if (!n) return;
+  for (let off = -CARO_SPREAD; off <= CARO_SPREAD; off++) {
+    const ch = caro.items[((caro.center + off) % n + n) % n]!;
+    stage.append(off === 0 ? centerCard(ch) : sideCard(ch, off));
+  }
+  void tuneCenter();
+}
 
-  const used = wallUsed();
-  const pool = heroPool().filter((ch) => !used.has(ch.id));
-  const ch = pool[Math.floor(Math.random() * pool.length)];
-  if (!ch) return;
-  cell.ch = ch;
-  el.classList.remove("playing");
-  el.querySelector(".cellName")!.textContent = ch.name;
+function sideCard(ch: Channel, off: number): HTMLElement {
+  const el = document.createElement("button");
+  el.className = `caroCard o${Math.abs(off)} ${off < 0 ? "left" : "right"}`;
+  el.title = ch.name;
+  el.innerHTML = `<div class="caroThumb"></div>`;
+  const box = el.querySelector<HTMLElement>(".caroThumb")!;
+  setLogo(box, ch);
+  const url = ch.streams[0]?.url;
+  if (url && state.health.get(url) !== false) {
+    const img = document.createElement("img");
+    img.className = "thumbImg";
+    img.alt = "";
+    img.onload = () => box.replaceChildren(img);
+    img.onerror = () => img.remove();
+    img.src = `/thumb?url=${encodeURIComponent(url)}`;
+  }
+  el.addEventListener("click", () => rotate(off));
+  return el;
+}
+
+function centerCard(ch: Channel): HTMLElement {
+  const el = document.createElement("div");
+  el.className = "caroCard center";
   const prog = onNow(ch);
-  el.querySelector(".cellMeta")!.textContent = prog ? `▸ ${prog.title}` : chMeta(ch);
-  cell.hls?.destroy();
-  cell.hls = null;
+  el.innerHTML = `
+    <div class="caroScreen">
+      <video muted autoplay playsinline></video>
+      <div class="heroStatic"><span class="tuningText">TUNING ···</span></div>
+    </div>
+    <div class="caroInfo">
+      <div class="caroInfoHead">
+        <span class="caroLogo"></span>
+        <div class="caroNames">
+          <div class="caroName">${escapeHtml(ch.name)}</div>
+          <div class="caroMeta">${escapeHtml(chMeta(ch))}</div>
+        </div>
+      </div>
+      ${prog ? `<div class="caroNow">▸ ${escapeHtml(prog.title)}</div>` : ""}
+      <div class="caroActions">
+        <button class="caroWatch">▶ Watch</button>
+      </div>
+    </div>`;
+  setLogo(el.querySelector<HTMLElement>(".caroLogo")!, ch);
+  el.querySelector(".caroScreen")!.addEventListener("click", () => openPlayer(ch, 0, caro.items));
+  el.querySelector(".caroWatch")!.addEventListener("click", () => openPlayer(ch, 0, caro.items));
+  return el;
+}
+
+async function tuneCenter(retry = false): Promise<void> {
+  const ch = caro.items[caro.center];
+  const screen = document.querySelector<HTMLElement>(".caroCard.center .caroScreen");
+  if (!ch || !screen) return;
+  if (!retry) caro.tries = 0;
+  const token = ++caro.token;
+  caro.hls?.destroy();
+  caro.hls = null;
 
   const url = ch.streams[0]!.url;
-  // verify before tuning in: static is a state, black is a bug
   if (state.health.get(url) === undefined) {
     try {
       const v = await checkStream(url);
@@ -371,44 +418,47 @@ async function tuneCell(i: number, retry = false): Promise<void> {
       state.health.set(url, false);
     }
   }
-  if (token !== cell.token || !el.isConnected) return;
+  if (token !== caro.token || !screen.isConnected) return;
   if (state.health.get(url) === false || !Hls.isSupported()) {
-    retuneFailed(i, token);
+    centerFailed(token);
     return;
   }
 
-  const video = el.querySelector<HTMLVideoElement>("video")!;
-  cell.hls = new Hls({ maxBufferLength: 8, capLevelToPlayerSize: true });
-  cell.hls.loadSource(`/proxy?url=${encodeURIComponent(url)}`);
-  cell.hls.attachMedia(video);
-  cell.hls.on(Hls.Events.ERROR, (_evt, data) => {
-    if (data.fatal && token === cell.token) retuneFailed(i, token);
+  const video = screen.querySelector<HTMLVideoElement>("video")!;
+  caro.hls = new Hls({ maxBufferLength: 10, capLevelToPlayerSize: true });
+  caro.hls.loadSource(`/proxy?url=${encodeURIComponent(url)}`);
+  caro.hls.attachMedia(video);
+  caro.hls.on(Hls.Events.ERROR, (_evt, data) => {
+    if (data.fatal && token === caro.token) centerFailed(token);
   });
   window.setTimeout(() => {
-    if (token === cell.token && !el.classList.contains("playing")) retuneFailed(i, token);
+    if (token === caro.token && !screen.classList.contains("playing")) centerFailed(token);
   }, 15000);
   video.onplaying = () => {
-    if (token === cell.token) el.classList.add("playing");
+    if (token === caro.token) screen.classList.add("playing");
   };
 }
 
-function retuneFailed(i: number, token: number): void {
-  const cell = wall[i]!;
-  if (token !== cell.token) return;
-  cell.hls?.destroy();
-  cell.hls = null;
-  cell.tries++;
-  if (cell.tries < 5) void tuneCell(i, true);
+function centerFailed(token: number): void {
+  if (token !== caro.token) return;
+  caro.hls?.destroy();
+  caro.hls = null;
+  caro.tries++;
+  if (caro.tries >= 5) return;
+  // swap the dud out of the lineup for a fresh channel
+  const used = new Set(caro.items.map((c) => c.id));
+  const pool = heroPool().filter((c) => !used.has(c.id));
+  const fresh = pool[Math.floor(Math.random() * pool.length)];
+  if (fresh) {
+    caro.items[caro.center] = fresh;
+    renderCaro();
+  }
 }
 
 function destroyHero(): void {
-  for (const cell of wall) {
-    cell.hls?.destroy();
-    cell.hls = null;
-    cell.ch = null;
-    cell.el = null;
-    cell.token++;
-  }
+  caro.hls?.destroy();
+  caro.hls = null;
+  caro.token++;
 }
 
 function rail(

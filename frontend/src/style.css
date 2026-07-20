@@ -205,47 +205,131 @@ select { max-width: 190px; }
 }
 #wallRetune:hover { color: var(--accent); border-color: var(--accent); }
 
-#wall {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+#caro { display: flex; align-items: center; gap: 4px; }
+.caroArrow {
+  background: none;
+  border: none;
+  color: var(--dim);
+  font-size: 34px;
+  cursor: pointer;
+  padding: 8px;
+  z-index: 20;
 }
-.wallCell {
+.caroArrow:hover { color: var(--accent); }
+#caroStage {
   position: relative;
+  flex: 1;
+  height: 380px;
+  overflow: hidden;
+}
+.caroCard {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border: none;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+  transition: transform .35s ease, opacity .35s ease;
+}
+.caroThumb {
+  width: 250px;
   aspect-ratio: 16 / 9;
-  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel2);
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+}
+.caroThumb img { max-width: 70%; max-height: 60%; object-fit: contain; }
+.caroThumb img.thumbImg {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  max-width: none; max-height: none;
+  object-fit: cover;
+}
+.caroThumb .noLogo { font-size: 30px; opacity: .4; }
+.caroCard.o1.left  { transform: translate(calc(-50% - 400px), -50%) scale(.95); z-index: 6; opacity: .8; }
+.caroCard.o1.right { transform: translate(calc(-50% + 400px), -50%) scale(.95); z-index: 6; opacity: .8; }
+.caroCard.o2.left  { transform: translate(calc(-50% - 590px), -50%) scale(.85); z-index: 4; opacity: .5; }
+.caroCard.o2.right { transform: translate(calc(-50% + 590px), -50%) scale(.85); z-index: 4; opacity: .5; }
+.caroCard.o3.left  { transform: translate(calc(-50% - 740px), -50%) scale(.75); z-index: 2; opacity: .25; }
+.caroCard.o3.right { transform: translate(calc(-50% + 740px), -50%) scale(.75); z-index: 2; opacity: .25; }
+.caroCard:not(.center):hover { opacity: 1; }
+
+.caroCard.center {
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  display: flex;
+  cursor: default;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .6);
   border-radius: 12px;
   overflow: hidden;
-  border: 1px solid #26262e;
-  cursor: pointer;
-  transition: border-color .1s, transform .1s;
 }
-.wallCell:hover { border-color: var(--accent); transform: scale(1.015); z-index: 2; }
-.wallCell video { width: 100%; height: 100%; object-fit: cover; display: block; }
-.wallCell .heroStatic { border-radius: 12px; }
-.wallCell .tuningText { font-size: 10px; letter-spacing: 3px; padding: 4px 10px; }
-.cellLabel {
-  position: absolute;
-  left: 0; right: 0; bottom: 0;
+.caroScreen {
+  position: relative;
+  width: 560px;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.caroScreen video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.caroInfo {
+  width: 215px;
+  background: var(--panel);
+  border: 1px solid #262a36;
+  border-left: none;
+  padding: 14px;
   display: flex;
   flex-direction: column;
-  padding: 18px 12px 8px;
-  background: linear-gradient(to top, rgba(0, 0, 0, .8), transparent);
-  pointer-events: none;
+  gap: 10px;
 }
-.cellName {
-  font-size: 13px; font-weight: 700;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, .9);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+.caroInfoHead { display: flex; gap: 10px; align-items: center; }
+.caroLogo {
+  width: 44px; height: 44px;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--panel2);
+  border-radius: 8px;
+  overflow: hidden;
 }
-.cellMeta {
-  font-family: var(--mono);
-  font-size: 10px; color: #cfcbc2;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+.caroLogo img { max-width: 85%; max-height: 85%; object-fit: contain; }
+.caroLogo .noLogo { font-size: 18px; opacity: .4; }
+.caroNames { min-width: 0; }
+.caroName { font-weight: 700; font-size: 14px; overflow: hidden; text-overflow: ellipsis; }
+.caroMeta { color: var(--dim); font-size: 11px; }
+.caroNow {
+  color: var(--accent);
+  font-size: 12px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
-@media (max-width: 700px) {
-  #wall { grid-template-columns: repeat(2, 1fr); }
-  .wallCell:nth-child(n+7) { display: none; }
+.caroActions { margin-top: auto; }
+.caroWatch {
+  width: 100%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: none;
+  border-radius: 8px;
+  padding: 10px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+}
+.caroWatch:hover { filter: brightness(1.08); }
+
+@media (max-width: 1000px) {
+  .caroCard.o2, .caroCard.o3 { display: none; }
+  .caroInfo { display: none; }
+  #caroStage { height: 300px; }
+  .caroScreen { width: min(500px, 74vw); }
+  .caroCard.o1.left  { transform: translate(calc(-50% - 56vw), -50%) scale(.9); }
+  .caroCard.o1.right { transform: translate(calc(-50% + 56vw), -50%) scale(.9); }
 }
 
 #moreRails {
