@@ -14,7 +14,7 @@ from fastapi.responses import PlainTextResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import captions, catalog, health, m3u, proxy, thumbs
+from . import captions, catalog, epg, health, m3u, proxy, thumbs
 from .store import Favorites, HealthCache
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -27,7 +27,14 @@ async def lifespan(app: FastAPI):
     app.state.health = HealthCache()
     app.state.client = httpx.AsyncClient(follow_redirects=True)
     app.state.check_sem = asyncio.Semaphore(6)
+    app.state.epg_keys = {
+        ch["id"]: key
+        for ch in app.state.catalog["channels"]
+        if (key := epg.epg_key(ch))
+    }
+    app.state.epg_task = asyncio.create_task(epg.refresh(app.state.client))
     yield
+    app.state.epg_task.cancel()
     await app.state.client.aclose()
 
 
@@ -71,6 +78,25 @@ async def get_catalog() -> dict:
             if app.state.health.get(url) is not None
         },
     }
+
+
+@app.get("/api/now")
+async def now_playing() -> dict:
+    """Now/next program per channel id, for every channel with guide data."""
+    import time as _time
+
+    if (
+        epg.loaded_at
+        and _time.time() - epg.loaded_at > epg.EPG_TTL
+        and app.state.epg_task.done()
+    ):
+        app.state.epg_task = asyncio.create_task(epg.refresh(app.state.client))
+    out = {}
+    for ch_id, key in app.state.epg_keys.items():
+        entry = epg.now_next(key)
+        if entry:
+            out[ch_id] = entry
+    return out
 
 
 @app.get("/api/favorites")

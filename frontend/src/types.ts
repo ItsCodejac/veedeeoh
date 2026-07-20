@@ -41,6 +41,17 @@ export interface CheckResult {
   cached: boolean;
 }
 
+export interface EpgProgram {
+  title: string;
+  start: number;
+  stop: number;
+}
+
+export interface NowNext {
+  now?: EpgProgram;
+  next?: EpgProgram;
+}
+
 export interface Filters {
   q: string;
   country: string;

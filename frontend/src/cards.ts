@@ -2,9 +2,9 @@ import Hls from "hls.js";
 import { toggleFavorite } from "./api";
 import { watchCard } from "./health";
 import { openPlayer } from "./player";
-import { chMeta, isDead, state } from "./state";
+import { chMeta, isDead, onNow, state } from "./state";
 import type { Channel } from "./types";
-import { escapeHtml } from "./util";
+import { escapeHtml, fmtTime } from "./util";
 
 export function card(ch: Channel, context?: Channel[]): HTMLElement {
   const el = document.createElement("div");
@@ -18,8 +18,10 @@ export function card(ch: Channel, context?: Channel[]): HTMLElement {
     <button class="star ${state.favorites.has(ch.id) ? "on" : ""}" title="Favorite">★</button>
     <div class="logoBox"></div>
     <div class="cname">${escapeHtml(ch.name)}</div>
+    <div class="cnow" hidden><span class="cnowTitle"></span><span class="cprog"><i></i></span></div>
     <div class="cmeta">${escapeHtml(chMeta(ch))}</div>`;
   setArt(el.querySelector<HTMLElement>(".logoBox")!, ch);
+  updateCardNow(el, ch);
 
   el.querySelector(".star")!.addEventListener("click", async (e) => {
     e.stopPropagation();
@@ -33,6 +35,22 @@ export function card(ch: Channel, context?: Channel[]): HTMLElement {
   wireHoverPreview(el, ch);
   watchCard(el);
   return el;
+}
+
+/** Fill the "on now" line from guide data; safe to call again as it updates. */
+export function updateCardNow(el: HTMLElement, ch: Channel): void {
+  const prog = onNow(ch);
+  const line = el.querySelector<HTMLElement>(".cnow");
+  if (!line) return;
+  if (!prog) {
+    line.hidden = true;
+    return;
+  }
+  line.hidden = false;
+  line.querySelector(".cnowTitle")!.textContent = `▸ ${prog.title}`;
+  line.title = `${prog.title} · until ${fmtTime(prog.stop)}`;
+  const pct = Math.min(100, Math.max(0, ((Date.now() / 1000 - prog.start) / (prog.stop - prog.start)) * 100));
+  line.querySelector<HTMLElement>(".cprog i")!.style.width = `${pct}%`;
 }
 
 /** Card art: a live captured frame from the stream (logo as corner badge),

@@ -171,3 +171,46 @@ def test_pluto_bumper_detection():
     assert not looks_like_pluto_bumper(jpeg(draw_yellow=False))  # plain black frame
     assert is_pluto_url("https://jmp2.uk/plu-abc123")
     assert not is_pluto_url("https://example.com/live.m3u8")
+
+
+def test_epg_parse_and_now_next():
+    import time as t
+
+    from tvlc import epg
+
+    now = t.time()
+
+    def ts(offset):
+        from datetime import datetime, timezone
+
+        return datetime.fromtimestamp(now + offset, tz=timezone.utc).strftime(
+            "%Y%m%d%H%M%S +0000"
+        )
+
+    xml = f"""<tv>
+      <programme channel="A1" start="{ts(-1800)}" stop="{ts(1800)}"><title>On Now Show</title></programme>
+      <programme channel="A1" start="{ts(1800)}" stop="{ts(5400)}"><title>Up Next Show</title></programme>
+      <programme channel="A1" start="{ts(-7200)}" stop="{ts(-3600)}"><title>Long Over</title></programme>
+      <programme channel="B2" start="{ts(-600)}" stop="{ts(600)}"><title>Other</title></programme>
+    </tv>"""
+    epg.guide = epg.parse_xmltv(xml.encode(), now=now)
+    assert "A1" in epg.guide and len(epg.guide["A1"]) == 2  # expired program dropped
+    entry = epg.now_next("A1", now=now)
+    assert entry["now"]["title"] == "On Now Show"
+    assert entry["next"]["title"] == "Up Next Show"
+    assert epg.now_next("missing", now=now) is None
+
+
+def test_epg_key_mapping():
+    from tvlc import epg
+
+    samsung = {"id": "samsung:USAJ3504502A", "source": "Samsung TV Plus", "streams": []}
+    pluto = {
+        "id": "PlutoTVSpotlight.us",
+        "source": "iptv-org",
+        "streams": [{"url": "https://jmp2.uk/plu-60940a07d88ba90007b9cb71.m3u8"}],
+    }
+    other = {"id": "News.us", "source": "iptv-org", "streams": [{"url": "http://x/n.m3u8"}]}
+    assert epg.epg_key(samsung) == "USAJ3504502A"
+    assert epg.epg_key(pluto) == "60940a07d88ba90007b9cb71"
+    assert epg.epg_key(other) is None

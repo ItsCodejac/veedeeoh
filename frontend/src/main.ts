@@ -1,9 +1,9 @@
 import "./style.css";
-import { fetchCatalog } from "./api";
+import { fetchCatalog, fetchNowPlaying } from "./api";
 import { openPlayer, wirePlayer } from "./player";
 import { categoryNames, countryNames, filters, state, visible } from "./state";
 import { $ } from "./util";
-import { applyFilters, goHome, renderMore } from "./view";
+import { applyFilters, goHome, refreshNowInfo, renderMore } from "./view";
 
 async function boot(): Promise<void> {
   const data = await fetchCatalog();
@@ -22,6 +22,18 @@ async function boot(): Promise<void> {
     $<HTMLSelectElement>("category").append(new Option(c.name, c.id));
   }
   applyFilters();
+
+  // guide data loads in the background server-side; poll briefly until it lands,
+  // then patch rendered cards in place (no re-render, streams keep playing)
+  for (let i = 0; i < 8 && !state.epg.size; i++) {
+    await fetchNowPlaying();
+    if (!state.epg.size) await new Promise((r) => setTimeout(r, 15000));
+  }
+  refreshNowInfo();
+  window.setInterval(async () => {
+    await fetchNowPlaying();
+    refreshNowInfo();
+  }, 10 * 60 * 1000);
 }
 
 function wireHeader(): void {

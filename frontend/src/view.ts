@@ -1,8 +1,8 @@
 import Hls from "hls.js";
 import { checkStream } from "./api";
-import { card, stopHoverPreview } from "./cards";
+import { card, stopHoverPreview, updateCardNow } from "./cards";
 import { openPlayer } from "./player";
-import { categoryNames, chMeta, countryNames, filters, isDead, rank, state, visible } from "./state";
+import { categoryNames, chMeta, countryNames, filters, isDead, onNow, rank, state, visible } from "./state";
 import type { Channel } from "./types";
 import { $, escapeHtml } from "./util";
 
@@ -22,7 +22,13 @@ export function applyFilters(): void {
   state.filtered = visible().filter((ch) => {
     if (f.country && ch.country !== f.country) return false;
     if (f.category && !ch.categories.includes(f.category)) return false;
-    if (f.q && !ch.name.toLowerCase().includes(f.q)) return false;
+    if (
+      f.q &&
+      !ch.name.toLowerCase().includes(f.q) &&
+      !onNow(ch)?.title.toLowerCase().includes(f.q) // search what's playing too
+    ) {
+      return false;
+    }
     if (f.favorites && !state.favorites.has(ch.id)) return false;
     if (f.hideDead && isDead(ch)) {
       hiddenDead++;
@@ -49,6 +55,21 @@ export function setFilter(kind: "country" | "category", value: string): void {
   $<HTMLSelectElement>(kind).value = value;
   window.scrollTo(0, 0);
   applyFilters();
+}
+
+/** Patch guide info into already-rendered cards and wall cells, in place. */
+export function refreshNowInfo(): void {
+  const byId = new Map(state.channels.map((c) => [c.id, c]));
+  document.querySelectorAll<HTMLElement>(".card[data-id]").forEach((el) => {
+    const ch = byId.get(el.dataset.id!);
+    if (ch) updateCardNow(el, ch);
+  });
+  for (const cell of wall) {
+    if (cell.ch && cell.el?.isConnected) {
+      const prog = onNow(cell.ch);
+      if (prog) cell.el.querySelector(".cellMeta")!.textContent = `▸ ${prog.title}`;
+    }
+  }
 }
 
 export function goHome(): void {
@@ -167,6 +188,21 @@ function renderExplore(): void {
       }));
     }
   }
+  // programs starting within the next 25 minutes — catch them from the top
+  const soonWindow = Date.now() / 1000 + 25 * 60;
+  const soon = all
+    .filter((ch) => {
+      const next = state.epg.get(ch.id)?.next;
+      return next && next.start < soonWindow;
+    })
+    .sort((a, b) => state.epg.get(a.id)!.next!.start - state.epg.get(b.id)!.next!.start);
+  if (soon.length >= 6) {
+    grid().append(rail("⏰ Starting soon", soon, () => {}, {
+      tagline: "catch it from the top",
+      linkLabel: `${soon.length} programs`,
+    }));
+  }
+
   // keep the landing tight: on-now collections up front, the rest one click away
   for (const railEl of collectionRails.slice(0, 4)) grid().append(railEl);
   const rest = collectionRails.slice(4);
@@ -300,7 +336,8 @@ async function tuneCell(i: number, retry = false): Promise<void> {
   cell.ch = ch;
   el.classList.remove("playing");
   el.querySelector(".cellName")!.textContent = ch.name;
-  el.querySelector(".cellMeta")!.textContent = chMeta(ch);
+  const prog = onNow(ch);
+  el.querySelector(".cellMeta")!.textContent = prog ? `▸ ${prog.title}` : chMeta(ch);
   cell.hls?.destroy();
   cell.hls = null;
 

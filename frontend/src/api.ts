@@ -1,10 +1,21 @@
-import type { Catalog, Channel, CheckResult } from "./types";
+import type { Catalog, Channel, CheckResult, NowNext } from "./types";
 import { state } from "./state";
 
 export async function fetchCatalog(): Promise<Catalog> {
   const res = await fetch("/api/catalog");
   if (!res.ok) throw new Error(`catalog fetch failed: ${res.status}`);
   return res.json();
+}
+
+export async function fetchNowPlaying(): Promise<void> {
+  try {
+    const res = await fetch("/api/now");
+    if (!res.ok) return;
+    const data: Record<string, NowNext> = await res.json();
+    state.epg = new Map(Object.entries(data));
+  } catch {
+    /* guide is a nice-to-have; the app works without it */
+  }
 }
 
 export function checkStream(url: string): Promise<CheckResult> {

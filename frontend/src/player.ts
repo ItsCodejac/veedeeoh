@@ -2,7 +2,7 @@ import Hls from "hls.js";
 import { openInVlc, toggleFavorite } from "./api";
 import { chMeta, state } from "./state";
 import type { Channel } from "./types";
-import { $ } from "./util";
+import { $, fmtTime } from "./util";
 
 let hls: Hls | null = null;
 
@@ -99,7 +99,12 @@ export function openPlayer(ch: Channel, streamIdx = 0, context?: Channel[]): voi
   updateZapButtons(ch);
   $("playerOverlay").hidden = false;
   $("pName").textContent = ch.name;
-  $("pMeta").textContent = chMeta(ch);
+  const entry = state.epg.get(ch.id);
+  const guide = [
+    entry?.now && `▸ ${entry.now.title} · until ${fmtTime(entry.now.stop)}`,
+    entry?.next && `then ${entry.next.title} at ${fmtTime(entry.next.start)}`,
+  ].filter(Boolean).join("  ·  ");
+  $("pMeta").textContent = guide ? `${chMeta(ch)}  —  ${guide}` : chMeta(ch);
   const logo = $<HTMLImageElement>("pLogo");
   logo.src = ch.logo || "";
   logo.hidden = !ch.logo;

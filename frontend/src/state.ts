@@ -1,4 +1,4 @@
-import type { Channel, Category, Country, Filters } from "./types";
+import type { Channel, Category, Country, Filters, NowNext } from "./types";
 import { $ } from "./util";
 
 export const state = {
@@ -7,10 +7,15 @@ export const state = {
   categories: [] as Category[],
   favorites: new Set<string>(),
   health: new Map<string, boolean>(),
+  epg: new Map<string, NowNext>(),
   filtered: [] as Channel[],
   rendered: 0,
   current: null as Channel | null,
 };
+
+export function onNow(ch: Channel) {
+  return state.epg.get(ch.id)?.now;
+}
 
 export const countryNames = new Map<string, string>();
 export const categoryNames = new Map<string, string>();

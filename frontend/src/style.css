@@ -143,6 +143,22 @@ select { max-width: 190px; }
 .cname { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cmeta { color: var(--dim); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* what's on right now, with progress through the program */
+.cnow { display: flex; flex-direction: column; gap: 3px; }
+.cnowTitle {
+  color: var(--accent);
+  font-size: 12px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cprog {
+  display: block;
+  height: 2px;
+  background: #262a35;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.cprog i { display: block; height: 100%; background: var(--accent); }
+
 .dot {
   position: absolute; top: 10px; left: 10px;
   width: 8px; height: 8px; border-radius: 50%;

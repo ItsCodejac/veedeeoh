@@ -11,3 +11,10 @@ const HTML_ESCAPES: Record<string, string> = {
 export function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => HTML_ESCAPES[c] ?? c);
 }
+
+export function fmtTime(epochSeconds: number): string {
+  return new Date(epochSeconds * 1000).toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
