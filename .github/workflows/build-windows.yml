@@ -21,13 +21,16 @@ jobs:
         include:
           - os: windows-latest
             label: windows
-            artifact: veedeeoh-windows.zip
+            artifact: dist/veedeeoh.exe
+            artifact_name: veedeeoh.exe
           - os: macos-latest
             label: macos
-            artifact: veedeeoh-macos.zip
+            artifact: dist/veedeeoh
+            artifact_name: veedeeoh-macos
           - os: ubuntu-latest
             label: linux
-            artifact: veedeeoh-linux.tar.gz
+            artifact: dist/veedeeoh
+            artifact_name: veedeeoh-linux
 
     runs-on: ${{ matrix.os }}
 
@@ -51,24 +54,11 @@ jobs:
       - name: Build with PyInstaller
         run: uv run pyinstaller tvlc.spec --noconfirm
 
-      - name: Package (Windows)
-        if: matrix.label == 'windows'
-        shell: pwsh
-        run: Compress-Archive -Path dist/veedeeoh -DestinationPath dist/veedeeoh-windows.zip
-
-      - name: Package (macOS)
-        if: matrix.label == 'macos'
-        run: cd dist && zip -r veedeeoh-macos.zip veedeeoh.app
-
-      - name: Package (Linux)
-        if: matrix.label == 'linux'
-        run: cd dist && tar -czf veedeeoh-linux.tar.gz veedeeoh
-
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: veedeeoh-${{ matrix.label }}
-          path: dist/${{ matrix.artifact }}
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact }}
           retention-days: 30
 
   release:
@@ -90,26 +80,16 @@ jobs:
           body: |
             Automated build from commit ${{ github.sha }}.
 
-            **Windows:**
-            1. Download `veedeeoh-windows.zip` and unzip it
-            2. Open the `veedeeoh` folder
-            3. Double-click `veedeeoh.exe`
-            4. Your browser opens automatically to `http://127.0.0.1:8321`
+            **Windows:** Download `veedeeoh.exe` and double-click it. Your browser opens to `http://127.0.0.1:8321`.
 
-            **macOS:**
-            1. Download `veedeeoh-macos.zip` and unzip it
-            2. Double-click `veedeeoh.app`
-            3. Your browser opens automatically to `http://127.0.0.1:8321`
+            **macOS:** Download `veedeeoh-macos`, make it executable (`chmod +x veedeeoh-macos`), then run it. Your browser opens to `http://127.0.0.1:8321`.
 
-            **Linux:**
-            1. Download and extract `veedeeoh-linux.tar.gz` (`tar -xzf veedeeoh-linux.tar.gz`)
-            2. Run `./veedeeoh/veedeeoh`
-            3. Your browser opens automatically to `http://127.0.0.1:8321`
+            **Linux:** Download `veedeeoh-linux`, make it executable (`chmod +x veedeeoh-linux`), then run it. Your browser opens to `http://127.0.0.1:8321`.
 
             > VLC must be installed separately if you want "Open in VLC" to work.
           files: |
-            artifacts/veedeeoh-windows/veedeeoh-windows.zip
-            artifacts/veedeeoh-macos/veedeeoh-macos.zip
-            artifacts/veedeeoh-linux/veedeeoh-linux.tar.gz
+            artifacts/veedeeoh.exe/veedeeoh.exe
+            artifacts/veedeeoh-macos/veedeeoh
+            artifacts/veedeeoh-linux/veedeeoh
           draft: false
           prerelease: false
