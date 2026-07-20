@@ -1,4 +1,4 @@
-name: Build Windows Executable
+name: Build
 
 on:
   workflow_dispatch:
@@ -13,7 +13,29 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            label: windows
+            exe: veedeeoh.exe
+            zip_cmd: "Compress-Archive -Path dist/veedeeoh -DestinationPath dist/veedeeoh-windows.zip"
+            zip_shell: pwsh
+            artifact: veedeeoh-windows.zip
+          - os: macos-latest
+            label: macos
+            exe: veedeeoh
+            zip_cmd: "cd dist && zip -r veedeeoh-macos.zip veedeeoh"
+            zip_shell: bash
+            artifact: veedeeoh-macos.zip
+          - os: ubuntu-latest
+            label: linux
+            exe: veedeeoh
+            zip_cmd: "cd dist && tar -czf veedeeoh-linux.tar.gz veedeeoh"
+            zip_shell: bash
+            artifact: veedeeoh-linux.tar.gz
+
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout repository
@@ -33,35 +55,59 @@ jobs:
           uv pip install pyinstaller
 
       - name: Build with PyInstaller
-        run: |
-          uv run pyinstaller tvlc.spec --noconfirm
+        run: uv run pyinstaller tvlc.spec --noconfirm
 
-      - name: Zip dist
-        run: |
-          Compress-Archive -Path dist\veedeeoh -DestinationPath dist\veedeeoh-windows.zip
-        shell: pwsh
+      - name: Package dist
+        run: ${{ matrix.zip_cmd }}
+        shell: ${{ matrix.zip_shell }}
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: veedeeoh-windows
-          path: dist/veedeeoh-windows.zip
+          name: veedeeoh-${{ matrix.label }}
+          path: dist/${{ matrix.artifact }}
           retention-days: 30
 
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
       - name: Create GitHub Release
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
           name: "veedeeoh. build #${{ github.run_number }}"
           body: |
-            Automated Windows build from commit ${{ github.sha }}.
+            Automated build from commit ${{ github.sha }}.
 
-            **How to run:**
+            **Windows:**
             1. Download `veedeeoh-windows.zip` and unzip it
             2. Open the `veedeeoh` folder
             3. Double-click `veedeeoh.exe`
-            4. Your browser will open automatically to `http://127.0.0.1:8321`
-          files: dist/veedeeoh-windows.zip
+            4. Your browser opens automatically to `http://127.0.0.1:8321`
+
+            **macOS:**
+            1. Download `veedeeoh-macos.zip` and unzip it
+            2. Open the `veedeeoh` folder
+            3. Double-click `veedeeoh` (or run `./veedeeoh` in Terminal)
+            4. Your browser opens automatically to `http://127.0.0.1:8321`
+
+            **Linux:**
+            1. Download `veedeeoh-linux.tar.gz` and extract it (`tar -xzf veedeeoh-linux.tar.gz`)
+            2. Run `./veedeeoh/veedeeoh`
+            3. Your browser opens automatically to `http://127.0.0.1:8321`
+
+            > VLC must be installed separately if you want "Open in VLC" to work.
+          files: |
+            artifacts/veedeeoh-windows/veedeeoh-windows.zip
+            artifacts/veedeeoh-macos/veedeeoh-macos.zip
+            artifacts/veedeeoh-linux/veedeeoh-linux.tar.gz
           draft: false
           prerelease: false
