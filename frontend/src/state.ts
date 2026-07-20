@@ -43,6 +43,7 @@ export function isDead(ch: Channel): boolean {
 export function rank(ch: Channel): number {
   let r = 0;
   if (state.favorites.has(ch.id)) r -= 2;
+  if (ch.streams[0] && state.health.get(ch.streams[0].url) === true) r -= 1;
   if (isDead(ch)) r += 4;
   return r;
 }

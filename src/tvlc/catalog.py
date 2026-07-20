@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 from pathlib import Path
 from typing import Any
@@ -123,6 +124,8 @@ def build_catalog(raw: dict[str, list[dict]]) -> dict[str, Any]:
                 by_name.setdefault(sources.normalize_name(ch["name"]), []).append(ch)
                 channels.append(ch)
 
+    for ch in channels:
+        ch["streams"].sort(key=lambda s: -_quality_rank(s.get("quality")))
     channels.sort(key=lambda c: c["name"].lower())
 
     used_countries = {c["country"] for c in channels}
@@ -151,6 +154,14 @@ def build_catalog(raw: dict[str, list[dict]]) -> dict[str, Any]:
             key=lambda c: c["name"],
         ),
     }
+
+
+def _quality_rank(quality: str | None) -> int:
+    """"1080p" -> 1080; unlabeled streams rank below any labeled one."""
+    if not quality:
+        return 0
+    m = re.search(r"(\d{3,4})", quality)
+    return int(m.group(1)) if m else 0
 
 
 def _merge_target(candidates: list[dict], ch: dict) -> dict | None:

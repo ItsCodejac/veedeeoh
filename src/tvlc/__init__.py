@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 import os
+import sys
 import threading
 import webbrowser
 
 
 def main() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] == "sweep":
+        from . import maintenance
+
+        maintenance.main()
+        return
+
     import uvicorn
 
     host = os.environ.get("TVLC_HOST", "127.0.0.1")

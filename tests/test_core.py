@@ -214,3 +214,14 @@ def test_epg_key_mapping():
     assert epg.epg_key(samsung) == "USAJ3504502A"
     assert epg.epg_key(pluto) == "60940a07d88ba90007b9cb71"
     assert epg.epg_key(other) is None
+
+
+def test_streams_sorted_by_quality():
+    raw = {**RAW, "streams": [
+        {"channel": "News.us", "url": "http://x/sd.m3u8", "quality": "480p"},
+        {"channel": "News.us", "url": "http://x/hd.m3u8", "quality": "1080p"},
+        {"channel": "News.us", "url": "http://x/unk.m3u8"},
+    ]}
+    channels = build_catalog(raw)["channels"]
+    news = next(c for c in channels if c["id"] == "News.us")
+    assert [s["quality"] for s in news["streams"]] == ["1080p", "480p", None]
