@@ -71,3 +71,34 @@ export async function toggleFavorite(ch: Channel): Promise<boolean> {
   });
   return true;
 }
+
+export async function fetchWatched(): Promise<string[]> {
+  try {
+    const res = await fetch("/api/watched");
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
+}
+
+export async function toggleWatched(episodeId: string, force?: boolean): Promise<boolean> {
+  const current = state.watched.has(episodeId);
+  const target = force !== undefined ? force : !current;
+  
+  if (target === current) return current;
+
+  if (target) {
+    state.watched.add(episodeId);
+    await fetch("/api/watched", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: episodeId }),
+    });
+    return true;
+  } else {
+    state.watched.delete(episodeId);
+    await fetch(`/api/watched/${encodeURIComponent(episodeId)}`, { method: "DELETE" });
+    return false;
+  }
+}

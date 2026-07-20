@@ -2,6 +2,7 @@ export interface Stream {
   url: string;
   quality: string | null;
   source: string;
+  id?: string;
 }
 
 export interface Channel {
@@ -14,6 +15,9 @@ export interface Channel {
   logos: string[];
   streams: Stream[];
   source: string;
+  vodPoster?: string | null;
+  vodBanner?: string | null;
+  vodItem?: any;
 }
 
 export interface Country {
@@ -65,6 +69,7 @@ export interface VodItem {
   title: string;
   type: string;
   poster: string | null;
+  banner?: string | null;
   summary: string;
   genre?: string | null;
   rating?: string | null;
@@ -84,6 +89,9 @@ export interface VodEpisode {
   season: number | null;
   number: number | null;
   url: string;
+  description?: string;
+  duration?: number | null;
+  thumbnail?: string | null;
 }
 
 export interface Filters {

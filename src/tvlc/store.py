@@ -49,6 +49,20 @@ class Favorites:
         self.store.save(sorted(self.ids))
 
 
+class Watched:
+    def __init__(self, path: Path | None = None) -> None:
+        self.store = JsonStore(path or DATA_DIR / "watched.json", [])
+        self.ids: set[str] = set(self.store.load())
+
+    def add(self, episode_id: str) -> None:
+        self.ids.add(episode_id)
+        self.store.save(sorted(self.ids))
+
+    def remove(self, episode_id: str) -> None:
+        self.ids.discard(episode_id)
+        self.store.save(sorted(self.ids))
+
+
 class HealthCache:
     """Stream url -> {"ok": bool, "checked_at": epoch}. Verdicts expire after ttl."""
 

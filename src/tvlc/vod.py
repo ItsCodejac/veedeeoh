@@ -87,7 +87,8 @@ def _normalize(session: dict[str, Any], item: dict) -> dict | None:
         "title": item.get("name", "Untitled"),
         "type": item.get("type"),
         "poster": poster,
-        "summary": (item.get("summary") or item.get("description") or "")[:300],
+        "banner": item.get("featuredImage", {}).get("path") or item.get("poster16_9", {}).get("path"),
+        "summary": (item.get("summary") or item.get("description") or "")[:500],
         "genre": item.get("genre"),
         "rating": item.get("rating"),
         "duration": item.get("duration"),
@@ -151,11 +152,19 @@ async def get_series(client: httpx.AsyncClient, series_id: str, region_code: str
         for ep in season.get("episodes", []):
             path = (ep.get("stitched") or {}).get("path")
             if path:
+                covers = ep.get("covers") or []
+                thumbnail = next(
+                    (c["url"] for c in covers if c.get("aspectRatio") == "16:9"),
+                    ep.get("poster16_9", {}).get("path") if ep.get("poster16_9") else None,
+                )
                 episodes.append({
                     "title": ep.get("name", "Episode"),
                     "season": ep.get("season"),
                     "number": ep.get("number"),
                     "url": stream_url(session, path),
+                    "description": ep.get("description") or ep.get("summary") or "",
+                    "duration": ep.get("duration"),
+                    "thumbnail": thumbnail,
                 })
     return episodes
 

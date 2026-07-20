@@ -3,26 +3,80 @@ import { checkStream } from "./api";
 import { card, setLogo, stopHoverPreview, updateCardNow } from "./cards";
 import { openPlayer } from "./player";
 import { categoryNames, chMeta, countryNames, filters, isDead, onNow, rank, state, visible } from "./state";
-import type { Channel } from "./types";
+import type { Channel, VodRail, VodItem } from "./types";
 import { $, escapeHtml, isGeoBlockBumper } from "./util";
-import { appendVodSection } from "./vod";
+import { getVodRails, resumeVodPlayback, openVodDetails } from "./vod";
 
 const BATCH = 120;
 const grid = () => $("grid");
+
+export const VIBE_MAP: Record<string, string[]> = {
+  "cartoon breakfast.": ["anime-gaming", "anime", "kids", "animation", "animated"],
+  "doomscroll.": ["news", "business", "weather"],
+  "the lock-in.": ["sports", "sports-outdoors"],
+  "sub'd not dub'd.": ["international", "foreign", "subtitled"],
+  "static.": ["classic", "western-classic-tv", "movies"],
+  "graveyard.": ["paranormal", "horror", "thriller"]
+};
+
+export function renderVibeBlocks(): void {
+  const row = $("vibeBlocksRow");
+  if (!row) return;
+  row.replaceChildren();
+
+  const blocks = [
+    { name: "cartoon breakfast.", desc: "toons, anime, cereal energy", icon: "🥞" },
+    { name: "doomscroll.", desc: "rolling news, all timezones", icon: "📰" },
+    { name: "the lock-in.", desc: "match day never ends", icon: "⚽" },
+    { name: "sub'd not dub'd.", desc: "the world, subtitled", icon: "💬" },
+    { name: "static.", desc: "b-movies, oddities, retro", icon: "📺" },
+    { name: "graveyard.", desc: "for the 3am crowd", icon: "💀" }
+  ];
+
+  blocks.forEach((b) => {
+    const card = document.createElement("div");
+    card.className = "vibeCard";
+    if (state.activeVibe === b.name) card.classList.add("active");
+    card.innerHTML = `
+      <div class="vibeIcon">${b.icon}</div>
+      <span class="vibeName">${b.name}</span>
+      <span class="vibeDesc">${b.desc}</span>
+    `;
+    card.addEventListener("click", () => {
+      if (state.activeVibe === b.name) {
+        state.activeVibe = null;
+        card.classList.remove("active");
+      } else {
+        state.activeVibe = b.name;
+        row.querySelectorAll(".vibeCard").forEach((c) => c.classList.remove("active"));
+        card.classList.add("active");
+      }
+      applyFilters();
+    });
+    row.append(card);
+  });
+}
 
 export function applyFilters(): void {
   const f = filters();
   destroyHero();
   stopHoverPreview();
-  if (!f.q && !f.country && !f.category && !f.favorites) {
-    renderExplore();
+
+  // Auto-switch to Live TV if a filter is set and we're not already on Live TV
+  const tabLive = document.getElementById("tabLive");
+  if ((f.q || f.country || f.category || f.favorites) && tabLive && !tabLive.classList.contains("active")) {
+    tabLive.click();
     return;
   }
-  grid().classList.remove("explore");
+
   let hiddenDead = 0;
   state.filtered = visible().filter((ch) => {
     if (f.country && ch.country !== f.country) return false;
     if (f.category && !ch.categories.includes(f.category)) return false;
+    if (state.activeVibe) {
+      const vibeCats = VIBE_MAP[state.activeVibe] || [];
+      if (!ch.categories.some((c) => vibeCats.includes(c))) return false;
+    }
     if (
       f.q &&
       !ch.name.toLowerCase().includes(f.q) &&
@@ -37,6 +91,7 @@ export function applyFilters(): void {
     }
     return true;
   });
+
   // known-dead channels sink to the bottom, favorites float to the top
   state.filtered.sort((a, b) => rank(a) - rank(b));
   $("stats").textContent = `${state.filtered.length.toLocaleString()} channels` +
@@ -57,7 +112,13 @@ export function renderMore(): void {
 function showCollection(title: string, channels: Channel[]): void {
   destroyHero();
   stopHoverPreview();
-  grid().classList.remove("explore");
+  
+  // Switch to Live TV view when opening a collection from Home
+  const tabLive = document.getElementById("tabLive");
+  if (tabLive && !tabLive.classList.contains("active")) {
+    tabLive.click();
+  }
+
   state.filtered = [...channels].sort((a, b) => rank(a) - rank(b));
   state.rendered = 0;
   $("stats").textContent = `${state.filtered.length.toLocaleString()} channels · ${title}`;
@@ -86,8 +147,13 @@ export function goHome(): void {
   $<HTMLSelectElement>("country").value = "";
   $<HTMLSelectElement>("category").value = "";
   $("favToggle").classList.remove("active");
+  state.activeVibe = null;
+  const vibeRow = document.getElementById("vibeBlocksRow");
+  if (vibeRow) {
+    vibeRow.querySelectorAll(".vibeCard").forEach((c) => c.classList.remove("active"));
+  }
   window.scrollTo(0, 0);
-  applyFilters();
+  $("tabHome").click();
 }
 
 /** Where you effectively are for stream availability. The server's egress
@@ -144,153 +210,121 @@ const caro = {
   tries: 0,
 };
 
-function renderExplore(): void {
-  const all = visible();
-  state.filtered = [];
-  state.rendered = 0;
-  grid().classList.add("explore");
-  grid().replaceChildren();
-  $("stats").textContent = "";
+export async function renderHome(): Promise<void> {
+  const homeContainer = $("homeView");
+  if (!homeContainer) return;
+  homeContainer.replaceChildren();
 
-  grid().append(buildCarousel());
-  caro.items = pickCarousel();
-  caro.center = 0;
-  renderCaro();
-  appendVodSection(grid());
+  // Create loading indicator
+  const loading = document.createElement("div");
+  loading.style.color = "var(--dim)";
+  loading.style.padding = "24px";
+  loading.textContent = "Loading Home Screen...";
+  homeContainer.append(loading);
 
-  const favs = all.filter((ch) => state.favorites.has(ch.id));
-  if (favs.length) {
-    grid().append(rail("★ Favorites", favs, () => {
-      $("favToggle").classList.add("active");
-      applyFilters();
-    }));
-  }
+  try {
+    const rails = await getVodRails();
+    loading.remove();
 
-  const byCat = new Map<string, Channel[]>();
-  const countryCounts = new Map<string, number>();
-  for (const ch of all) {
-    for (const c of ch.categories) {
-      if (!byCat.has(c)) byCat.set(c, []);
-      byCat.get(c)!.push(ch);
+    // 1. Continue Watching (Recent Resumes) from localStorage
+    const resumeHistoryStr = localStorage.getItem("tvlc_resume_history") || "[]";
+    let resumeHistory: any[] = [];
+    try {
+      resumeHistory = JSON.parse(resumeHistoryStr);
+    } catch (e) {
+      resumeHistory = [];
     }
-    if (ch.country) countryCounts.set(ch.country, (countryCounts.get(ch.country) || 0) + 1);
-  }
 
-  // "Near you": inferred from the browser locale — no geolocation, no lookups
-  const home = homeCountry();
-  if (home) {
-    const local = all.filter((ch) => ch.country === home);
-    if (local.length >= 8) {
-      const name = countryNames.get(home) || home;
-      grid().append(rail(`📍 ${name}`, local, () => setFilter("country", home)));
+    if (resumeHistory.length > 0) {
+      const continueRail = document.createElement("div");
+      continueRail.className = "rail";
+      continueRail.innerHTML = `
+        <div class="railHead">
+          <h2>Continue Watching</h2>
+          <span class="railTag">Resume where you left off</span>
+        </div>
+      `;
+      const continueScroller = document.createElement("div");
+      continueScroller.className = "railScroll";
+
+      resumeHistory.forEach((item) => {
+        const card = document.createElement("button");
+        card.className = "vodCard";
+        card.style.position = "relative";
+        card.innerHTML = `
+          <span class="vodPoster">${item.poster ? `<img loading="lazy" alt="" src="${escapeHtml(item.poster)}">` : "🎬"}</span>
+          <span class="vodTitle">${escapeHtml(item.title)}</span>
+          <span class="vodMeta">${escapeHtml(item.episodeTitle || "Movie")}</span>
+          <div class="resumeProgressWrapper">
+            <div class="resumeProgressBar" style="width: ${item.percentage}%;"></div>
+          </div>
+        `;
+        card.onclick = () => {
+          resumeVodPlayback(item);
+        };
+        continueScroller.append(card);
+      });
+      continueRail.append(continueScroller);
+      homeContainer.append(continueRail);
     }
-  }
 
-  // collections whose primetime includes the current hour lead the lineup
-  const hour = new Date().getHours();
-  const lineup = [...COLLECTIONS].sort(
-    (a, b) => Number(b.primetime.includes(hour)) - Number(a.primetime.includes(hour))
-  );
-  const collectionRails: HTMLElement[] = [];
-  for (const col of lineup) {
-    const seen = new Set<string>();
-    const chans = col.categories
-      .flatMap((id) => byCat.get(id) || [])
-      .concat(col.match ? all.filter((ch) => col.match!.test(ch.name)) : [])
-      .filter((ch) => !seen.has(ch.id) && seen.add(ch.id));
-    if (chans.length >= 8) {
-      const seeAll = col.match
-        ? () => showCollection(col.title, chans)
-        : () => setFilter("category", col.categories[0]!);
-      collectionRails.push(rail(col.title, chans, seeAll, {
-        tagline: col.primetime.includes(hour) ? `${col.tagline} · on now` : col.tagline,
-      }));
+    // 2. Add Spotlight VOD Hero if there is a featured item
+    const hero = $("homeHero");
+    if (hero) {
+      const featured = rails[0]?.items[0];
+      if (featured) {
+        const bannerImg = featured.banner || featured.poster || "";
+        hero.className = "vodHeroBlock";
+        hero.style.backgroundImage = bannerImg ? `url(${bannerImg})` : "";
+        hero.innerHTML = `
+          <div class="vodHeroOverlay"></div>
+          <div class="vodHeroContent">
+            <span class="vodHeroGenre">${escapeHtml(featured.genre || "Featured")}</span>
+            <h2 class="vodHeroTitle">${escapeHtml(featured.title)}</h2>
+            <div class="vodHeroMeta">${escapeHtml(featured.rating || "")}</div>
+            <p class="vodHeroSummary">${escapeHtml(featured.summary)}</p>
+          </div>
+        `;
+        hero.onclick = () => {
+          void openVodDetails(featured);
+        };
+        hero.removeAttribute("hidden");
+      }
     }
-  }
-  // programs starting within the next 25 minutes — catch them from the top
-  const soonWindow = Date.now() / 1000 + 25 * 60;
-  const soon = all
-    .filter((ch) => {
-      const next = state.epg.get(ch.id)?.next;
-      return next && next.start < soonWindow;
-    })
-    .sort((a, b) => state.epg.get(a.id)!.next!.start - state.epg.get(b.id)!.next!.start);
-  if (soon.length >= 6) {
-    grid().append(rail("⏰ Starting soon", soon, () => {}, {
-      tagline: "catch it from the top",
-      linkLabel: `${soon.length} programs`,
-    }));
-  }
 
-  // keep the landing tight: on-now collections up front, the rest one click away
-  for (const railEl of collectionRails.slice(0, 4)) grid().append(railEl);
-  const rest = collectionRails.slice(4);
-  if (rest.length) {
-    const more = document.createElement("button");
-    more.id = "moreRails";
-    more.textContent = `▾ ${rest.length} more collections`;
-    more.addEventListener("click", () => {
-      more.replaceWith(...rest);
+    // 3. Render top 3-4 VOD Rails on the Home page!
+    rails.slice(0, 4).forEach((rail: VodRail) => {
+      const el = document.createElement("div");
+      el.className = "rail";
+      el.innerHTML = `
+        <div class="railHead">
+          <h2>${escapeHtml(rail.name)}</h2>
+          <span class="railTag">${rail.items.length} items</span>
+        </div>
+      `;
+      const scroller = document.createElement("div");
+      scroller.className = "railScroll";
+      rail.items.slice(0, 15).forEach((item: VodItem) => {
+        const card = document.createElement("button");
+        card.className = "vodCard";
+        card.title = item.summary || item.title;
+        card.innerHTML = `
+          <span class="vodPoster">${item.poster ? `<img loading="lazy" alt="" src="${escapeHtml(item.poster)}">` : "🎬"}</span>
+          <span class="vodTitle">${escapeHtml(item.title)}</span>
+          <span class="vodMeta">${escapeHtml([item.genre, item.rating].filter(Boolean).join(" · "))}</span>
+        `;
+        card.onclick = () => {
+          void openVodDetails(item);
+        };
+        scroller.append(card);
+      });
+      el.append(scroller);
+      homeContainer.append(el);
     });
-    grid().append(more);
-  }
 
-  // Passport: a different country spotlight every visit
-  const eligible = state.countries.filter((c) => (countryCounts.get(c.code) || 0) >= 8);
-  const dest = eligible[Math.floor(Math.random() * eligible.length)];
-  if (dest) {
-    grid().append(rail(
-      `🌍 Passport: ${dest.flag} ${dest.name}`,
-      all.filter((ch) => ch.country === dest.code),
-      () => setFilter("country", dest.code),
-      { tagline: "tonight we're broadcasting from" }
-    ));
+  } catch (err) {
+    loading.textContent = `Failed to load Home dashboard: ${err}`;
   }
-
-  // Lucky Dip: pure chaos, reshuffled every visit
-  const dip = [...all].filter((ch) => ch.logo);
-  for (let i = dip.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [dip[i], dip[j]] = [dip[j]!, dip[i]!];
-  }
-  grid().append(rail("🎰 Lucky Dip", dip.slice(0, 25), () => applyFilters(), {
-    tagline: "25 channels, zero logic",
-    linkLabel: "Reshuffle ↻",
-  }));
-
-  const strip = document.createElement("div");
-  strip.className = "countryStrip";
-  const head = document.createElement("div");
-  head.className = "sectionHead";
-  const rc = state.region?.code;
-  const homeName = rc ? countryNames.get(rc) || rc : null;
-  head.textContent = homeName
-    ? `Around the world — you appear to be in ${homeName}`
-    : "Around the world";
-  strip.append(head);
-  const chipRow = document.createElement("div");
-  chipRow.className = "chipRow";
-  const top = [...state.countries]
-    .sort(
-      (a, b) =>
-        Number(b.code === home) - Number(a.code === home) ||
-        (countryCounts.get(b.code) || 0) - (countryCounts.get(a.code) || 0)
-    )
-    .slice(0, 21);
-  for (const c of top) {
-    const chip = document.createElement("button");
-    chip.className = "countryChip";
-    chip.innerHTML = `${c.flag} <span>${escapeHtml(c.name)}</span> <em>${(countryCounts.get(c.code) || 0).toLocaleString()}</em>`;
-    chip.addEventListener("click", () => setFilter("country", c.code));
-    chipRow.append(chip);
-  }
-  const more = document.createElement("button");
-  more.className = "countryChip more";
-  more.textContent = `all ${state.countries.length} countries…`;
-  more.addEventListener("click", () => $("country").focus());
-  chipRow.append(more);
-  strip.append(chipRow);
-  grid().append(strip);
 }
 
 // The signature, Twitch-style: one live stream center stage with an info

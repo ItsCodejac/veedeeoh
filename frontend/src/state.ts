@@ -7,11 +7,13 @@ export const state = {
   categories: [] as Category[],
   region: { code: null, source: "unknown" } as Region,
   favorites: new Set<string>(),
+  watched: new Set<string>(),
   health: new Map<string, boolean>(),
   epg: new Map<string, NowNext>(),
   filtered: [] as Channel[],
   rendered: 0,
   current: null as Channel | null,
+  activeVibe: null as string | null,
 };
 
 export function onNow(ch: Channel) {

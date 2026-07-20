@@ -1,13 +1,12 @@
-# TVLC 📺
+# veedeeoh.
 
 Browse and watch the [iptv-org](https://github.com/iptv-org/iptv) catalog — ~10,000 free,
 legal live TV streams from around the world — without drowning in one giant alphabetical
-playlist. TVLC gives you a searchable channel grid with logos, filters, favorites, and
+playlist. veedeeoh. gives you a channel grid with logos, filters, favorites, and
 instant in-page previews, with **VLC one click away** for proper watching.
 
 ## Features
 
-- 🔍 **Instant search** across ~10k channels, plus country / category filters
 - 🖼 **Channel grid with logos** — lazy-loaded, infinite scroll
 - ▶️ **In-page preview** via hls.js (streams are proxied locally to dodge CORS), with an
   **Open in VLC** button for the real thing
@@ -16,16 +15,31 @@ instant in-page previews, with **VLC one click away** for proper watching.
 - 🟢 **Lazy health checks** — streams are probed as their cards scroll into view;
   dead channels dim and sink to the bottom (never deleted — streams come back)
 - ⤓ **Export M3U** — download whatever your current filters show as a clean playlist with
-  `group-title` folders and logos, ready for plain VLC or any IPTV app; or subscribe
-  directly to e.g. `http://localhost:8321/playlist.m3u?favorites=true&alive=true`
+  `group-title` folders and logos, ready for plain VLC or any IPTV app
 - 💬 **Live captions & translation** — a CC button in the player runs the stream's audio
   through a local Whisper model ([faster-whisper](https://github.com/SYSTRAN/faster-whisper)):
   one click for original-language captions, another for live translation to English.
   Needs `ffmpeg` (`brew install ffmpeg`); the model (~500 MB) downloads on first use.
-  Set `TVLC_WHISPER_MODEL` (`tiny`/`base`/`small`/`medium`) to trade accuracy for speed.
 - 🔞 NSFW channels hidden by default
 
-## Run it
+## Known issues
+
+- Search doesn't work yet
+- The country dropdown is from a removed feature and does nothing
+- The home page is still under development
+
+## Download (Windows)
+
+Grab the latest build from the [Releases](../../releases) page:
+
+1. Download `veedeeoh-windows.zip` and unzip it
+2. Open the `veedeeoh` folder
+3. Double-click `veedeeoh.exe`
+4. Your browser opens automatically to `http://127.0.0.1:8321`
+
+> VLC must be installed separately if you want "Open in VLC" to work.
+
+## Run from source
 
 Requires [uv](https://docs.astral.sh/uv/) and (optionally) [VLC](https://www.videolan.org/).
 
@@ -38,8 +52,7 @@ First launch downloads and caches the iptv-org catalog (~20 MB), then opens
 
 Environment knobs: `TVLC_PORT` (default 8321), `TVLC_HOST` (default 127.0.0.1),
 `TVLC_NO_BROWSER=1` to skip auto-opening the browser, `TVLC_REGION` to force an
-availability region (ISO country code) instead of auto-detecting your egress —
-useful behind a VPN when providers geo-block your exit country.
+availability region (ISO country code) instead of auto-detecting your egress.
 
 ## Development
 
@@ -61,9 +74,7 @@ npm run dev    # dev server on :5173, proxies API calls to the running backend
 npm run build  # type-check + build into src/tvlc/static/
 ```
 
-Design notes live in [docs/plans/](docs/plans/).
-
 ## Credits
 
 All channel data and streams come from the wonderful [iptv-org](https://github.com/iptv-org)
-project. TVLC hosts nothing — it only organizes publicly available streams they index.
+project. veedeeoh. hosts nothing — it only organizes publicly available streams they index.

@@ -1,17 +1,21 @@
 import "./style.css";
-import { fetchCatalog, fetchNowPlaying } from "./api";
+import { fetchCatalog, fetchNowPlaying, fetchWatched } from "./api";
 import { openPlayer, wirePlayer } from "./player";
 import { categoryNames, countryNames, filters, state, visible } from "./state";
 import { $ } from "./util";
-import { applyFilters, goHome, refreshNowInfo, renderMore } from "./view";
+import { applyFilters, goHome, refreshNowInfo, renderMore, renderHome, renderVibeBlocks } from "./view";
+import { wireVodDetails, renderShows, renderMovies, wireSearchInputs } from "./vod";
+import { closePartyPlayer } from "./party";
+import { renderMusic } from "./music";
 
 async function boot(): Promise<void> {
-  const data = await fetchCatalog();
+  const [data, watchedList] = await Promise.all([fetchCatalog(), fetchWatched()]);
   state.channels = data.channels;
   state.countries = data.countries;
   state.categories = data.categories;
   state.region = data.region;
   state.favorites = new Set(data.favorites);
+  state.watched = new Set(watchedList);
   state.health = new Map(Object.entries(data.health));
 
   for (const c of state.countries) {
@@ -22,19 +26,57 @@ async function boot(): Promise<void> {
     categoryNames.set(c.id, c.name);
     $<HTMLSelectElement>("category").append(new Option(c.name, c.id));
   }
-  applyFilters();
+  renderHome();
+  renderVibeBlocks();
 
-  // guide data loads in the background server-side; poll briefly until it lands,
-  // then patch rendered cards in place (no re-render, streams keep playing)
-  for (let i = 0; i < 8 && !state.epg.size; i++) {
-    await fetchNowPlaying();
-    if (!state.epg.size) await new Promise((r) => setTimeout(r, 15000));
+  // Vibe blocks & Live TV polling disabled for VOD-only pivot
+  wireSearchInputs();
+}
+
+function wireSidebar(): void {
+  const tabs = ["tabHome", "tabShows", "tabMovies"];
+  const views = ["homeView", "showsView", "moviesView"];
+
+  function switchView(activeTabId: string) {
+    closePartyPlayer();
+
+    tabs.forEach((t) => {
+      const btn = $(t);
+      if (btn) {
+        if (t === activeTabId) {
+          btn.classList.add("active");
+        } else {
+          btn.classList.remove("active");
+        }
+      }
+    });
+
+    views.forEach((v) => {
+      const el = $(v);
+      if (el) el.setAttribute("hidden", "");
+    });
+
+    if (activeTabId === "tabHome") {
+      $("homeView").removeAttribute("hidden");
+      renderHome();
+    } else if (activeTabId === "tabShows") {
+      $("showsView").removeAttribute("hidden");
+      if (!$("showsRails").querySelector(".rail")) {
+        renderShows($("showsRails"));
+      }
+    } else if (activeTabId === "tabMovies") {
+      $("moviesView").removeAttribute("hidden");
+      if (!$("moviesRails").querySelector(".rail")) {
+        renderMovies($("moviesRails"));
+      }
+    }
   }
-  refreshNowInfo();
-  window.setInterval(async () => {
-    await fetchNowPlaying();
-    refreshNowInfo();
-  }, 10 * 60 * 1000);
+
+  tabs.forEach((tabId) => {
+    $(tabId).addEventListener("click", () => {
+      switchView(tabId);
+    });
+  });
 }
 
 function wireHeader(): void {
@@ -55,7 +97,11 @@ function wireHeader(): void {
     applyFilters();
   });
   if (localStorage.getItem("tvlc.hideDead")) $("hideDead").classList.add("active");
-  $("home").addEventListener("click", goHome);
+  
+  $("brand").addEventListener("click", (e) => {
+    e.preventDefault();
+    $("tabHome").click();
+  });
 
   $("surprise").addEventListener("click", () => {
     const pool = state.filtered.length ? state.filtered : visible();
@@ -63,7 +109,7 @@ function wireHeader(): void {
     if (ch) openPlayer(ch);
   });
 
-  $("export").addEventListener("click", () => {
+  $("tabExport").addEventListener("click", () => {
     const f = filters();
     const params = new URLSearchParams();
     if (f.country) params.set("country", f.country);
@@ -79,6 +125,8 @@ new IntersectionObserver((entries) => {
   if (entries[0]?.isIntersecting) renderMore();
 }).observe($("sentinel"));
 
+wireSidebar();
 wireHeader();
 wirePlayer();
+wireVodDetails();
 void boot();

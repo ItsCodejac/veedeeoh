@@ -8,15 +8,16 @@ import platform
 import subprocess
 from contextlib import asynccontextmanager
 from pathlib import Path
+import re
 
 import httpx
-from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Query, WebSocket, Request, WebSocketDisconnect
 from fastapi.responses import PlainTextResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import captions, catalog, epg, health, m3u, proxy, thumbs, vod
-from .store import Favorites, HealthCache
+from . import captions, catalog, epg, health, m3u, proxy, thumbs, vod, music_scanner
+from .store import Favorites, HealthCache, Watched
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -25,6 +26,7 @@ STATIC_DIR = Path(__file__).parent / "static"
 async def lifespan(app: FastAPI):
     app.state.catalog = catalog.build_catalog(await catalog.load_raw())
     app.state.favorites = Favorites()
+    app.state.watched = Watched()
     app.state.health = HealthCache()
     app.state.client = httpx.AsyncClient(follow_redirects=True)
     app.state.check_sem = asyncio.Semaphore(6)
@@ -124,6 +126,92 @@ async def now_playing() -> dict:
     return out
 
 
+@app.get("/api/party")
+async def party_playlist(mood: str = Query("chillout")) -> dict:
+    """Continuous Party Mode playlist provider, filtered by mood."""
+    region = app.state.region
+    code = region.get("code") if region.get("source") == "override" else "US"
+    
+    live_channels = app.state.catalog.get("channels", [])
+    vod_items = []
+    try:
+        rails_data = await vod.get_catalog(app.state.client, region_code=code)
+        for r in rails_data:
+            vod_items.extend(r.get("items", []))
+    except Exception:
+        pass
+        
+    try:
+        archive = await vod.archive_movies(app.state.client, rows=60)
+        vod_items.extend(archive)
+    except Exception:
+        pass
+        
+    pool = []
+    
+    music_live = [ch for ch in live_channels if "music" in ch.get("categories", [])]
+    for ch in music_live:
+        url = ch["streams"][0]["url"] if ch.get("streams") else None
+        if url:
+            pool.append({
+                "id": ch["id"],
+                "title": ch["name"],
+                "url": url,
+                "type": "live",
+                "poster": ch.get("logo"),
+                "genre": "Live Music TV",
+                "summary": "24/7 Music Video stream"
+            })
+            
+    for item in vod_items:
+        genre = (item.get("genre") or "").lower()
+        title = (item.get("title") or "").lower()
+        summary = (item.get("summary") or "").lower()
+        
+        is_music = "music" in genre or "musical" in genre or "variety" in genre or "music" in title or "concert" in title
+        
+        if is_music:
+            url = item.get("url")
+            if not url and item.get("id", "").startswith("archive:"):
+                ident = item.get("identifier")
+                url = f"https://archive.org/download/{ident}/{ident}.mp4"
+                
+            if url:
+                pool.append({
+                    "id": item["id"],
+                    "title": item["title"],
+                    "url": url,
+                    "type": "vod",
+                    "poster": item.get("poster") or item.get("banner"),
+                    "genre": item.get("genre") or "Music Video",
+                    "summary": item.get("summary") or "Concert & Performance Video"
+                })
+                
+    mood_str = mood.lower()
+    filtered_pool = []
+    
+    for track in pool:
+        text = f"{track['title']} {track['genre']} {track['summary']}".lower()
+        if mood_str == "chillout":
+            if any(w in text for w in ["chill", "acoustic", "ambient", "jazz", "soul", "relax", "soft", "classical", "lounge", "weather"]):
+                filtered_pool.append(track)
+        elif mood_str == "high-energy":
+            if any(w in text for w in ["pop", "rock", "dance", "party", "electronic", "metal", "hip", "rap", "live", "vevo", "concert", "energetic"]):
+                filtered_pool.append(track)
+        elif mood_str == "retro":
+            if any(w in text for w in ["classic", "retro", "70s", "80s", "90s", "archive", "vintage", "oldies", "sullivan", "variety"]):
+                filtered_pool.append(track)
+        else:
+            filtered_pool.append(track)
+            
+    if not filtered_pool:
+        filtered_pool = pool
+        
+    import random
+    random.shuffle(filtered_pool)
+    return {"tracks": filtered_pool[:30]}
+
+
 @app.get("/api/vod")
 async def vod_catalog() -> dict:
     """On-demand rails: Pluto VOD (with a synthesized anime rail) + Archive films."""
@@ -178,6 +266,23 @@ async def add_favorite(body: ChannelBody) -> dict:
 @app.delete("/api/favorites/{channel_id}")
 async def remove_favorite(channel_id: str) -> dict:
     app.state.favorites.remove(channel_id)
+    return {"ok": True}
+
+
+@app.get("/api/watched")
+async def list_watched() -> list[str]:
+    return sorted(app.state.watched.ids)
+
+
+@app.post("/api/watched")
+async def add_watched(body: ChannelBody) -> dict:
+    app.state.watched.add(body.id)
+    return {"ok": True}
+
+
+@app.delete("/api/watched/{episode_id:path}")
+async def remove_watched(episode_id: str) -> dict:
+    app.state.watched.remove(episode_id)
     return {"ok": True}
 
 
@@ -355,4 +460,164 @@ async def playlist(
     )
 
 
+@app.middleware("http")
+async def add_no_cache_headers(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path in ("/", "/index.html"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    return response
+
+
+class CORSStaticFiles(StaticFiles):
+    async def simple_response(self, *args, **kwargs):
+        response = await super().simple_response(*args, **kwargs)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        return response
+
+
+import xml.etree.ElementTree as ET
+
+@app.get("/api/music/npr")
+async def npr_tiny_desk() -> dict:
+    """Fetch and parse NPR Tiny Desk Concert RSS feed."""
+    url = "https://www.npr.org/rss/podcast.php?id=510306"
+    try:
+        async with httpx.AsyncClient(follow_redirects=True) as client:
+            resp = await client.get(url, timeout=15)
+            resp.raise_for_status()
+            root = ET.fromstring(resp.content)
+            channel = root.find("channel")
+            items = channel.findall("item") if channel else []
+            
+            tracks = []
+            for item in items[:50]:
+                title = item.find("title").text if item.find("title") is not None else "Unknown Concert"
+                
+                enclosure = item.find("enclosure")
+                enc_url = enclosure.attrib.get("url") if enclosure is not None else None
+                if not enc_url:
+                    continue
+                    
+                itunes_ns = "{http://www.itunes.com/dtds/podcast-1.0.dtd}"
+                img_node = item.find(f"{itunes_ns}image")
+                img_url = img_node.attrib.get("href") if img_node is not None else None
+                
+                desc = item.find("description")
+                summary = desc.text if desc is not None else ""
+                summary = re.sub('<[^<]+?>', '', summary)[:150]
+                
+                tracks.append({
+                    "id": f"npr:{enc_url.split('/')[-2] if '/' in enc_url else title}",
+                    "title": title,
+                    "url": enc_url,
+                    "type": "vod",
+                    "poster": img_url,
+                    "genre": "Acoustic Session",
+                    "summary": f"NPR Tiny Desk: {summary}"
+                })
+            return {"tracks": tracks}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to fetch NPR feed: {exc}")
+
+
+@app.get("/api/music/archive")
+async def archive_live_concerts(rows: int = 30) -> dict:
+    """Fetch top-downloaded concerts from the Internet Archive Live Music Archive."""
+    url = "https://archive.org/advancedsearch.php"
+    params = {
+        "q": "collection:etree AND format:(MP3 OR \"VBR MP3\") AND downloads:[5000 TO 999999]",
+        "fl[]": ["identifier", "title", "creator", "year", "downloads"],
+        "sort[]": "downloads desc",
+        "rows": rows,
+        "output": "json"
+    }
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(url, params=params, timeout=15)
+            resp.raise_for_status()
+            docs = resp.json().get("response", {}).get("docs", [])
+            
+            concerts = []
+            for doc in docs:
+                ident = doc["identifier"]
+                creator = doc.get("creator", "Unknown Artist")
+                title = doc.get("title", ident)
+                downloads = doc.get("downloads", 0)
+                year = doc.get("year", "N/A")
+                
+                concerts.append({
+                    "id": f"archive_concert:{ident}",
+                    "identifier": ident,
+                    "title": title,
+                    "creator": creator,
+                    "downloads": downloads,
+                    "year": year,
+                    "poster": f"https://archive.org/services/img/{ident}",
+                    "genre": "Live Concert",
+                    "summary": f"Artist: {creator} · Downloads: {downloads:,} · Year: {year}"
+                })
+            return {"concerts": concerts}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to fetch Archive concerts: {exc}")
+
+
+@app.get("/api/music/archive/{identifier}/tracks")
+async def archive_concert_tracks(identifier: str) -> dict:
+    """Fetch tracklist files inside an Internet Archive concert item."""
+    url = f"https://archive.org/metadata/{identifier}"
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(url, timeout=15)
+            resp.raise_for_status()
+            files_data = resp.json().get("files", [])
+            
+            tracks = []
+            for file in files_data:
+                if file.get("format") in ("VBR MP3", "MP3"):
+                    name = file["name"]
+                    title = file.get("title", name.replace(".mp3", ""))
+                    length = file.get("length", "0.0")
+                    try:
+                        duration = float(length)
+                    except ValueError:
+                        duration = 0.0
+                        
+                    tracks.append({
+                        "id": f"archive_track:{identifier}:{name}",
+                        "title": title,
+                        "url": f"https://archive.org/download/{identifier}/{name}",
+                        "type": "vod",
+                        "poster": f"https://archive.org/services/img/{identifier}",
+                        "genre": "Live Track",
+                        "summary": f"Duration: {int(duration // 60)}m {int(duration % 60)}s"
+                    })
+            return {"tracks": tracks}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to fetch concert tracks: {exc}")
+
+
+@app.get("/api/local/music")
+async def local_music_catalog() -> dict:
+    """JSON manifest of the scanned local music folder."""
+    return music_scanner.scan_library()
+
+
+@app.get("/api/local/music/art/{track_id:path}")
+async def local_music_art(track_id: str):
+    """Extract and serve embedded artwork for a track."""
+    music_dir = music_scanner.get_music_dir()
+    track_path = (music_dir / track_id).resolve()
+    
+    if not track_path.exists() or not track_path.is_file() or not track_path.is_relative_to(music_dir):
+        raise HTTPException(status_code=404, detail="Track not found")
+        
+    art_data = music_scanner.extract_album_art(track_path)
+    if not art_data:
+        raise HTTPException(status_code=404, detail="No artwork found")
+        
+    data, mime = art_data
+    return Response(content=data, media_type=mime)
+
+
+app.mount("/api/local/music/file", CORSStaticFiles(directory=str(music_scanner.get_music_dir())), name="local_music_files")
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
