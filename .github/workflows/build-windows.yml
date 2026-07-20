@@ -25,8 +25,8 @@ jobs:
             artifact_name: veedeeoh.exe
           - os: macos-latest
             label: macos
-            artifact: dist/veedeeoh
-            artifact_name: veedeeoh-macos
+            artifact: dist/veedeeoh-macos.zip
+            artifact_name: veedeeoh-macos.zip
           - os: ubuntu-latest
             label: linux
             artifact: dist/veedeeoh
@@ -53,6 +53,10 @@ jobs:
 
       - name: Build with PyInstaller
         run: uv run pyinstaller tvlc.spec --noconfirm
+
+      - name: Package macOS .app
+        if: matrix.label == 'macos'
+        run: cd dist && zip -r veedeeoh-macos.zip veedeeoh.app
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -82,14 +86,15 @@ jobs:
 
             **Windows:** Download `veedeeoh.exe` and double-click it. Your browser opens to `http://127.0.0.1:8321`.
 
-            **macOS:** Download `veedeeoh-macos`, make it executable (`chmod +x veedeeoh-macos`), then run it. Your browser opens to `http://127.0.0.1:8321`.
+            **macOS:** Download `veedeeoh-macos.zip`, unzip it, and double-click `veedeeoh.app`. Your browser opens to `http://127.0.0.1:8321`.
+            > macOS may block it on first launch — right-click → Open to bypass Gatekeeper.
 
             **Linux:** Download `veedeeoh-linux`, make it executable (`chmod +x veedeeoh-linux`), then run it. Your browser opens to `http://127.0.0.1:8321`.
 
             > VLC must be installed separately if you want "Open in VLC" to work.
           files: |
             artifacts/veedeeoh.exe/veedeeoh.exe
-            artifacts/veedeeoh-macos/veedeeoh
+            artifacts/veedeeoh-macos.zip/veedeeoh-macos.zip
             artifacts/veedeeoh-linux/veedeeoh
           draft: false
           prerelease: false

@@ -1,13 +1,10 @@
 # -*- mode: python ; coding: utf-8 -*-
-# PyInstaller spec for TVLC
-# Builds a single-folder dist (onedir) with all static assets bundled.
 
 import os
-from pathlib import Path
+import sys
 
 block_cipher = None
 
-# Root of the source tree (same directory as this spec file)
 SRC_ROOT = os.path.abspath(".")
 STATIC_DIR = os.path.join(SRC_ROOT, "src", "tvlc", "static")
 
@@ -16,11 +13,9 @@ a = Analysis(
     pathex=[os.path.join(SRC_ROOT, "src")],
     binaries=[],
     datas=[
-        # Bundle the pre-built frontend
         (STATIC_DIR, "tvlc/static"),
     ],
     hiddenimports=[
-        # FastAPI / Starlette internals that get missed by static analysis
         "uvicorn.logging",
         "uvicorn.loops",
         "uvicorn.loops.auto",
@@ -36,29 +31,19 @@ a = Analysis(
         "anyio",
         "anyio._backends._asyncio",
         "httpx",
-        # faster-whisper
         "faster_whisper",
-        # mutagen
         "mutagen",
         "mutagen.mp3",
         "mutagen.flac",
         "mutagen.mp4",
-        # pillow
         "PIL",
         "PIL.Image",
-        # platformdirs
         "platformdirs",
     ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[
-        # Dev / test stuff we don't need at runtime
-        "pytest",
-        "ruff",
-        "IPython",
-        "jupyter",
-    ],
+    excludes=["pytest", "ruff", "IPython", "jupyter"],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
@@ -67,23 +52,60 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
-exe = EXE(
-    pyz,
-    a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    [],
-    exclude_binaries=False,
-    name="veedeeoh",
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=True,
-    console=False,
-    disable_windowed_traceback=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
-    icon=None,
-)
+if sys.platform == "darwin":
+    # macOS: onedir + .app bundle
+    exe = EXE(
+        pyz,
+        a.scripts,
+        [],
+        exclude_binaries=True,
+        name="veedeeoh",
+        debug=False,
+        strip=False,
+        upx=True,
+        console=False,
+        target_arch=None,
+        codesign_identity=None,
+        entitlements_file=None,
+        icon=None,
+    )
+    coll = COLLECT(
+        exe,
+        a.binaries,
+        a.zipfiles,
+        a.datas,
+        strip=False,
+        upx=True,
+        upx_exclude=[],
+        name="veedeeoh",
+    )
+    app = BUNDLE(
+        coll,
+        name="veedeeoh.app",
+        icon=None,
+        bundle_identifier="com.veedeeoh.app",
+        info_plist={
+            "NSHighResolutionCapable": True,
+        },
+    )
+else:
+    # Windows / Linux: single-file exe
+    exe = EXE(
+        pyz,
+        a.scripts,
+        a.binaries,
+        a.zipfiles,
+        a.datas,
+        [],
+        exclude_binaries=False,
+        name="veedeeoh",
+        debug=False,
+        strip=False,
+        upx=True,
+        console=False,
+        disable_windowed_traceback=False,
+        target_arch=None,
+        codesign_identity=None,
+        entitlements_file=None,
+        icon=None,
+    )
