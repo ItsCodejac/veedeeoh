@@ -37,7 +37,9 @@ First launch downloads and caches the iptv-org catalog (~20 MB), then opens
 `http://127.0.0.1:8321` in your browser.
 
 Environment knobs: `TVLC_PORT` (default 8321), `TVLC_HOST` (default 127.0.0.1),
-`TVLC_NO_BROWSER=1` to skip auto-opening the browser.
+`TVLC_NO_BROWSER=1` to skip auto-opening the browser, `TVLC_REGION` to force an
+availability region (ISO country code) instead of auto-detecting your egress —
+useful behind a VPN when providers geo-block your exit country.
 
 ## Development
 

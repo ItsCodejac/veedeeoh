@@ -27,10 +27,18 @@ export interface Category {
   name: string;
 }
 
+export interface Region {
+  code: string | null;
+  name?: string;
+  city?: string;
+  source: string;
+}
+
 export interface Catalog {
   channels: Channel[];
   countries: Country[];
   categories: Category[];
+  region: Region;
   favorites: string[];
   health: Record<string, boolean>;
 }

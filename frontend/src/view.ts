@@ -90,9 +90,12 @@ export function goHome(): void {
   applyFilters();
 }
 
-/** Country inferred from the browser locale (e.g. "en-US" -> "US"). Private:
- * no geolocation permission, no external lookups. */
+/** Where you effectively are for stream availability. The server's egress
+ * country (what providers actually see — a VPN moves it) wins; the browser
+ * locale is only a fallback when geo-IP is unavailable. */
 function homeCountry(): string | null {
+  const egress = state.region?.code;
+  if (egress && state.countries.some((c) => c.code === egress)) return egress;
   try {
     const region = new Intl.Locale(navigator.language).maximize().region;
     return region && state.countries.some((c) => c.code === region) ? region : null;
@@ -259,7 +262,11 @@ function renderExplore(): void {
   strip.className = "countryStrip";
   const head = document.createElement("div");
   head.className = "sectionHead";
-  head.textContent = "Around the world";
+  const rc = state.region?.code;
+  const homeName = rc ? countryNames.get(rc) || rc : null;
+  head.textContent = homeName
+    ? `Around the world — you appear to be in ${homeName}`
+    : "Around the world";
   strip.append(head);
   const chipRow = document.createElement("div");
   chipRow.className = "chipRow";

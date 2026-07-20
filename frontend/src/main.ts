@@ -10,6 +10,7 @@ async function boot(): Promise<void> {
   state.channels = data.channels;
   state.countries = data.countries;
   state.categories = data.categories;
+  state.region = data.region;
   state.favorites = new Set(data.favorites);
   state.health = new Map(Object.entries(data.health));
 

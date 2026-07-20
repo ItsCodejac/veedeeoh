@@ -1,10 +1,11 @@
-import type { Channel, Category, Country, Filters, NowNext } from "./types";
+import type { Channel, Category, Country, Filters, NowNext, Region } from "./types";
 import { $ } from "./util";
 
 export const state = {
   channels: [] as Channel[],
   countries: [] as Country[],
   categories: [] as Category[],
+  region: { code: null, source: "unknown" } as Region,
   favorites: new Set<string>(),
   health: new Map<string, boolean>(),
   epg: new Map<string, NowNext>(),

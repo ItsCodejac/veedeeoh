@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import platform
 import subprocess
 from contextlib import asynccontextmanager
@@ -33,12 +34,35 @@ async def lifespan(app: FastAPI):
         if (key := epg.epg_key(ch))
     }
     app.state.epg_task = asyncio.create_task(epg.refresh(app.state.client))
+    app.state.region = await _detect_region(app.state.client)
     yield
     app.state.epg_task.cancel()
     await app.state.client.aclose()
 
 
 app = FastAPI(title="TVLC", lifespan=lifespan)
+
+
+async def _detect_region(client: httpx.AsyncClient) -> dict:
+    """The server's egress country — what stream providers actually see.
+
+    This is the real availability signal (a VPN moves it), unlike the browser
+    locale. TVLC_REGION overrides it (ISO country code).
+    """
+    override = os.environ.get("TVLC_REGION")
+    if override:
+        return {"code": override.upper(), "source": "override"}
+    try:
+        resp = await client.get(
+            "http://ip-api.com/json/?fields=countryCode,country,city", timeout=10
+        )
+        data = resp.json()
+        if data.get("countryCode"):
+            return {"code": data["countryCode"], "name": data.get("country"),
+                    "city": data.get("city"), "source": "geoip"}
+    except (httpx.HTTPError, ValueError):
+        pass
+    return {"code": None, "source": "unknown"}
 
 
 class UrlBody(BaseModel):
@@ -71,6 +95,7 @@ async def get_catalog() -> dict:
     cat = app.state.catalog
     return {
         **cat,
+        "region": app.state.region,
         "favorites": sorted(app.state.favorites.ids),
         "health": {
             url: entry["ok"]
