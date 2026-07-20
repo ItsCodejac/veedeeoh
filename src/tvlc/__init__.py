@@ -25,5 +25,12 @@ def main() -> None:
     host = os.environ.get("TVLC_HOST", "127.0.0.1")
     port = int(os.environ.get("TVLC_PORT", "8321"))
     if os.environ.get("TVLC_NO_BROWSER") != "1":
-        threading.Timer(1.5, webbrowser.open, args=(f"http://{host}:{port}",)).start()
+        url = f"http://{host}:{port}"
+        if sys.platform == "darwin":
+            import subprocess
+            def _open():
+                subprocess.Popen(["/usr/bin/open", url])
+        else:
+            _open = lambda: webbrowser.open(url)
+        threading.Timer(1.5, _open).start()
     uvicorn.run("tvlc.server:app", host=host, port=port)
