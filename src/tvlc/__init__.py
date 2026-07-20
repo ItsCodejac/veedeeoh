@@ -14,6 +14,11 @@ def main() -> None:
 
         maintenance.main()
         return
+    if len(sys.argv) > 1 and sys.argv[1] == "categorize":
+        from . import categorize
+
+        categorize.main()
+        return
 
     import uvicorn
 

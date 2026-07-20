@@ -14,6 +14,20 @@ from platformdirs import user_cache_dir
 from . import sources
 
 API_BASE = "https://iptv-org.github.io/api"
+
+# Display names for the smart-tag taxonomy (`tvlc categorize`). Ids double as
+# category ids once tagging has run.
+TAG_NAMES = {
+    "news": "News", "sports": "Sports", "movies": "Movies", "series": "Series",
+    "music": "Music", "kids": "Kids", "animation": "Animation", "anime": "Anime",
+    "horror": "Horror", "scifi": "Sci-Fi", "comedy": "Comedy", "crime": "Crime & True Crime",
+    "documentary": "Documentary", "education": "Education", "science": "Science",
+    "religious": "Religious", "shopping": "Shopping", "weather": "Weather",
+    "travel": "Travel", "food": "Food", "gaming": "Gaming", "business": "Business",
+    "entertainment": "Entertainment", "retro": "Retro & Classic", "reality": "Reality",
+    "culture": "Culture", "lifestyle": "Lifestyle", "ambient": "Ambient & Relax",
+    "general": "General",
+}
 DATASETS = ("channels", "streams", "logos", "countries", "categories")
 CACHE_DIR = Path(user_cache_dir("tvlc"))
 CACHE_TTL = 24 * 3600
@@ -55,7 +69,19 @@ async def load_raw() -> dict[str, Any]:
             except (httpx.HTTPError, OSError):
                 continue  # a broken extra source shouldn't take the app down
         raw["extras"] = extras
+        raw["smart_tags"] = _load_smart_tags()
         return raw
+
+
+def _load_smart_tags() -> dict[str, list[str]]:
+    """Tags produced by `tvlc categorize` (local LLM), if any."""
+    from .store import DATA_DIR
+
+    path = DATA_DIR / "smart_tags.json"
+    try:
+        return json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return {}
 
 
 def build_catalog(raw: dict[str, list[dict]]) -> dict[str, Any]:
@@ -124,8 +150,12 @@ def build_catalog(raw: dict[str, list[dict]]) -> dict[str, Any]:
                 by_name.setdefault(sources.normalize_name(ch["name"]), []).append(ch)
                 channels.append(ch)
 
+    smart_tags = raw.get("smart_tags") or {}
     for ch in channels:
         ch["streams"].sort(key=lambda s: -_quality_rank(s.get("quality")))
+        llm_tags = smart_tags.get(ch["id"])
+        if llm_tags:
+            ch["categories"] = sorted({*ch["categories"], *llm_tags})
     channels.sort(key=lambda c: c["name"].lower())
 
     used_countries = {c["country"] for c in channels}
@@ -146,7 +176,7 @@ def build_catalog(raw: dict[str, list[dict]]) -> dict[str, Any]:
                 ]
                 + [
                     {"id": slug, "name": name}
-                    for slug, name in extra_category_names.items()
+                    for slug, name in {**extra_category_names, **TAG_NAMES}.items()
                     if slug in used_categories
                     and slug not in {c["id"] for c in raw["categories"]}
                 ]
