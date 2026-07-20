@@ -122,6 +122,7 @@ const COLLECTIONS: Collection[] = [
   { title: "🏟 Stadium Row", tagline: "somewhere, a ball is in play", categories: ["sports", "sports-outdoors"], primetime: [12, 13, 14, 15, 16, 17] },
   { title: "🎬 Movie Marathon", tagline: "opening credits forever", categories: ["movies"], primetime: [19, 20, 21, 22] },
   { title: "😂 Comedy Cellar", tagline: "laugh tracks optional", categories: ["comedy", "dark-comedy"], primetime: [20, 21, 22, 23] },
+  { title: "🩸 Fright Night", tagline: "sleep is overrated", categories: ["paranormal"], primetime: [21, 22, 23, 0, 1, 2], match: /horror|creep|terror|scream|fear ?factor|fright|zombie|halloween|shudder|slasher|haunt|midnight pulp|grindhouse|exorc/i },
   { title: "🎸 MTV Era", tagline: "when television played music", categories: ["music"], primetime: [15, 16, 17, 18] },
   { title: "🔬 Big Brain Hours", tagline: "accidentally learn something", categories: ["documentary", "science", "education"], primetime: [10, 11, 12, 13] },
   { title: "🧘 Screensaver Mode", tagline: "television as furniture", categories: ["relax", "ambiance", "travel", "weather"], primetime: [9, 10, 11, 14] },
