@@ -51,6 +51,20 @@ export function renderMore(): void {
   state.rendered += slice.length;
 }
 
+/** Show an explicit channel list in the grid (for name-swept collections
+ * that no single category filter can reproduce). */
+function showCollection(title: string, channels: Channel[]): void {
+  destroyHero();
+  stopHoverPreview();
+  grid().classList.remove("explore");
+  state.filtered = [...channels].sort((a, b) => rank(a) - rank(b));
+  state.rendered = 0;
+  $("stats").textContent = `${state.filtered.length.toLocaleString()} channels · ${title}`;
+  grid().replaceChildren();
+  window.scrollTo(0, 0);
+  renderMore();
+}
+
 export function setFilter(kind: "country" | "category", value: string): void {
   $<HTMLSelectElement>(kind).value = value;
   window.scrollTo(0, 0);
@@ -102,11 +116,13 @@ interface Collection {
   categories: string[];
   /** hours (0-23) when this collection leads the lineup */
   primetime: number[];
+  /** additionally sweep the whole catalog by channel name */
+  match?: RegExp;
 }
 
 const COLLECTIONS: Collection[] = [
   { title: "🌙 Insomnia Theater", tagline: "for the wide awake", categories: ["classic", "series", "western-classic-tv"], primetime: [23, 0, 1, 2, 3, 4] },
-  { title: "⛩ Anime Block", tagline: "subs, dubs, and mechs", categories: ["anime-gaming", "anime"], primetime: [22, 23, 0, 1] },
+  { title: "⛩ Anime Block", tagline: "subs, dubs, and mechs", categories: ["anime-gaming", "anime"], primetime: [22, 23, 0, 1], match: /anime|naruto|one piece|dragon ?ball|jojo|sailor moon|animax|crunchyroll|hidive|gundam|conan|bleach|pokemon|pokémon|retrocrush|aniplus|ani-one|hunter x|shonen|ghibli|yu-gi-oh/i },
   { title: "🧸 Saturday Mornings", tagline: "cereal not included", categories: ["kids", "animation", "animated"], primetime: [6, 7, 8, 9, 10] },
   { title: "🗞 The Situation Room", tagline: "everything, everywhere, right now", categories: ["news"], primetime: [6, 7, 8, 17, 18] },
   { title: "🏟 Stadium Row", tagline: "somewhere, a ball is in play", categories: ["sports", "sports-outdoors"], primetime: [12, 13, 14, 15, 16, 17] },
@@ -181,9 +197,13 @@ function renderExplore(): void {
     const seen = new Set<string>();
     const chans = col.categories
       .flatMap((id) => byCat.get(id) || [])
+      .concat(col.match ? all.filter((ch) => col.match!.test(ch.name)) : [])
       .filter((ch) => !seen.has(ch.id) && seen.add(ch.id));
     if (chans.length >= 8) {
-      collectionRails.push(rail(col.title, chans, () => setFilter("category", col.categories[0]!), {
+      const seeAll = col.match
+        ? () => showCollection(col.title, chans)
+        : () => setFilter("category", col.categories[0]!);
+      collectionRails.push(rail(col.title, chans, seeAll, {
         tagline: col.primetime.includes(hour) ? `${col.tagline} · on now` : col.tagline,
       }));
     }
