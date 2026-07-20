@@ -5,14 +5,18 @@ from __future__ import annotations
 import re
 
 _BASE = "https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/main/playlists"
+_TUBI = "https://raw.githubusercontent.com/BuddyChewChew/tubi-scraper/refs/heads/main/tubi_playlist.m3u"
+_XUMO = "https://raw.githubusercontent.com/BuddyChewChew/xumo-playlist-generator/main/playlists/xumo_playlist.m3u"
 
-# Regenerated daily by the app-m3u-generator GitHub Action. Pluto TV is omitted:
-# iptv-org already indexes ~1700 Pluto streams and it would only duplicate.
-# In the *_all playlists, group-title is the country name, not a category.
+# All regenerated daily by GitHub Actions. Pluto TV is omitted: iptv-org already
+# indexes ~1700 Pluto streams and it would only duplicate. In the *_all playlists,
+# group-title is the country name; in Tubi/Xumo it's a real category (News, ...).
 SOURCES = [
     {"key": "samsung", "label": "Samsung TV Plus", "url": f"{_BASE}/samsungtvplus_all.m3u", "group_is_country": True},
     {"key": "plex", "label": "Plex", "url": f"{_BASE}/plex_all.m3u", "group_is_country": True},
     {"key": "roku", "label": "Roku", "url": f"{_BASE}/roku_all.m3u", "country": "US"},
+    {"key": "tubi", "label": "Tubi", "url": _TUBI, "country": "US"},
+    {"key": "xumo", "label": "Xumo", "url": _XUMO, "country": "US"},
 ]
 
 _ATTR = re.compile(r'([\w-]+)="([^"]*)"')
