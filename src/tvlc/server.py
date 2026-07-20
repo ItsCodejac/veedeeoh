@@ -128,8 +128,10 @@ async def now_playing() -> dict:
 async def vod_catalog() -> dict:
     """On-demand rails: Pluto VOD (with a synthesized anime rail) + Archive films."""
     rails = []
+    region = app.state.region
+    code = region.get("code") if region.get("source") == "override" else "US"
     try:
-        rails = await vod.get_catalog(app.state.client)
+        rails = await vod.get_catalog(app.state.client, region_code=code)
     except (httpx.HTTPError, KeyError) as exc:
         return {"rails": [], "error": f"Pluto VOD unavailable: {exc}"}
     try:
@@ -143,8 +145,10 @@ async def vod_catalog() -> dict:
 
 @app.get("/api/vod/series/{series_id}")
 async def vod_series(series_id: str) -> dict:
+    region = app.state.region
+    code = region.get("code") if region.get("source") == "override" else "US"
     try:
-        return {"episodes": await vod.get_series(app.state.client, series_id)}
+        return {"episodes": await vod.get_series(app.state.client, series_id, region_code=code)}
     except (httpx.HTTPError, KeyError) as exc:
         raise HTTPException(502, f"series fetch failed: {exc}") from exc
 
@@ -275,11 +279,29 @@ async def logo(url: str = Query(...)) -> Response:
 
 
 @app.get("/proxy")
-async def proxy_stream(url: str = Query(...)):
+async def proxy_stream(url: str = Query(...), obf: str | None = None):
+    if obf == "1":
+        try:
+            url = bytes.fromhex(url).decode("utf-8")
+        except ValueError:
+            raise HTTPException(400, "bad obfuscated url")
     if not url.startswith(("http://", "https://")):
         raise HTTPException(400, "bad url")
     client: httpx.AsyncClient = app.state.client
-    req = client.build_request("GET", url, headers={"User-Agent": health.UA}, timeout=20)
+    headers = {"User-Agent": health.UA}
+    if "pluto.tv" in url or "jmp2.uk/plu-" in url:
+        region = app.state.region
+        code = region.get("code") if region.get("source") == "override" else "US"
+        spoof_ips = {
+            "US": "76.81.9.69",
+            "CA": "192.206.151.131",
+            "GB": "178.238.11.6",
+            "FR": "193.169.64.141",
+        }
+        headers["X-Forwarded-For"] = spoof_ips.get((code or "US").upper(), "76.81.9.69")
+        headers["Referer"] = "https://pluto.tv/"
+        headers["Origin"] = "https://pluto.tv"
+    req = client.build_request("GET", url, headers=headers, timeout=20)
     try:
         resp = await client.send(req, stream=True)
     except httpx.HTTPError as exc:

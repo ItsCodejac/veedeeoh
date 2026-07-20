@@ -24,14 +24,33 @@ _session: dict[str, Any] = {}
 _catalog: dict[str, Any] = {}
 
 
-async def _boot(client: httpx.AsyncClient) -> dict[str, Any]:
+def pluto_headers(region_code: str | None = None) -> dict[str, str]:
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+        "Referer": "https://pluto.tv/",
+        "Origin": "https://pluto.tv",
+    }
+    code = (region_code or "US").upper()
+    spoof_ips = {
+        "US": "76.81.9.69",
+        "CA": "192.206.151.131",
+        "GB": "178.238.11.6",
+        "FR": "193.169.64.141",
+    }
+    headers["X-Forwarded-For"] = spoof_ips.get(code, "76.81.9.69")
+    return headers
+
+
+async def _boot(client: httpx.AsyncClient, region_code: str | None = None) -> dict[str, Any]:
     resp = await client.get(
         BOOT_URL,
         params={
             "appName": "web", "appVersion": "8.0.0", "deviceVersion": "120.0.0",
             "deviceModel": "web", "deviceMake": "chrome", "deviceType": "web",
             "clientID": str(uuid.uuid4()), "clientModelNumber": "1.0.0",
+            "serverSideAds": "true",
         },
+        headers=pluto_headers(region_code),
         timeout=30,
     )
     resp.raise_for_status()
@@ -44,15 +63,17 @@ async def _boot(client: httpx.AsyncClient) -> dict[str, Any]:
     }
 
 
-async def get_session(client: httpx.AsyncClient) -> dict[str, Any]:
+async def get_session(client: httpx.AsyncClient, region_code: str | None = None) -> dict[str, Any]:
     global _session
     if not _session or time.time() - _session["at"] > SESSION_TTL:
-        _session = await _boot(client)
+        _session = await _boot(client, region_code)
     return _session
 
 
 def stream_url(session: dict[str, Any], path: str) -> str:
-    return f"{session['stitcher']}{path}?{session['params']}&jwt={session['token']}"
+    # Rewrite legacy /stitch/ path to /v2/stitch/ to route to the modern validated stitcher API
+    v2_path = path.replace("/stitch/", "/v2/stitch/")
+    return f"{session['stitcher']}{v2_path}?{session['params']}&jwt={session['token']}&masterJWTPassthrough=true"
 
 
 def _normalize(session: dict[str, Any], item: dict) -> dict | None:
@@ -81,16 +102,19 @@ def _normalize(session: dict[str, Any], item: dict) -> dict | None:
     return out
 
 
-async def get_catalog(client: httpx.AsyncClient) -> list[dict]:
+async def get_catalog(client: httpx.AsyncClient, region_code: str | None = None) -> list[dict]:
     """Pluto VOD rails: [{name, items: [...]}], with a synthesized Anime rail first."""
     global _catalog
     if _catalog and time.time() - _catalog["at"] < CATALOG_TTL:
         return _catalog["rails"]
-    session = await get_session(client)
+    session = await get_session(client, region_code)
     resp = await client.get(
         f"{VOD_URL}/categories",
         params={"offset": 0, "page": 1, "includeItems": "true"},
-        headers={"Authorization": f"Bearer {session['token']}"},
+        headers={
+            "Authorization": f"Bearer {session['token']}",
+            **pluto_headers(region_code)
+        },
         timeout=60,
     )
     resp.raise_for_status()
@@ -109,13 +133,16 @@ async def get_catalog(client: httpx.AsyncClient) -> list[dict]:
     return rails
 
 
-async def get_series(client: httpx.AsyncClient, series_id: str) -> list[dict]:
+async def get_series(client: httpx.AsyncClient, series_id: str, region_code: str | None = None) -> list[dict]:
     """Episodes for a series, each with a ready-to-play url."""
-    session = await get_session(client)
+    session = await get_session(client, region_code)
     resp = await client.get(
         f"{VOD_URL}/series/{series_id}/seasons",
         params={"offset": 0, "page": 1},
-        headers={"Authorization": f"Bearer {session['token']}"},
+        headers={
+            "Authorization": f"Bearer {session['token']}",
+            **pluto_headers(region_code)
+        },
         timeout=60,
     )
     resp.raise_for_status()

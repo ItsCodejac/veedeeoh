@@ -9,7 +9,9 @@ URI_ATTR = re.compile(r'URI="([^"]+)"')
 
 
 def proxied(url: str) -> str:
-    return f"/proxy?url={quote(url, safe='')}"
+    """Hex-encode the URL to prevent client-side ad blockers from blocking it."""
+    encoded = url.encode("utf-8").hex()
+    return f"/proxy?url={encoded}&obf=1"
 
 
 def is_playlist(url: str, content_type: str | None) -> bool:

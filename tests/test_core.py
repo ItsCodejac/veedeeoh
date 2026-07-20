@@ -88,9 +88,9 @@ def test_rewrite_m3u8():
         ]
     )
     out = rewrite_m3u8(playlist, "https://cdn.example/live/chunks.m3u8")
-    assert '/proxy?url=https%3A%2F%2Fcdn.example%2Flive%2Fseg1.ts' in out
-    assert '/proxy?url=https%3A%2F%2Fother.host%2Fseg2.ts' in out
-    assert 'URI="/proxy?url=https%3A%2F%2Fcdn.example%2Flive%2Fkey.bin"' in out
+    assert '/proxy?url=68747470733a2f2f63646e2e6578616d706c652f6c6976652f736567312e7473&obf=1' in out
+    assert '/proxy?url=68747470733a2f2f6f746865722e686f73742f736567322e7473&obf=1' in out
+    assert 'URI="/proxy?url=68747470733a2f2f63646e2e6578616d706c652f6c6976652f6b65792e62696e&obf=1"' in out
     assert out.splitlines()[0] == "#EXTM3U"
 
 
