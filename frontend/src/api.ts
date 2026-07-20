@@ -1,4 +1,4 @@
-import type { Catalog, Channel, CheckResult, NowNext } from "./types";
+import type { Catalog, Channel, CheckResult, NowNext, VodEpisode, VodRail } from "./types";
 import { state } from "./state";
 
 export async function fetchCatalog(): Promise<Catalog> {
@@ -16,6 +16,28 @@ export async function fetchNowPlaying(): Promise<void> {
   } catch {
     /* guide is a nice-to-have; the app works without it */
   }
+}
+
+export async function fetchVod(): Promise<VodRail[]> {
+  try {
+    const res = await fetch("/api/vod");
+    if (!res.ok) return [];
+    return (await res.json()).rails ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchVodSeries(seriesId: string): Promise<VodEpisode[]> {
+  const res = await fetch(`/api/vod/series/${encodeURIComponent(seriesId)}`);
+  if (!res.ok) throw new Error(`series fetch failed: ${res.status}`);
+  return (await res.json()).episodes ?? [];
+}
+
+export async function fetchArchiveStream(identifier: string): Promise<string> {
+  const res = await fetch(`/api/vod/archive/${encodeURIComponent(identifier)}`);
+  if (!res.ok) throw new Error(`archive fetch failed: ${res.status}`);
+  return (await res.json()).url;
 }
 
 export function checkStream(url: string): Promise<CheckResult> {

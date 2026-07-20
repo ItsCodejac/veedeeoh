@@ -5,6 +5,7 @@ import { openPlayer } from "./player";
 import { categoryNames, chMeta, countryNames, filters, isDead, onNow, rank, state, visible } from "./state";
 import type { Channel } from "./types";
 import { $, escapeHtml } from "./util";
+import { appendVodSection } from "./vod";
 
 const BATCH = 120;
 const grid = () => $("grid");
@@ -152,6 +153,7 @@ function renderExplore(): void {
   caro.items = pickCarousel();
   caro.center = 0;
   renderCaro();
+  appendVodSection(grid());
 
   const favs = all.filter((ch) => state.favorites.has(ch.id));
   if (favs.length) {

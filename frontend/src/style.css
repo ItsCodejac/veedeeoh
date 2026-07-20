@@ -412,6 +412,45 @@ select { max-width: 190px; }
 }
 .railScroll .card { width: 195px; flex-shrink: 0; }
 
+/* ---- on demand: poster cards ---- */
+#vodSection { margin-top: 34px; }
+.vodHead { padding: 0 18px; color: var(--accent); }
+.vodCard {
+  width: 132px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+.vodCard.loading { opacity: .5; }
+.vodPoster {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 347 / 500;
+  background: var(--panel2);
+  border-radius: 10px;
+  overflow: hidden;
+  font-size: 28px;
+  transition: transform .1s;
+}
+.vodCard:hover .vodPoster { transform: scale(1.04); outline: 1px solid var(--accent); }
+.vodPoster img { width: 100%; height: 100%; object-fit: cover; }
+.vodTitle {
+  font-size: 12px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vodMeta { font-family: var(--mono); font-size: 10px; color: var(--dim); }
+
 .countryStrip { margin-top: 34px; padding: 0 18px; }
 .chipRow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .countryChip {

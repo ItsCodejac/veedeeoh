@@ -131,7 +131,12 @@ function play(url: string): void {
   startCaptions();
   status.textContent = "Loading stream…";
   const src = `/proxy?url=${encodeURIComponent(url)}`;
-  if (Hls.isSupported()) {
+  // direct files (VOD mp4/webm/ogv) play natively; HLS goes through hls.js
+  if (/\.(mp4|m4v|webm|ogv)(\?|$)/i.test(url)) {
+    video.src = src;
+    video.onloadeddata = () => (status.textContent = "");
+    video.onerror = () => (status.textContent = "⚠ Playback failed — try Open in VLC.");
+  } else if (Hls.isSupported()) {
     // generous timeouts: ad-stitched FAST streams can take 20s+ to start
     hls = new Hls({
       maxBufferLength: 15,

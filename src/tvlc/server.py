@@ -14,7 +14,7 @@ from fastapi.responses import PlainTextResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import captions, catalog, epg, health, m3u, proxy, thumbs
+from . import captions, catalog, epg, health, m3u, proxy, thumbs, vod
 from .store import Favorites, HealthCache
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -97,6 +97,42 @@ async def now_playing() -> dict:
         if entry:
             out[ch_id] = entry
     return out
+
+
+@app.get("/api/vod")
+async def vod_catalog() -> dict:
+    """On-demand rails: Pluto VOD (with a synthesized anime rail) + Archive films."""
+    rails = []
+    try:
+        rails = await vod.get_catalog(app.state.client)
+    except (httpx.HTTPError, KeyError) as exc:
+        return {"rails": [], "error": f"Pluto VOD unavailable: {exc}"}
+    try:
+        archive = await vod.archive_movies(app.state.client)
+        if archive:
+            rails.append({"name": "🎞 Archive Classics", "items": archive})
+    except (httpx.HTTPError, KeyError):
+        pass  # archive is a bonus rail
+    return {"rails": rails}
+
+
+@app.get("/api/vod/series/{series_id}")
+async def vod_series(series_id: str) -> dict:
+    try:
+        return {"episodes": await vod.get_series(app.state.client, series_id)}
+    except (httpx.HTTPError, KeyError) as exc:
+        raise HTTPException(502, f"series fetch failed: {exc}") from exc
+
+
+@app.get("/api/vod/archive/{identifier}")
+async def vod_archive(identifier: str) -> dict:
+    try:
+        url = await vod.archive_stream(app.state.client, identifier)
+    except (httpx.HTTPError, KeyError) as exc:
+        raise HTTPException(502, f"archive fetch failed: {exc}") from exc
+    if not url:
+        raise HTTPException(404, "no playable file")
+    return {"url": url}
 
 
 @app.get("/api/favorites")
