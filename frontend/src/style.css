@@ -145,6 +145,7 @@ select { max-width: 190px; }
 
 /* what's on right now, with progress through the program */
 .cnow { display: flex; flex-direction: column; gap: 3px; }
+.cnow[hidden] { display: none; }
 .cnowTitle {
   color: var(--accent);
   font-size: 12px;
@@ -157,7 +158,7 @@ select { max-width: 190px; }
   border-radius: 2px;
   overflow: hidden;
 }
-.cprog i { display: block; height: 100%; background: var(--accent); }
+.cprog i { display: block; width: 0; height: 100%; background: var(--accent); }
 
 .dot {
   position: absolute; top: 10px; left: 10px;

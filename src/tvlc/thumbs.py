@@ -16,7 +16,7 @@ NEG_TTL = 10 * 60  # don't re-hammer streams that failed to yield a frame
 GRAB_TIMEOUT = 25.0  # ad-stitched FAST streams (Samsung/Pluto) can be slow to start
 
 _negative: dict[str, float] = {}
-_sem = asyncio.Semaphore(4)
+_sem = asyncio.Semaphore(6)
 
 
 def _path(url: str) -> Path:

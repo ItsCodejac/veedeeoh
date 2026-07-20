@@ -56,16 +56,15 @@ export function updateCardNow(el: HTMLElement, ch: Channel): void {
 /** Card art: a live captured frame from the stream (logo as corner badge),
  * falling back to the logo treatment when no frame can be grabbed. */
 function setArt(box: HTMLElement, ch: Channel): void {
+  setLogo(box, ch); // show the logo immediately; the live frame swaps in on load
   const stream = ch.streams[0];
-  if (!stream || state.health.get(stream.url) === false) {
-    setLogo(box, ch);
-    return;
-  }
+  if (!stream || state.health.get(stream.url) === false) return;
   const img = document.createElement("img");
   img.className = "thumbImg";
   img.loading = "lazy";
   img.alt = "";
   img.onload = () => {
+    box.replaceChildren(img);
     box.classList.add("hasThumb");
     if (ch.logo) {
       const badge = document.createElement("img");
@@ -76,10 +75,7 @@ function setArt(box: HTMLElement, ch: Channel): void {
       box.append(badge);
     }
   };
-  img.onerror = () => {
-    img.remove();
-    setLogo(box, ch);
-  };
+  img.onerror = () => img.remove();
   img.src = `/thumb?url=${encodeURIComponent(stream.url)}`;
   box.append(img);
 }
