@@ -1,0 +1,79 @@
+name: Build Windows Executable
+
+on:
+  # Run manually from the Actions tab whenever you want a fresh build
+  workflow_dispatch:
+  # Also run on pushes to main so you always have a fresh artifact
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "tvlc.spec"
+      - ".github/workflows/build-windows.yml"
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      # ── Checkout ─────────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Python setup ─────────────────────────────────────────────────────────
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # ── Install uv ───────────────────────────────────────────────────────────
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      # ── Install project + PyInstaller into a venv ─────────────────────────
+      - name: Install dependencies
+        run: |
+          uv sync --frozen
+          uv pip install pyinstaller
+
+      # ── Build the exe ────────────────────────────────────────────────────────
+      - name: Build with PyInstaller
+        run: |
+          uv run pyinstaller tvlc.spec --noconfirm
+
+      # ── Zip the output folder for easy download ───────────────────────────
+      - name: Zip dist
+        run: |
+          Compress-Archive -Path dist\tvlc -DestinationPath dist\TVLC-Windows.zip
+        shell: pwsh
+
+      # ── Upload artifact ───────────────────────────────────────────────────
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TVLC-Windows
+          path: dist/TVLC-Windows.zip
+          retention-days: 30
+
+      # ── (Optional) Also create/update a GitHub Release on main pushes ─────
+      - name: Create GitHub Release
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: "Windows Build #${{ github.run_number }}"
+          body: |
+            Automated Windows build from commit ${{ github.sha }}.
+            
+            **How to run:**
+            1. Download `TVLC-Windows.zip` and unzip it
+            2. Open the `tvlc` folder
+            3. Double-click `tvlc.exe`
+            4. Your browser will open automatically to `http://127.0.0.1:8321`
+            
+            > **Note:** VLC must be installed separately if you want "Open in VLC" to work.
+          files: dist/TVLC-Windows.zip
+          draft: false
+          prerelease: false

@@ -4,5 +4,8 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 dist/
+build/
 nohup.out
 frontend/node_modules/
+# PyInstaller
+*.spec~
