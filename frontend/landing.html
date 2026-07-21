@@ -701,50 +701,72 @@
         text-overflow: ellipsis;
       }
 
-      /* Genre Carousel Section */
+      /* Film Strip Genre Carousel Section */
       .genre-section {
-        padding: 85px 6%;
+        padding: 85px 0;
         border-bottom: 1px solid var(--border);
         position: relative;
         overflow: hidden;
+        background: #05070b;
       }
 
-      .genre-carousel-container {
+      /* Film Strip Perforation Borders */
+      .film-strip-border {
+        height: 16px;
+        width: 100%;
+        background-image: repeating-linear-gradient(
+          to right,
+          #000 0px,
+          #000 12px,
+          rgba(255, 255, 255, 0.25) 12px,
+          rgba(255, 255, 255, 0.25) 20px
+        );
+        opacity: 0.7;
+        margin: 8px 0;
+      }
+
+      .genre-filmstrip-wrapper {
         position: relative;
-        max-width: 1280px;
-        margin: 0 auto;
+        width: 100%;
+        overflow: hidden;
+        mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
+        -webkit-mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
+        padding: 14px 0;
       }
 
-      .genre-track {
+      .genre-track-loop {
         display: flex;
         gap: 20px;
-        overflow-x: auto;
-        scroll-behavior: smooth;
-        padding: 10px 4px 20px;
-        scrollbar-width: none;
-        -ms-overflow-style: none;
+        width: max-content;
+        animation: filmStripLoop 42s linear infinite;
       }
 
-      .genre-track::-webkit-scrollbar {
-        display: none;
+      .genre-track-loop:hover {
+        animation-play-state: paused;
+      }
+
+      @keyframes filmStripLoop {
+        0% { transform: translateX(0); }
+        100% { transform: translateX(-50%); }
       }
 
       .genre-card {
         flex: 0 0 240px;
         height: 330px;
-        border-radius: 16px;
+        border-radius: 14px;
         position: relative;
         overflow: hidden;
-        border: 1px solid var(--border);
+        border: 2px solid rgba(255, 255, 255, 0.12);
         background: var(--card-bg);
         cursor: pointer;
         transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
       }
 
       .genre-card:hover {
-        transform: translateY(-6px) scale(1.02);
+        transform: translateY(-6px) scale(1.03);
         border-color: var(--accent);
-        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.65), 0 0 25px rgba(197, 240, 78, 0.22);
+        box-shadow: 0 20px 45px rgba(0, 0, 0, 0.75), 0 0 30px rgba(197, 240, 78, 0.25);
       }
 
       .genre-card img {
@@ -790,35 +812,6 @@
         color: #fff;
         line-height: 1.2;
       }
-
-      .carousel-btn {
-        position: absolute;
-        top: 50%;
-        transform: translateY(-50%);
-        width: 44px;
-        height: 44px;
-        border-radius: 50%;
-        background: rgba(16, 20, 30, 0.9);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        color: #fff;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        z-index: 10;
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        transition: background 0.2s, border-color 0.2s, color 0.2s;
-      }
-
-      .carousel-btn:hover {
-        background: var(--accent);
-        color: #06070a;
-        border-color: var(--accent);
-      }
-
-      .carousel-btn-left { left: -14px; }
-      .carousel-btn-right { right: -14px; }
 
       /* Single Access Plan Section */
       .pricing-section {
@@ -1128,24 +1121,20 @@
       </div>
     </section>
 
-    <!-- Movie Genre Showcase Carousel -->
+    <!-- Movie Genre Showcase Infinite Film Strip Loop -->
     <section class="genre-section" id="features">
       <h2 class="section-title" style="text-align: center;">Explore Movie &amp; TV Genres</h2>
-      <p class="section-subtitle" style="text-align: center;">Browse curated collections across thousands of streaming titles.</p>
+      <p class="section-subtitle" style="text-align: center; margin-bottom: 24px;">Browse continuous film strip collections across thousands of streaming titles.</p>
 
-      <div class="genre-carousel-container">
-        <button class="carousel-btn carousel-btn-left" onclick="document.getElementById('genreTrack').scrollBy({left: -500, behavior: 'smooth'})">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
-        </button>
-        
-        <div class="genre-track" id="genreTrack">
-          <!-- Dynamically populated 10 Genre Cards from catalog -->
+      <div class="film-strip-border"></div>
+
+      <div class="genre-filmstrip-wrapper">
+        <div class="genre-track-loop" id="genreTrack">
+          <!-- Dynamically populated duplicated Film Strip cards -->
         </div>
-
-        <button class="carousel-btn carousel-btn-right" onclick="document.getElementById('genreTrack').scrollBy({left: 500, behavior: 'smooth'})">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
-        </button>
       </div>
+
+      <div class="film-strip-border"></div>
     </section>
 
     <!-- Hosted Infrastructure Pricing Plan (Coming Soon) -->

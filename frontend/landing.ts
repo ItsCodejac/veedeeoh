@@ -235,7 +235,10 @@ async function loadLiveCatalog() {
       ];
 
       genreTrack.innerHTML = '';
-      genres.forEach((g) => {
+      // Duplicate array for seamless infinite film strip marquee loop
+      const filmStripList = [...genres, ...genres];
+
+      filmStripList.forEach((g) => {
         const match = allItems.find(i => 
           (i.genre && i.genre.toLowerCase().includes(g.keyword)) ||
           (i.title && i.title.toLowerCase().includes(g.keyword))
