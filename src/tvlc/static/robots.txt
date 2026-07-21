@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Allow: /landing.html
+Allow: /index.html
+Allow: /privacy.html
+Allow: /terms.html
+Allow: /404.html
+
+Sitemap: https://veedeeoh.vercel.app/sitemap.xml

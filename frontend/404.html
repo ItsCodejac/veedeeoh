@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>404 - Page Not Found - veedeeoh.</title>
+    <meta name="description" content="404 Page Not Found - Return to veedeeoh free movies and TV show streaming catalog." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;800&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg: #06070a;
+        --card-bg: #10141e;
+        --border: rgba(255, 255, 255, 0.1);
+        --text: #ffffff;
+        --dim: #9aa5b5;
+        --accent: #c5f04e;
+        --accent-hover: #b4df40;
+        --display: "Space Grotesk", sans-serif;
+        --body: "Instrument Sans", sans-serif;
+        --brand: "Bricolage Grotesque", sans-serif;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        padding: 0;
+        min-height: 100vh;
+        font-family: var(--body);
+        background-color: var(--bg);
+        color: var(--text);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        overflow: hidden;
+        -webkit-font-smoothing: antialiased;
+      }
+      .glow {
+        position: absolute;
+        width: 600px;
+        height: 600px;
+        background: radial-gradient(circle at center, rgba(197, 240, 78, 0.14) 0%, rgba(0, 242, 254, 0.04) 50%, transparent 70%);
+        pointer-events: none;
+        z-index: 0;
+      }
+      .container {
+        position: relative;
+        z-index: 2;
+        max-width: 600px;
+        padding: 40px 24px;
+      }
+      .logo {
+        font-family: var(--brand);
+        font-size: 36px;
+        font-weight: 800;
+        letter-spacing: -1px;
+        color: var(--text);
+        text-decoration: none;
+        margin-bottom: 24px;
+        display: inline-block;
+      }
+      .logo span { color: var(--accent); }
+      .code-badge {
+        display: inline-block;
+        padding: 6px 16px;
+        border-radius: 20px;
+        background: rgba(197, 240, 78, 0.1);
+        border: 1px solid rgba(197, 240, 78, 0.3);
+        color: var(--accent);
+        font-family: var(--display);
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        margin-bottom: 20px;
+      }
+      h1 {
+        font-family: var(--display);
+        font-size: clamp(4rem, 10vw, 7.5rem);
+        font-weight: 800;
+        line-height: 0.95;
+        letter-spacing: -3px;
+        margin: 0 0 16px;
+        background: linear-gradient(135deg, #ffffff 0%, #9aa5b5 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      p {
+        font-size: 18px;
+        color: var(--dim);
+        margin: 0 0 36px;
+        line-height: 1.6;
+      }
+      .actions {
+        display: flex;
+        gap: 16px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 13px 28px;
+        border-radius: 10px;
+        font-family: var(--display);
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+        text-decoration: none;
+        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .btn-primary {
+        background: var(--accent);
+        color: #06070a;
+        box-shadow: 0 0 24px rgba(197, 240, 78, 0.25);
+      }
+      .btn-primary:hover {
+        background: var(--accent-hover);
+        transform: translateY(-2px);
+        box-shadow: 0 0 32px rgba(197, 240, 78, 0.4);
+      }
+      .btn-secondary {
+        background: rgba(255, 255, 255, 0.06);
+        color: #fff;
+        border: 1px solid var(--border);
+      }
+      .btn-secondary:hover {
+        background: rgba(255, 255, 255, 0.12);
+        border-color: rgba(255, 255, 255, 0.25);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="glow"></div>
+    <div class="container">
+      <a href="/landing.html" class="logo">veedeeoh<span>.</span></a>
+      <div><span class="code-badge">ERROR 404</span></div>
+      <h1>Lost in Space.</h1>
+      <p>The channel or page you are looking for has been moved, renamed, or doesn't exist in our catalog.</p>
+      <div class="actions">
+        <a href="/landing.html" class="btn btn-primary">Return Home</a>
+        <a href="/index.html" class="btn btn-secondary">Browse Catalog</a>
+      </div>
+    </div>
+  </body>
+</html>

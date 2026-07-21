@@ -8,7 +8,10 @@ export default defineConfig({
       input: {
         main: 'index.html',
         landing: 'landing.html',
-        changePassword: 'change-password.html'
+        changePassword: 'change-password.html',
+        privacy: 'privacy.html',
+        terms: 'terms.html',
+        notFound: '404.html'
       }
     }
   },

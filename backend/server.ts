@@ -133,7 +133,7 @@ app.get('/api/catalog', (c) => {
 app.get('/api/vod', async (c) => {
   const rails: any[] = [];
   try {
-    const plutoRails = await vod.getCatalog(state.region.code);
+    const { rails: plutoRails } = await vod.getCatalog(state.region.code);
     rails.push(...plutoRails);
   } catch (e) {
     console.error("Pluto VOD error:", e);

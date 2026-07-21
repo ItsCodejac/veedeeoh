@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Privacy Policy - veedeeoh.</title>
+    <meta name="description" content="veedeeoh privacy policy - Learn how we protect user privacy with zero data tracking and client-side streaming." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;800&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg: #06070a;
+        --card-bg: #10141e;
+        --border: rgba(255, 255, 255, 0.1);
+        --text: #ffffff;
+        --dim: #9aa5b5;
+        --accent: #c5f04e;
+        --accent-hover: #b4df40;
+        --display: "Space Grotesk", sans-serif;
+        --body: "Instrument Sans", sans-serif;
+        --brand: "Bricolage Grotesque", sans-serif;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        padding: 0;
+        font-family: var(--body);
+        background-color: var(--bg);
+        color: var(--text);
+        line-height: 1.7;
+        -webkit-font-smoothing: antialiased;
+      }
+      nav {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 6%;
+        background: rgba(6, 7, 10, 0.85);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border-bottom: 1px solid var(--border);
+      }
+      .logo {
+        font-family: var(--brand);
+        font-size: 32px;
+        font-weight: 800;
+        letter-spacing: -1px;
+        color: var(--text);
+        text-decoration: none;
+      }
+      .logo span { color: var(--accent); }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 10px 22px;
+        border-radius: 8px;
+        font-family: var(--display);
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        text-decoration: none;
+        background: var(--accent);
+        color: #06070a;
+        transition: all 0.2s ease;
+      }
+      .btn:hover { background: var(--accent-hover); transform: translateY(-1px); }
+      .content-wrapper {
+        max-width: 860px;
+        margin: 140px auto 100px;
+        padding: 0 24px;
+      }
+      h1 {
+        font-family: var(--display);
+        font-size: 42px;
+        font-weight: 800;
+        letter-spacing: -1px;
+        margin-bottom: 12px;
+      }
+      .last-updated {
+        font-size: 14px;
+        color: var(--dim);
+        margin-bottom: 40px;
+      }
+      h2 {
+        font-family: var(--display);
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--accent);
+        margin-top: 36px;
+        margin-bottom: 16px;
+      }
+      p, li {
+        color: #c4d0e0;
+        font-size: 16px;
+        margin-bottom: 16px;
+      }
+      ul { padding-left: 24px; }
+      .card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 28px;
+        margin: 28px 0;
+      }
+      footer {
+        border-top: 1px solid var(--border);
+        padding: 40px 6%;
+        text-align: center;
+        color: var(--dim);
+        font-size: 14px;
+      }
+      footer a { color: var(--dim); text-decoration: none; }
+      footer a:hover { color: #fff; }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a href="/landing.html" class="logo">veedeeoh<span>.</span></a>
+      <a href="/landing.html" class="btn">Back to Home</a>
+    </nav>
+
+    <div class="content-wrapper">
+      <h1>Privacy Policy</h1>
+      <div class="last-updated">Last Updated: July 2026</div>
+
+      <div class="card">
+        <p>At <strong>veedeeoh.</strong>, we prioritize user privacy above all else. Our platform is designed from the ground up to operate with zero intrusive data tracking, zero third-party profiling cookies, and maximum user transparency.</p>
+      </div>
+
+      <h2>1. Zero Tracking & Zero Data Retention</h2>
+      <p>We do not track your watching behavior, search queries, or viewing history. When using the web platform or self-hosting local instances of veedeeoh:</p>
+      <ul>
+        <li>No personal identification information (PII) is sold or shared.</li>
+        <li>No behavioral profiling or persistent cross-site tracking cookies are stored.</li>
+        <li>Your local viewing state remains strictly stored within your browser's private LocalStorage.</li>
+      </ul>
+
+      <h2>2. Client-Side Video Streaming Architecture</h2>
+      <p>All video stream segment downloads (.m3u8 manifests and .ts media chunks) execute directly between your web browser client and official public content distribution networks (CDNs). Your video playback bandwidth does not pass through intermediate servers or track your activity.</p>
+
+      <h2>3. Self-Hosting & Local Installation</h2>
+      <p>For users utilizing the self-hosted edition of veedeeoh via Docker, Python, or desktop releases, 100% of network requests, session configurations, and local index files reside exclusively on your local hardware.</p>
+
+      <h2>4. Cookies & Local Storage</h2>
+      <p>We use LocalStorage exclusively to persist essential application state such as UI preferences, active playback position, and volume settings. You can clear this data at any time through your browser settings.</p>
+
+      <h2>5. Contact & Open Source</h2>
+      <p>veedeeoh is built with transparency in mind. If you have questions regarding privacy or architecture, please review our open-source codebase on <a href="https://github.com/ItsCodejac/veedeeoh" style="color: var(--accent);">GitHub</a>.</p>
+    </div>
+
+    <footer>
+      <p>&copy; 2026 veedeeoh. All rights reserved. &middot; <a href="/privacy.html">Privacy Policy</a> &middot; <a href="/terms.html">Terms of Service</a></p>
+    </footer>
+  </body>
+</html>
