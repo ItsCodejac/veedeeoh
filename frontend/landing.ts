@@ -125,7 +125,10 @@ async function loadLiveCatalog() {
           const img = document.createElement('img');
           img.src = item.poster;
           img.alt = item.title || 'Stream';
-          img.onerror = () => { card.style.display = 'none'; };
+          img.referrerPolicy = 'no-referrer';
+          img.onerror = () => {
+            img.src = 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=400&q=80';
+          };
 
           const overlay = document.createElement('div');
           overlay.className = 'marquee-card-overlay';
@@ -209,7 +212,7 @@ async function loadLiveCatalog() {
         card.innerHTML = `
           <div class="top10-num">${index + 1}</div>
           <div class="top10-poster">
-            <img src="${item.poster}" alt="${item.title}" />
+            <img src="${item.poster}" alt="${item.title}" referrerpolicy="no-referrer" onerror="this.src='https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=400&q=80'" />
             <div class="top10-poster-overlay"></div>
             <div class="top10-poster-title">${item.title}</div>
           </div>
@@ -249,7 +252,7 @@ async function loadLiveCatalog() {
         card.className = 'genre-card';
         card.addEventListener('click', openAuth);
         card.innerHTML = `
-          <img src="${posterUrl}" alt="${g.name}" />
+          <img src="${posterUrl}" alt="${g.name}" referrerpolicy="no-referrer" onerror="this.src='${g.fallback}'" />
           <div class="genre-card-overlay"></div>
           <div class="genre-card-info">
             <div class="genre-tag">FEATURED GENRE</div>
