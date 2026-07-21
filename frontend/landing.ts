@@ -1,5 +1,12 @@
 import { getSession, restoreSession, signIn } from './src/auth';
 
+async function checkAuth() {
+  const session = await restoreSession();
+  if (session) {
+    window.location.href = '/index.html';
+  }
+}
+
 async function loadLiveStats() {
   const statsText = document.getElementById('heroStatsText');
   if (!statsText) return;
