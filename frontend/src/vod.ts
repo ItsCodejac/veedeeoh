@@ -1396,22 +1396,12 @@ export async function renderHome(): Promise<void> {
       railsContainer.append(el);
     };
 
-    // Render Featured / Top Level (Banners)
-    renderGenreRail("Trending Movies", uniqueMovies.filter(m => m.banner), true);
-    renderGenreRail("Popular Series", uniqueTv.filter(t => t.banner), true);
-
-    // Render Genre Rails (Posters)
-    Object.entries(movieGenres).forEach(([genre, items]) => {
-      if (items.length >= 3 && genre !== "Hit Films") {
-        renderGenreRail(`${genre} Movies`, items, false);
+    // Render all catalog rails directly (⛩ Anime, Animation, Cartoons, Movies, Shows, etc.)
+    for (const rail of rails) {
+      if (rail.items && rail.items.length > 0) {
+        renderGenreRail(rail.name, rail.items, false);
       }
-    });
-    
-    Object.entries(tvGenres).forEach(([genre, items]) => {
-      if (items.length >= 3 && genre !== "Binge-Worthy Series") {
-        renderGenreRail(`${genre} TV`, items, false);
-      }
-    });
+    }
   } catch (err) {
     loading.textContent = `Failed to load Home dashboard: ${err}`;
   }
