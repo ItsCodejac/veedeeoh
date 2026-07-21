@@ -7,8 +7,8 @@ const CATALOG_TTL = 5 * 60 * 1000;
 
 const ANIME_RE = /anime|naruto|one piece|dragon ?ball|jojo|sailor moon|gundam|bleach|yu-gi-oh|shonen|ghibli|evangelion|cowboy bebop|akira|slayer/i;
 
-let _session: any = null;
-let _catalog: any = null;
+let _sessions: Record<string, any> = {};
+let _catalogs: Record<string, any> = {};
 
 function plutoHeaders(regionCode?: string): Record<string, string> {
   const headers: Record<string, string> = {
@@ -48,10 +48,11 @@ async function boot(regionCode?: string): Promise<any> {
 }
 
 async function getSession(regionCode?: string): Promise<any> {
-  if (!_session || Date.now() - _session.at > SESSION_TTL) {
-    _session = await boot(regionCode);
+  const code = (regionCode || "US").toUpperCase();
+  if (!_sessions[code] || Date.now() - _sessions[code].at > SESSION_TTL) {
+    _sessions[code] = await boot(code);
   }
-  return _session;
+  return _sessions[code];
 }
 
 function streamUrl(session: any, path: string): string {
@@ -87,16 +88,17 @@ function normalize(session: any, item: any): any | null {
 }
 
 export async function getCatalog(regionCode?: string): Promise<any[]> {
-  if (_catalog && Date.now() - _catalog.at < CATALOG_TTL) {
-    return _catalog.rails;
+  const code = (regionCode || "US").toUpperCase();
+  if (_catalogs[code] && Date.now() - _catalogs[code].at < CATALOG_TTL) {
+    return _catalogs[code].rails;
   }
-  const session = await getSession(regionCode);
+  const session = await getSession(code);
   const params = new URLSearchParams({ offset: "0", page: "1", includeItems: "true" });
   
   const res = await fetch(`${VOD_URL}/categories?${params.toString()}`, {
     headers: {
       "Authorization": `Bearer ${session.token}`,
-      ...plutoHeaders(regionCode)
+      ...plutoHeaders(code)
     }
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -125,7 +127,7 @@ export async function getCatalog(regionCode?: string): Promise<any[]> {
     rails.unshift({ name: "⛩ Anime", items: Object.values(seenAnime) });
   }
   
-  _catalog = { rails, at: Date.now() };
+  _catalogs[code] = { rails, at: Date.now() };
   return rails;
 }
 

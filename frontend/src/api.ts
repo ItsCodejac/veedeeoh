@@ -17,9 +17,18 @@ export async function fetchCatalog(): Promise<Catalog> {
   return res.json();
 }
 
-export async function fetchVod(): Promise<VodRail[]> {
+export function getActiveRegion(): string {
+  return localStorage.getItem("tvlc_region") || "US";
+}
+
+export function setActiveRegion(region: string): void {
+  localStorage.setItem("tvlc_region", region);
+}
+
+export async function fetchVod(region?: string): Promise<VodRail[]> {
   try {
-    const res = await apiFetch("/api/vod");
+    const reg = region || getActiveRegion();
+    const res = await apiFetch(`/api/vod?region=${encodeURIComponent(reg)}`);
     if (!res.ok) return [];
     return (await res.json()).rails ?? [];
   } catch {
@@ -27,8 +36,9 @@ export async function fetchVod(): Promise<VodRail[]> {
   }
 }
 
-export async function fetchVodSeries(seriesId: string): Promise<VodEpisode[]> {
-  const res = await apiFetch(`/api/vod/series/${encodeURIComponent(seriesId)}`);
+export async function fetchVodSeries(seriesId: string, region?: string): Promise<VodEpisode[]> {
+  const reg = region || getActiveRegion();
+  const res = await apiFetch(`/api/vod/series/${encodeURIComponent(seriesId)}?region=${encodeURIComponent(reg)}`);
   if (!res.ok) throw new Error(`series fetch failed: ${res.status}`);
   return (await res.json()).episodes ?? [];
 }

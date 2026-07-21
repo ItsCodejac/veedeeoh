@@ -140,6 +140,22 @@ function wireHeader(): void {
     }
   });
 
+  const regionSelector = $<HTMLSelectElement>("regionSelector");
+  if (regionSelector) {
+    import("./api").then(api => {
+      regionSelector.value = api.getActiveRegion();
+      regionSelector.addEventListener("change", (e) => {
+        const val = (e.target as HTMLSelectElement).value;
+        api.setActiveRegion(val);
+        renderHome();
+        const showsRails = $("showsRails");
+        if (showsRails) showsRails.replaceChildren();
+        const moviesRails = $("moviesRails");
+        if (moviesRails) moviesRails.replaceChildren();
+      });
+    });
+  }
+
   if (searchInput) {
     searchInput.addEventListener("input", (e) => {
       clearTimeout(searchTimer);

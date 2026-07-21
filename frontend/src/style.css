@@ -2946,6 +2946,25 @@ select { max-width: 190px; }
     animation: searchSlideDown 0.2s ease-out;
   }
 
+.region-selector-pill {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+}
+.region-selector-pill:hover, .region-selector-pill:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 10px rgba(197, 240, 78, 0.25);
+  background: rgba(255, 255, 255, 0.14);
+}
+
   #searchBar {
     background: rgba(13, 16, 23, 0.98);
     backdrop-filter: blur(20px);
