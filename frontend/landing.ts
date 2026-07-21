@@ -253,10 +253,17 @@ document.addEventListener('visibilitychange', () => {
     });
   }
 
-  // 3. Populate Top Watched Catalog Row
+  // 3. Populate Top Watched Catalog Row (Diverse Multi-Genre Hit Titles)
   if (top10Row) {
     top10Row.innerHTML = '';
-    const topList = activeItems.slice(0, 5);
+    
+    // Pick #1 hit title from 5 distinct categories for authentic top 5 list
+    const topCategories = ['action_franchise', 'comedy_standup', 'horror_thriller', 'classic_tv', 'anime'];
+    const topList = topCategories.map(catKey => {
+      const match = CURATED_POSTERS.find(i => i.category === catKey);
+      return match || CURATED_POSTERS[0];
+    });
+
     topList.forEach((item, index) => {
       const card = document.createElement('div');
       card.className = 'top10-card';
