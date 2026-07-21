@@ -2,7 +2,7 @@
   "name": "veedeeoh.",
   "short_name": "veedeeoh.",
   "description": "Stream your movies and TV shows across all devices.",
-  "start_url": "/",
+  "start_url": "/index.html",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#07080b",

@@ -2,7 +2,7 @@ import { getSession, restoreSession, signIn } from './src/auth';
 
 async function checkAuth() {
   const session = await restoreSession();
-  if (session && window.location.pathname.endsWith('landing.html')) {
+  if (session) {
     window.location.href = '/index.html';
   }
 }

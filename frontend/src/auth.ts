@@ -18,7 +18,7 @@ export function getSupabase(): SupabaseClient {
 
     _supabase.auth.onAuthStateChange((event, session) => {
       if (session && session.user && session.user.email) {
-        setSession(session.user.email, session.access_token);
+        setSession(session.user.email!, session.access_token);
       } else if (event === 'SIGNED_OUT') {
         localStorage.removeItem(AUTH_KEY);
       }
@@ -42,11 +42,39 @@ export function isCloudMode(): boolean {
   );
 }
 
+function setCookie(name: string, value: string, days = 365): void {
+  try {
+    const expires = new Date(Date.now() + days * 864e5).toUTCString();
+    document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax; Secure`;
+  } catch {}
+}
+
+function getCookie(name: string): string | null {
+  try {
+    const match = document.cookie.split('; ').find(row => row.startsWith(`${name}=`));
+    if (!match) return null;
+    const parts = match.split('=');
+    return parts[1] ? decodeURIComponent(parts[1]) : null;
+  } catch {
+    return null;
+  }
+}
+
+function eraseCookie(name: string): void {
+  try {
+    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Lax; Secure`;
+  } catch {}
+}
+
 export function getSession(): AuthSession | null {
   try {
-    const raw = localStorage.getItem(AUTH_KEY);
+    const raw = localStorage.getItem(AUTH_KEY) || getCookie(AUTH_KEY);
     if (!raw) return null;
-    return JSON.parse(raw);
+    const session = JSON.parse(raw);
+    if (!localStorage.getItem(AUTH_KEY)) {
+      localStorage.setItem(AUTH_KEY, raw);
+    }
+    return session;
   } catch {
     return null;
   }
@@ -60,7 +88,7 @@ export async function restoreSession(): Promise<AuthSession | null> {
     const client = getSupabase();
     const { data } = await client.auth.getSession();
     if (data?.session?.user?.email) {
-      setSession(data.session.user.email, data.session.access_token);
+      setSession(data.session.user.email!, data.session.access_token);
       return getSession();
     }
   } catch (err) {
@@ -76,11 +104,14 @@ export function setSession(email: string, access_token?: string): void {
     authenticatedAt: new Date().toISOString(),
     access_token
   };
-  localStorage.setItem(AUTH_KEY, JSON.stringify(session));
+  const json = JSON.stringify(session);
+  localStorage.setItem(AUTH_KEY, json);
+  setCookie(AUTH_KEY, json, 365);
 }
 
 export function signOut(): void {
   localStorage.removeItem(AUTH_KEY);
+  eraseCookie(AUTH_KEY);
   try {
     getSupabase().auth.signOut();
   } catch {}
