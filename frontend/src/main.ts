@@ -3,14 +3,16 @@ import { fetchCatalog, fetchWatched } from "./api";
 import { state } from "./state";
 import { $ } from "./util";
 import { wireVodDetails, renderShows, renderMovies, wireSearchInputs, renderHome } from "./vod";
-import { getSession } from "./auth";
+import { getSession, isCloudMode } from "./auth";
 
 async function boot(): Promise<void> {
-  // const session = await getSession();
-  // if (!session) {
-  //   window.location.href = '/landing.html';
-  //   return;
-  // }
+  if (isCloudMode) {
+    const session = await getSession();
+    if (!session) {
+      window.location.href = '/landing.html';
+      return;
+    }
+  }
 
   const [data, watchedList] = await Promise.all([fetchCatalog(), fetchWatched()]);
 
