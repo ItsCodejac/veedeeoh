@@ -211,14 +211,14 @@
       /* Ultra-Vibrant Butter-Smooth 60FPS Hero Marquee */
       .hero-marquee-container {
         position: absolute;
-        inset: 0;
+        inset: -60px 0;
         display: flex;
         flex-direction: column;
-        justify-content: center;
-        gap: 20px;
-        opacity: 0.88;
-        mask-image: linear-gradient(180deg, transparent 0%, black 15%, black 85%, transparent 100%);
-        -webkit-mask-image: linear-gradient(180deg, transparent 0%, black 15%, black 85%, transparent 100%);
+        justify-content: space-evenly;
+        gap: 16px;
+        opacity: 0.95;
+        mask-image: linear-gradient(180deg, transparent 0%, black 10%, black 90%, transparent 100%);
+        -webkit-mask-image: linear-gradient(180deg, transparent 0%, black 10%, black 90%, transparent 100%);
         pointer-events: none;
         z-index: 0;
         overflow: hidden;
@@ -302,7 +302,7 @@
       .hero-overlay {
         position: absolute;
         inset: 0;
-        background: radial-gradient(circle at 50% 50%, rgba(6, 7, 10, 0.22) 0%, rgba(6, 7, 10, 0.65) 65%, rgba(6, 7, 10, 0.95) 100%);
+        background: radial-gradient(circle at 50% 50%, rgba(6, 7, 10, 0.1) 0%, rgba(6, 7, 10, 0.5) 60%, rgba(6, 7, 10, 0.85) 100%);
         z-index: 1;
       }
 
@@ -1086,6 +1086,12 @@
         <div class="marquee-row">
           <div class="marquee-track marquee-track-reverse" id="marqueeTrack2"></div>
         </div>
+        <div class="marquee-row">
+          <div class="marquee-track" id="marqueeTrack3"></div>
+        </div>
+        <div class="marquee-row">
+          <div class="marquee-track marquee-track-reverse" id="marqueeTrack4"></div>
+        </div>
       </div>
       <div class="hero-overlay"></div>
 
@@ -1279,10 +1285,13 @@ Health Check: /api/health</div>
       <div class="modal-box">
         <button class="close-btn" id="closeAuthBtn">&times;</button>
         <h2>Sign In</h2>
-        <p>Enter your authorized email address for instant access.</p>
+        <p>Enter your email and password to access your library.</p>
         <form id="authForm">
+          <div style="margin-bottom: 14px;">
+            <input type="email" id="emailInput" placeholder="Email address" required style="width: 100%; padding: 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: #fff; outline: none; box-sizing: border-box;" />
+          </div>
           <div style="margin-bottom: 20px;">
-            <input type="email" id="emailInput" placeholder="Enter authorized email..." required style="width: 100%; padding: 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: #fff; outline: none;" />
+            <input type="password" id="passwordInput" placeholder="Password" required style="width: 100%; padding: 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: #fff; outline: none; box-sizing: border-box;" />
           </div>
           <button type="submit" class="btn btn-accent" id="submitBtn" style="width: 100%; padding: 14px;">Sign In &gt;</button>
         </form>

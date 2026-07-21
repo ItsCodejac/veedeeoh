@@ -7,7 +7,8 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: 'index.html',
-        landing: 'landing.html'
+        landing: 'landing.html',
+        changePassword: 'change-password.html'
       }
     }
   },

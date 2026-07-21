@@ -1,6 +1,7 @@
 {
   "routes": [
     { "src": "/", "dest": "/landing.html" },
+    { "src": "/change-password", "dest": "/change-password.html" },
     { "src": "/api/(.*)", "dest": "/api/index.ts" },
     { "src": "/proxy", "dest": "/api/proxy.ts" },
     { "handle": "filesystem" }

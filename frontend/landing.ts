@@ -81,22 +81,30 @@ if (authModal) {
 if (authForm) {
   authForm.addEventListener('submit', async (e) => {
     e.preventDefault();
+    const password = (document.getElementById('passwordInput') as HTMLInputElement)?.value || '';
     const email = emailInput.value;
     submitBtn.disabled = true;
     submitBtn.textContent = 'Verifying...';
     
     try {
-      await signIn(email);
+      const { mustChangePassword } = await signIn(email, password);
       authMessage.style.display = 'block';
       authMessage.style.color = '#c5f04e';
-      authMessage.textContent = 'Access granted! Redirecting to streaming app...';
-      setTimeout(() => {
-        window.location.href = '/index.html';
-      }, 400);
+      if (mustChangePassword) {
+        authMessage.textContent = 'Access granted! You must set a new password first...';
+        setTimeout(() => {
+          window.location.href = '/change-password.html';
+        }, 600);
+      } else {
+        authMessage.textContent = 'Access granted! Redirecting to streaming app...';
+        setTimeout(() => {
+          window.location.href = '/index.html';
+        }, 400);
+      }
     } catch (err: any) {
       authMessage.style.display = 'block';
       authMessage.style.color = '#ff3b30';
-      authMessage.textContent = err.message || 'Access is reserved for invited waitlist members.';
+      authMessage.textContent = err.message || 'Invalid email or password.';
       submitBtn.disabled = false;
       submitBtn.textContent = 'Sign In';
     }
@@ -138,14 +146,20 @@ function renderCatalogUI(items: any[], rails: any[]) {
   const genreTrack = document.getElementById('genreTrack');
   const marqueeTrack1 = document.getElementById('marqueeTrack1');
   const marqueeTrack2 = document.getElementById('marqueeTrack2');
+  const marqueeTrack3 = document.getElementById('marqueeTrack3');
+  const marqueeTrack4 = document.getElementById('marqueeTrack4');
 
   // 1. Populate Top Hero Marquee Tracks (Smooth 60FPS Vivid Wall)
-  if (marqueeTrack1 && marqueeTrack2) {
+  if (marqueeTrack1 && marqueeTrack2 && marqueeTrack3 && marqueeTrack4) {
     marqueeTrack1.innerHTML = '';
     marqueeTrack2.innerHTML = '';
+    marqueeTrack3.innerHTML = '';
+    marqueeTrack4.innerHTML = '';
 
     const row1Items = activeItems.slice(0, 5);
     const row2Items = activeItems.slice(5, 10);
+    const row3Items = activeItems.slice(0, 5).reverse();
+    const row4Items = activeItems.slice(5, 10).reverse();
 
     const renderTrack = (trackElement: HTMLElement, trackItems: any[]) => {
       const loopItems = [...trackItems, ...trackItems, ...trackItems];
@@ -178,6 +192,8 @@ function renderCatalogUI(items: any[], rails: any[]) {
 
     renderTrack(marqueeTrack1, row1Items);
     renderTrack(marqueeTrack2, row2Items);
+    renderTrack(marqueeTrack3, row3Items);
+    renderTrack(marqueeTrack4, row4Items);
   }
 
   // 2. Populate Category Hub Grid
