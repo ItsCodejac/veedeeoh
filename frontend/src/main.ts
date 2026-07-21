@@ -18,14 +18,7 @@ async function boot(): Promise<void> {
   state.watched = new Set(watchedList);
   state.health = new Map(Object.entries(data.health));
 
-  for (const c of state.countries) {
-    countryNames.set(c.code, `${c.flag} ${c.name}`);
-    $<HTMLSelectElement>("country").append(new Option(`${c.flag} ${c.name}`, c.code));
-  }
-  for (const c of state.categories) {
-    categoryNames.set(c.id, c.name);
-    $<HTMLSelectElement>("category").append(new Option(c.name, c.id));
-  }
+  // Removed Live TV header population
   renderHome();
   renderVibeBlocks();
 
@@ -34,8 +27,8 @@ async function boot(): Promise<void> {
 }
 
 function wireSidebar(): void {
-  const tabs = ["tabHome", "tabShows", "tabMovies"];
-  const views = ["homeView", "showsView", "moviesView"];
+  const tabs = ["tabHome", "tabShows", "tabMovies", "tabPodcasts"];
+  const views = ["homeView", "showsView", "moviesView", "podcastsView"];
 
   function switchView(activeTabId: string) {
     closePartyPlayer();
@@ -67,7 +60,12 @@ function wireSidebar(): void {
     } else if (activeTabId === "tabMovies") {
       $("moviesView").removeAttribute("hidden");
       if (!$("moviesRails").querySelector(".rail")) {
-        renderMovies($("moviesRails"));
+        import("./vod").then(vod => vod.renderMovies($("moviesRails")));
+      }
+    } else if (activeTabId === "tabPodcasts") {
+      $("podcastsView").removeAttribute("hidden");
+      if (!$("podcastsRails").querySelector(".rail")) {
+        import("./vod").then(vod => vod.renderPodcasts($("podcastsRails")));
       }
     }
   }
@@ -81,33 +79,18 @@ function wireSidebar(): void {
 
 function wireHeader(): void {
   let searchTimer: number | undefined;
-  $("search").addEventListener("input", () => {
-    clearTimeout(searchTimer);
-    searchTimer = window.setTimeout(applyFilters, 150);
-  });
-  $("country").addEventListener("change", applyFilters);
-  $("category").addEventListener("change", applyFilters);
-  $("favToggle").addEventListener("click", (e) => {
-    (e.target as HTMLElement).classList.toggle("active");
-    applyFilters();
-  });
-  $("hideDead").addEventListener("click", (e) => {
-    const on = (e.target as HTMLElement).classList.toggle("active");
-    localStorage.setItem("tvlc.hideDead", on ? "1" : "");
-    applyFilters();
-  });
-  if (localStorage.getItem("tvlc.hideDead")) $("hideDead").classList.add("active");
-  
-  $("brand").addEventListener("click", (e) => {
-    e.preventDefault();
-    $("tabHome").click();
-  });
-
-  $("surprise").addEventListener("click", () => {
-    const pool = state.filtered.length ? state.filtered : visible();
-    const ch = pool[Math.floor(Math.random() * pool.length)];
-    if (ch) openPlayer(ch);
-  });
+  const searchInput = $("search") as HTMLInputElement;
+  if (searchInput) {
+    searchInput.addEventListener("input", (e) => {
+      clearTimeout(searchTimer);
+      searchTimer = window.setTimeout(() => {
+        const query = (e.target as HTMLInputElement).value.toLowerCase();
+        import("./vod").then((vod) => {
+          vod.setGlobalSearchQuery(query);
+        });
+      }, 150);
+    });
+  }
 
   $("tabExport").addEventListener("click", () => {
     const f = filters();

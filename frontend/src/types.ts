@@ -77,6 +77,7 @@ export interface VodItem {
   url?: string;
   series_id?: string;
   identifier?: string;
+  episodes?: VodEpisode[];
 }
 
 export interface VodRail {

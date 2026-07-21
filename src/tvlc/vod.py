@@ -198,6 +198,106 @@ async def archive_movies(client: httpx.AsyncClient, rows: int = 30) -> list[dict
     ]
 
 
+import xml.etree.ElementTree as ET
+
+_podcast_catalog = {"rails": [], "at": 0}
+
+async def apple_podcasts(client: httpx.AsyncClient) -> list[dict]:
+    global _podcast_catalog
+    if _podcast_catalog["rails"] and time.time() - _podcast_catalog["at"] < CATALOG_TTL:
+        return _podcast_catalog["rails"]
+
+    search_terms = ["video podcast", "comedy video podcast", "tech video podcast", "sports video podcast", "news video podcast", "gaming video podcast"]
+    results = []
+    
+    import asyncio
+    async def fetch_term(term: str):
+        try:
+            r = await client.get(
+                "https://itunes.apple.com/search",
+                params={"term": term, "media": "podcast", "limit": 20},
+                timeout=10,
+            )
+            if r.status_code == 200:
+                return r.json().get("results", [])
+        except:
+            pass
+        return []
+        
+    responses = await asyncio.gather(*(fetch_term(t) for t in search_terms))
+    for r in responses:
+        results.extend(r)
+        
+    # Deduplicate results by collectionId
+    seen = set()
+    unique_results = []
+    for p in results:
+        cid = p.get("collectionId")
+        if cid and cid not in seen:
+            seen.add(cid)
+            unique_results.append(p)
+            
+    items = []
+    
+    # Process up to 30 unique feeds to avoid taking too long
+    for p in unique_results[:30]:
+        feed_url = p.get("feedUrl")
+        if not feed_url:
+            continue
+        try:
+            f_resp = await client.get(feed_url, timeout=10)
+            if f_resp.status_code != 200:
+                continue
+            
+            root = ET.fromstring(f_resp.text)
+            channel = root.find("channel")
+            if not channel:
+                continue
+                
+            episodes = []
+            for i, item in enumerate(channel.findall("item")):
+                enc = item.find("enclosure")
+                if enc is not None:
+                    url = enc.get("url")
+                    typ = enc.get("type", "").lower()
+                    if url and ("video" in typ or url.endswith(".mp4") or url.endswith(".m4v")):
+                        title = item.findtext("title") or "Episode"
+                        desc = item.findtext("description") or ""
+                        
+                        thumb = p.get("artworkUrl600")
+                        itunes_img = item.find("{http://www.itunes.com/dtds/podcast-1.0.dtd}image")
+                        if itunes_img is not None and itunes_img.get("href"):
+                            thumb = itunes_img.get("href")
+                        
+                        episodes.append({
+                            "title": title,
+                            "url": url,
+                            "description": desc[:500],
+                            "thumbnail": thumb,
+                            "number": len(episodes) + 1,
+                        })
+                        if len(episodes) >= 20: 
+                            break
+                            
+            if episodes:
+                items.append({
+                    "id": f"podcast:{p['collectionId']}",
+                    "title": p.get("collectionName", "Podcast"),
+                    "type": "podcast",
+                    "poster": p.get("artworkUrl600"),
+                    "banner": p.get("artworkUrl600"),
+                    "summary": p.get("artistName", ""),
+                    "genre": p.get("primaryGenreName", "Video Podcast"),
+                    "episodes": episodes
+                })
+        except Exception:
+            continue
+            
+    _podcast_catalog = {"rails": items, "at": time.time()}
+    return items
+
+
+
 async def archive_stream(client: httpx.AsyncClient, identifier: str) -> str | None:
     """Best playable file URL for an archive.org item."""
     resp = await client.get(f"https://archive.org/metadata/{identifier}", timeout=30)

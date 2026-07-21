@@ -11,7 +11,35 @@ let showsSearchQuery = "";
 let showsActiveGenre = "";
 let moviesSearchQuery = "";
 let moviesActiveGenre = "";
+let podcastsSearchQuery = "";
 let lastSaveTime = 0;
+
+export function setGlobalSearchQuery(query: string): void {
+  showsSearchQuery = query;
+  moviesSearchQuery = query;
+  
+  // Trigger re-renders if elements are present and not hidden
+  const showsContainer = $("showsRails");
+  if (showsContainer && !showsContainer.parentElement?.hidden) {
+    void import("./vod").then(vod => vod.renderShows(showsContainer));
+  }
+  
+  const moviesContainer = $("moviesRails");
+  if (moviesContainer && !moviesContainer.parentElement?.hidden) {
+    void import("./vod").then(vod => vod.renderMovies(moviesContainer));
+  }
+  
+  const podcastsContainer = $("podcastsRails");
+  if (podcastsContainer && !podcastsContainer.parentElement?.hidden) {
+    void import("./vod").then(vod => vod.renderPodcasts(podcastsContainer));
+  }
+  
+  const homeView = $("homeView");
+  if (homeView && !homeView.hidden && query.length > 0) {
+    // Automatically switch to Movies tab when searching from Home
+    $("tabMovies")?.click();
+  }
+}
 
 export async function getVodRails(): Promise<VodRail[]> {
   if (cachedVodRails) return cachedVodRails;
@@ -415,6 +443,9 @@ function asChannel(item: VodItem, streams: Stream[]): Channel {
     logos: [],
     streams,
     source: item.genre || "On Demand",
+    vodPoster: item.poster,
+    vodBanner: item.banner,
+    vodItem: item,
   };
 }
 
@@ -488,8 +519,8 @@ export async function openVodDetails(item: VodItem): Promise<void> {
     return;
   }
 
-  // 2. Series item
-  if (item.series_id) {
+  // 2. Series or Podcast item
+  if (item.series_id || item.episodes) {
     playBtn.textContent = "▶ START WATCHING";
     
     const loading = document.createElement("div");
@@ -497,17 +528,28 @@ export async function openVodDetails(item: VodItem): Promise<void> {
     loading.style.gridColumn = "1/-1";
     loading.style.textAlign = "center";
     loading.style.padding = "40px";
-    loading.textContent = "Loading episodes...";
-    grid.append(loading);
-
-    try {
-      const episodes = await fetchVodSeries(item.series_id);
-      grid.replaceChildren();
-      if (!episodes.length) {
-        loading.textContent = "No episodes found.";
+    
+    let episodes = item.episodes || [];
+    
+    if (item.series_id && !episodes.length) {
+      loading.textContent = "Loading episodes...";
+      grid.append(loading);
+      try {
+        episodes = await fetchVodSeries(item.series_id);
+      } catch (err) {
+        grid.replaceChildren();
+        loading.textContent = `Failed to load episodes: ${err}`;
         grid.append(loading);
         return;
       }
+    }
+
+    grid.replaceChildren();
+    if (!episodes.length) {
+      loading.textContent = "No episodes found.";
+      grid.append(loading);
+      return;
+    }
 
       // Group episodes by season
       const seasons: Record<number, VodEpisode[]> = {};
@@ -616,12 +658,7 @@ export async function openVodDetails(item: VodItem): Promise<void> {
         // Render first season by default
         renderSeason(seasonNums[0]!);
       }
-
-    } catch (err) {
-      grid.replaceChildren();
-      loading.textContent = `Failed to load episodes: ${err}`;
-      grid.append(loading);
-    }
+      
     return;
   }
 
@@ -944,4 +981,64 @@ export function renderMovies(container: HTMLElement): void {
   }).catch((err) => {
     loading.textContent = `Failed to load Movies: ${err}`;
   });
+}
+
+/** Render Podcasts only */
+export async function renderPodcasts(container: HTMLElement): Promise<void> {
+  try {
+    const rawRails = await getVodRails();
+    
+    // Extract only podcast items
+    let allPodcasts: VodItem[] = [];
+    rawRails.forEach(r => {
+      allPodcasts.push(...r.items.filter(i => i.type === "podcast"));
+    });
+    
+    // Remove duplicates
+    const uniquePodcasts = Array.from(new Map(allPodcasts.map(m => [m.title, m])).values());
+
+    if (podcastsSearchQuery) {
+      allPodcasts = uniquePodcasts.filter(item => {
+        return item.title.toLowerCase().includes(podcastsSearchQuery) || 
+               (item.summary && item.summary.toLowerCase().includes(podcastsSearchQuery));
+      });
+    } else {
+      allPodcasts = uniquePodcasts;
+    }
+
+    container.replaceChildren();
+
+    if (!allPodcasts.length) {
+      const msg = document.createElement("div");
+      msg.style.color = "var(--dim)";
+      msg.style.padding = "24px";
+      msg.textContent = "No Podcasts available matching filters.";
+      container.append(msg);
+      return;
+    }
+
+    const title = document.createElement("div");
+    title.className = "sectionTitle";
+    title.textContent = "Video Podcasts";
+    container.append(title);
+
+    const el = document.createElement("div");
+    el.className = "rail";
+    el.innerHTML = `
+      <div class="railHead">
+        <h2>Featured Channels</h2>
+        <span class="railTag">${allPodcasts.length} shows</span>
+      </div>
+    `;
+    const scroller = document.createElement("div");
+    scroller.className = "railScroll";
+    for (const item of allPodcasts) {
+      scroller.append(vodCard(item));
+    }
+    el.append(scroller);
+    container.append(el);
+
+  } catch (err) {
+    container.innerHTML = `<div style="padding: 24px; color: var(--dim)">Failed to load podcasts: ${err}</div>`;
+  }
 }

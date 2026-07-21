@@ -7,8 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Archivo:wght@400;500;600;700&family=Bricolage+Grotesque:wght@700;800&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-  <script type="module" crossorigin src="/assets/index-vzm7wVwo.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-Beak4034.css">
+  <script type="module" crossorigin src="/assets/index-B4DCm8Dp.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-B5bsshw6.css">
 </head>
 <body>
 
@@ -30,6 +30,10 @@
     <button id="tabMovies" title="VOD Movies" class="navBtn">
       <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="2" rx="2" ry="2"></rect><path d="M12 2v20M2 7h20M2 17h20"></path></svg>
       <span>Movies</span>
+    </button>
+    <button id="tabPodcasts" title="Podcasts" class="navBtn">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+      <span>Podcasts</span>
     </button>
     <button id="tabMusic" title="Music & Party" class="navBtn" style="display: none;">
       <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
@@ -55,15 +59,7 @@
     <header>
       <div id="searchBar">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-        <input id="search" type="search" placeholder="Search live program, channel, or country..." autocomplete="off">
-      </div>
-
-      <div class="headerActions">
-        <select id="country"><option value="">All Countries</option></select>
-        <select id="category"><option value="">All Categories</option></select>
-        <button id="favToggle" class="actionBtn">★ Favorites</button>
-        <button id="hideDead" class="actionBtn">🚫 Hide Dead</button>
-        <button id="surprise" class="actionBtn primary">🎲 Surprise Me</button>
+        <input id="search" type="search" placeholder="Search movies and shows..." autocomplete="off">
       </div>
     </header>
 
@@ -176,7 +172,12 @@
         <div id="moviesRails"></div>
       </div>
 
-      <!-- Panel 5: Music View -->
+      <!-- Podcasts View -->
+      <section id="podcastsView" hidden>
+        <div id="podcastsRails"></div>
+      </section>
+
+      <!-- Music View -->
       <div id="musicView" class="viewPanel" hidden style="display: none !important;">
         <div id="musicHero"></div>
         <div id="musicRails"></div>

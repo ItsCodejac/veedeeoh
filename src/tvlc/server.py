@@ -228,6 +228,14 @@ async def vod_catalog() -> dict:
             rails.append({"name": "🎞 Archive Classics", "items": archive})
     except (httpx.HTTPError, KeyError):
         pass  # archive is a bonus rail
+        
+    try:
+        podcasts = await vod.apple_podcasts(app.state.client)
+        if podcasts:
+            rails.append({"name": "🎙 Featured Video Podcasts", "items": podcasts})
+    except (httpx.HTTPError, KeyError):
+        pass  # podcasts is a bonus rail
+        
     return {"rails": rails}
 
 

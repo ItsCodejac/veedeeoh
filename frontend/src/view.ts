@@ -9,6 +9,7 @@ import { getVodRails, resumeVodPlayback, openVodDetails } from "./vod";
 
 const BATCH = 120;
 const grid = () => $("grid");
+let heroCarouselInterval: number | undefined;
 
 export const VIBE_MAP: Record<string, string[]> = {
   "cartoon breakfast.": ["anime-gaming", "anime", "kids", "animation", "animated"],
@@ -226,6 +227,17 @@ export async function renderHome(): Promise<void> {
     const rails = await getVodRails();
     loading.remove();
 
+    // Recreate the Hero and Rails containers that were wiped by replaceChildren
+    const hero = document.createElement("div");
+    hero.id = "homeHero";
+    hero.className = "vodHeroBlock";
+    hero.style.display = "none";
+    homeContainer.append(hero);
+
+    const railsContainer = document.createElement("div");
+    railsContainer.id = "homeRails";
+    homeContainer.append(railsContainer);
+
     // 1. Continue Watching (Recent Resumes) from localStorage
     const resumeHistoryStr = localStorage.getItem("tvlc_resume_history") || "[]";
     let resumeHistory: any[] = [];
@@ -249,15 +261,17 @@ export async function renderHome(): Promise<void> {
 
       resumeHistory.forEach((item) => {
         const card = document.createElement("button");
-        card.className = "vodCard";
-        card.style.position = "relative";
+        card.className = "continueCard";
+        const imgUrl = item.banner || item.poster || "";
         card.innerHTML = `
-          <span class="vodPoster">${item.poster ? `<img loading="lazy" alt="" src="${escapeHtml(item.poster)}">` : "🎬"}</span>
-          <span class="vodTitle">${escapeHtml(item.title)}</span>
-          <span class="vodMeta">${escapeHtml(item.episodeTitle || "Movie")}</span>
-          <div class="resumeProgressWrapper">
-            <div class="resumeProgressBar" style="width: ${item.percentage}%;"></div>
+          <div class="continueImage">
+            ${imgUrl ? `<img loading="lazy" alt="" src="${escapeHtml(imgUrl)}">` : "🎬"}
+            <div class="continueProgressWrap">
+              <div class="continueProgressBar" style="width: ${item.percentage}%;"></div>
+            </div>
           </div>
+          <span class="showcaseTitle">${escapeHtml(item.title)}</span>
+          <span class="showcaseMeta">${escapeHtml(item.episodeTitle || "Movie")}</span>
         `;
         card.onclick = () => {
           resumeVodPlayback(item);
@@ -265,53 +279,122 @@ export async function renderHome(): Promise<void> {
         continueScroller.append(card);
       });
       continueRail.append(continueScroller);
-      homeContainer.append(continueRail);
+      railsContainer.append(continueRail);
     }
 
-    // 2. Add Spotlight VOD Hero if there is a featured item
-    const hero = $("homeHero");
-    if (hero) {
-      const featured = rails[0]?.items[0];
-      if (featured) {
+    // Clear interval if re-rendering
+    if (heroCarouselInterval) clearInterval(heroCarouselInterval);
+
+    // Flatten all items and extract a featured pool for the rotating hero
+    const allItems = rails.flatMap(r => r.items);
+    const featuredPool = allItems.filter(i => i.banner && i.banner.length > 0).slice(0, 5);
+    if (featuredPool.length === 0) {
+      featuredPool.push(...allItems.filter(i => i.poster && i.poster.length > 0).slice(0, 5));
+    }
+
+    // 2. Add Spotlight VOD Hero Carousel
+    if (hero && featuredPool.length > 0) {
+      let heroIdx = 0;
+      
+      const renderHero = () => {
+        const featured = featuredPool[heroIdx];
+        if (!featured) return;
         const bannerImg = featured.banner || featured.poster || "";
-        hero.className = "vodHeroBlock";
         hero.style.backgroundImage = bannerImg ? `url(${bannerImg})` : "";
         hero.innerHTML = `
           <div class="vodHeroOverlay"></div>
-          <div class="vodHeroContent">
-            <span class="vodHeroGenre">${escapeHtml(featured.genre || "Featured")}</span>
+          <div class="vodHeroContent" style="animation: fadeIn 0.5s;">
+            <span class="vodHeroGenre">${escapeHtml(featured.genre || "Featured Showcase")}</span>
             <h2 class="vodHeroTitle">${escapeHtml(featured.title)}</h2>
-            <div class="vodHeroMeta">${escapeHtml(featured.rating || "")}</div>
-            <p class="vodHeroSummary">${escapeHtml(featured.summary)}</p>
+            <div class="vodHeroMeta">${escapeHtml(featured.rating || "TV-MA")}</div>
+            <p class="vodHeroSummary">${escapeHtml(featured.summary || "Start watching now.")}</p>
+            <div style="display: flex; gap: 16px; margin-top: 16px;">
+              <button class="actionBtn primary" style="padding: 12px 32px; font-size: 16px; border-radius: 8px; font-weight: 700;">
+                ▶ WATCH NOW
+              </button>
+              <button class="actionBtn" style="padding: 12px 24px; font-size: 16px; border-radius: 8px;">
+                More Info
+              </button>
+            </div>
+          </div>
+          <div class="vodHeroCarouselDots">
+            ${featuredPool.map((_, i) => `<div class="vodHeroDot ${i === heroIdx ? 'active' : ''}" data-idx="${i}"></div>`).join("")}
           </div>
         `;
+        
+        const dots = hero.querySelectorAll(".vodHeroDot");
+        dots.forEach(d => {
+           d.addEventListener("click", (e) => {
+             e.stopPropagation();
+             heroIdx = parseInt((e.target as HTMLElement).dataset.idx || "0");
+             renderHero();
+             resetInterval();
+           });
+        });
+        
         hero.onclick = () => {
           void openVodDetails(featured);
         };
-        hero.removeAttribute("hidden");
-      }
+      };
+      
+      const resetInterval = () => {
+        if (heroCarouselInterval) clearInterval(heroCarouselInterval);
+        heroCarouselInterval = window.setInterval(() => {
+          heroIdx = (heroIdx + 1) % featuredPool.length;
+          renderHero();
+        }, 8000);
+      };
+      
+      renderHero();
+      resetInterval();
+      hero.style.display = "flex";
     }
 
-    // 3. Render top 3-4 VOD Rails on the Home page!
-    rails.slice(0, 4).forEach((rail: VodRail) => {
+    // 3. Separate TV and Movies, and Group by Genre
+    const moviesItems = allItems.filter(i => (i.type === "movie" || (!i.series_id && i.type !== "series")) && i.type !== "podcast");
+    const tvItems = allItems.filter(i => i.type === "series" || i.series_id);
+    
+    const uniqueMovies = Array.from(new Map(moviesItems.map(m => [m.title, m])).values()).filter(i => i.poster || i.banner);
+    const uniqueTv = Array.from(new Map(tvItems.map(m => [m.title, m])).values()).filter(i => i.poster || i.banner);
+    
+    const groupIntoGenres = (items: VodItem[], fallbackGenre: string) => {
+      const groups: Record<string, VodItem[]> = {};
+      items.forEach(item => {
+        const g = item.genre || fallbackGenre;
+        if (!groups[g]) groups[g] = [];
+        groups[g].push(item);
+      });
+      return groups;
+    };
+
+    const movieGenres = groupIntoGenres(uniqueMovies, "Hit Films");
+    const tvGenres = groupIntoGenres(uniqueTv, "Binge-Worthy Series");
+    
+    const renderGenreRail = (title: string, items: VodItem[], prioritizeBanner: boolean) => {
+      if (items.length === 0) return;
       const el = document.createElement("div");
-      el.className = "rail";
+      el.className = "showcaseRail";
       el.innerHTML = `
-        <div class="railHead">
-          <h2>${escapeHtml(rail.name)}</h2>
-          <span class="railTag">${rail.items.length} items</span>
+        <div class="showcaseRailHead">
+          <h2>${escapeHtml(title)}</h2>
         </div>
       `;
       const scroller = document.createElement("div");
-      scroller.className = "railScroll";
-      rail.items.slice(0, 15).forEach((item: VodItem) => {
+      scroller.className = "showcaseScroll";
+      
+      items.slice(0, 20).forEach((item: VodItem) => {
         const card = document.createElement("button");
-        card.className = "vodCard";
+        const useBanner = prioritizeBanner && item.banner;
+        card.className = useBanner ? "showcaseCard" : "posterCard";
         card.title = item.summary || item.title;
+        
+        const imgUrl = useBanner ? item.banner : (item.poster || item.banner || "");
+        const imageClass = useBanner ? "showcasePoster" : "posterImage";
+        
         card.innerHTML = `
-          <span class="vodPoster">${item.poster ? `<img loading="lazy" alt="" src="${escapeHtml(item.poster)}">` : "🎬"}</span>
-          <span class="vodTitle">${escapeHtml(item.title)}</span>
-          <span class="vodMeta">${escapeHtml([item.genre, item.rating].filter(Boolean).join(" · "))}</span>
+          <span class="${imageClass}">${imgUrl ? `<img loading="lazy" alt="" src="${escapeHtml(imgUrl)}">` : "🎬"}</span>
+          <span class="showcaseTitle">${escapeHtml(item.title)}</span>
+          <span class="showcaseMeta">${escapeHtml([item.genre, item.rating].filter(Boolean).join(" · "))}</span>
         `;
         card.onclick = () => {
           void openVodDetails(item);
@@ -319,9 +402,25 @@ export async function renderHome(): Promise<void> {
         scroller.append(card);
       });
       el.append(scroller);
-      homeContainer.append(el);
-    });
+      railsContainer.append(el);
+    };
 
+    // Render Featured / Top Level (Banners)
+    renderGenreRail("Trending Movies", uniqueMovies.filter(m => m.banner), true);
+    renderGenreRail("Popular Series", uniqueTv.filter(t => t.banner), true);
+
+    // Render Genre Rails (Posters)
+    Object.entries(movieGenres).forEach(([genre, items]) => {
+      if (items.length >= 3 && genre !== "Hit Films") {
+        renderGenreRail(`${genre} Movies`, items, false);
+      }
+    });
+    
+    Object.entries(tvGenres).forEach(([genre, items]) => {
+      if (items.length >= 3 && genre !== "Binge-Worthy Series") {
+        renderGenreRail(`${genre} TV`, items, false);
+      }
+    });
   } catch (err) {
     loading.textContent = `Failed to load Home dashboard: ${err}`;
   }
