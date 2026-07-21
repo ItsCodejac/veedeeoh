@@ -1,21 +1,63 @@
 [
   {
-    "id": "anime_hunter_x_hunter",
-    "title": "Hunter × Hunter (Subbed)",
-    "category": "anime",
-    "poster": "/posters/anime_hunter_x_hunter.jpg"
+    "id": "a24_award_dungeons_dragons_honor_among_thieves",
+    "title": "Dungeons & Dragons: Honor Among Thieves",
+    "category": "a24_award",
+    "poster": "/posters/a24_award_dungeons_dragons_honor_among_thieves.jpg"
   },
   {
-    "id": "anime_jojo_s_bizarre_adventure",
-    "title": "JoJo's Bizarre Adventure",
-    "category": "anime",
-    "poster": "/posters/anime_jojo_s_bizarre_adventure.jpg"
+    "id": "a24_award_jack_ryan_shadow_recruit",
+    "title": "Jack Ryan: Shadow Recruit",
+    "category": "a24_award",
+    "poster": "/posters/a24_award_jack_ryan_shadow_recruit.jpg"
   },
   {
-    "id": "anime_death_note",
-    "title": "Death Note (Subtitled)",
-    "category": "anime",
-    "poster": "/posters/anime_death_note.jpg"
+    "id": "a24_award_the_contractor",
+    "title": "The Contractor",
+    "category": "a24_award",
+    "poster": "/posters/a24_award_the_contractor.jpg"
+  },
+  {
+    "id": "a24_award_z_for_zachariah",
+    "title": "Z For Zachariah",
+    "category": "a24_award",
+    "poster": "/posters/a24_award_z_for_zachariah.jpg"
+  },
+  {
+    "id": "a24_award_bottle_shock",
+    "title": "Bottle Shock",
+    "category": "a24_award",
+    "poster": "/posters/a24_award_bottle_shock.jpg"
+  },
+  {
+    "id": "action_franchise_memento",
+    "title": "Memento",
+    "category": "action_franchise",
+    "poster": "/posters/action_franchise_memento.jpg"
+  },
+  {
+    "id": "action_franchise_anchorman_the_legend_of_ron_burgundy",
+    "title": "Anchorman: The Legend of Ron Burgundy",
+    "category": "action_franchise",
+    "poster": "/posters/action_franchise_anchorman_the_legend_of_ron_burgundy.jpg"
+  },
+  {
+    "id": "action_franchise_terminator_2_judgment_day",
+    "title": "Terminator 2: Judgment Day",
+    "category": "action_franchise",
+    "poster": "/posters/action_franchise_terminator_2_judgment_day.jpg"
+  },
+  {
+    "id": "action_franchise_indiana_jones_and_the_raiders_of_the_lost_ark",
+    "title": "Indiana Jones and the Raiders of the Lost Ark",
+    "category": "action_franchise",
+    "poster": "/posters/action_franchise_indiana_jones_and_the_raiders_of_the_lost_ark.jpg"
+  },
+  {
+    "id": "action_franchise_indiana_jones_and_the_temple_of_doom",
+    "title": "Indiana Jones and the Temple of Doom",
+    "category": "action_franchise",
+    "poster": "/posters/action_franchise_indiana_jones_and_the_temple_of_doom.jpg"
   },
   {
     "id": "anime_ghost_in_the_shell",
@@ -24,99 +66,177 @@
     "poster": "/posters/anime_ghost_in_the_shell.jpg"
   },
   {
-    "id": "anime_naruto",
-    "title": "Naruto (Subtitled)",
+    "id": "anime_space_adventure_cobra",
+    "title": "Space Adventure Cobra",
     "category": "anime",
-    "poster": "/posters/anime_naruto.jpg"
+    "poster": "/posters/anime_space_adventure_cobra.jpg"
   },
   {
-    "id": "anime_yu_gi_oh",
-    "title": "Yu-Gi-Oh! The Movie",
+    "id": "anime_naruto_en_espa_ol",
+    "title": "Naruto en español",
     "category": "anime",
-    "poster": "/posters/anime_yu_gi_oh.jpg"
+    "poster": "/posters/anime_naruto_en_espa_ol.jpg"
   },
   {
-    "id": "anime_redline",
-    "title": "Redline",
+    "id": "anime_yu_gi_oh_en_espa_ol",
+    "title": "Yu-Gi-Oh! en español",
     "category": "anime",
-    "poster": "/posters/anime_redline.jpg"
+    "poster": "/posters/anime_yu_gi_oh_en_espa_ol.jpg"
   },
   {
-    "id": "action_the_hunt_for_red_october",
-    "title": "The Hunt for Red October",
-    "category": "action",
-    "poster": "/posters/action_the_hunt_for_red_october.jpg"
+    "id": "anime_death_note_en_espa_ol",
+    "title": "Death Note en español",
+    "category": "anime",
+    "poster": "/posters/anime_death_note_en_espa_ol.jpg"
   },
   {
-    "id": "horror_american_psycho",
-    "title": "American Psycho",
-    "category": "horror",
-    "poster": "/posters/horror_american_psycho.jpg"
+    "id": "black_cinema_in_too_deep",
+    "title": "In Too Deep",
+    "category": "black_cinema",
+    "poster": "/posters/black_cinema_in_too_deep.jpg"
   },
   {
-    "id": "action_timeline",
-    "title": "Timeline",
-    "category": "action",
-    "poster": "/posters/action_timeline.jpg"
+    "id": "black_cinema_code_name_the_cleaner",
+    "title": "Code Name: The Cleaner",
+    "category": "black_cinema",
+    "poster": "/posters/black_cinema_code_name_the_cleaner.jpg"
   },
   {
-    "id": "comedy_national_security",
-    "title": "National Security",
-    "category": "comedy",
-    "poster": "/posters/comedy_national_security.jpg"
+    "id": "black_cinema_drumline",
+    "title": "Drumline",
+    "category": "black_cinema",
+    "poster": "/posters/black_cinema_drumline.jpg"
   },
   {
-    "id": "comedy_rango",
-    "title": "Rango",
-    "category": "comedy",
-    "poster": "/posters/comedy_rango.jpg"
+    "id": "black_cinema_nobody_s_fool_2018",
+    "title": "Nobody's Fool (2018)",
+    "category": "black_cinema",
+    "poster": "/posters/black_cinema_nobody_s_fool_2018.jpg"
   },
   {
-    "id": "comedy_cloudy_with_a_chance_of_meatballs",
-    "title": "Cloudy With a Chance of Meatballs",
-    "category": "comedy",
-    "poster": "/posters/comedy_cloudy_with_a_chance_of_meatballs.jpg"
+    "id": "black_cinema_down_to_earth",
+    "title": "Down to Earth",
+    "category": "black_cinema",
+    "poster": "/posters/black_cinema_down_to_earth.jpg"
   },
   {
-    "id": "comedy_fun_with_dick_and_jane",
-    "title": "Fun with Dick and Jane",
-    "category": "comedy",
-    "poster": "/posters/comedy_fun_with_dick_and_jane.jpg"
+    "id": "comedy_standup_three_kings",
+    "title": "Three Kings",
+    "category": "comedy_standup",
+    "poster": "/posters/comedy_standup_three_kings.jpg"
   },
   {
-    "id": "black_the_wood",
-    "title": "The Wood",
-    "category": "black",
-    "poster": "/posters/black_the_wood.jpg"
+    "id": "comedy_standup_drugstore_june",
+    "title": "Drugstore June",
+    "category": "comedy_standup",
+    "poster": "/posters/comedy_standup_drugstore_june.jpg"
   },
   {
-    "id": "black_set_it_off",
-    "title": "Set It Off",
-    "category": "black",
-    "poster": "/posters/black_set_it_off.jpg"
+    "id": "comedy_standup_don_t_tell_mom_the_babysitter_s_dead_2024",
+    "title": "Don't Tell Mom the Babysitter's Dead (2024)",
+    "category": "comedy_standup",
+    "poster": "/posters/comedy_standup_don_t_tell_mom_the_babysitter_s_dead_2024.jpg"
   },
   {
-    "id": "black_beauty_shop",
-    "title": "Beauty Shop",
-    "category": "black",
-    "poster": "/posters/black_beauty_shop.jpg"
+    "id": "comedy_standup_blades_of_glory",
+    "title": "Blades of Glory",
+    "category": "comedy_standup",
+    "poster": "/posters/comedy_standup_blades_of_glory.jpg"
   },
   {
-    "id": "drama_full_metal_jacket",
-    "title": "Full Metal Jacket",
-    "category": "drama",
-    "poster": "/posters/drama_full_metal_jacket.jpg"
+    "id": "comedy_standup_tropic_thunder",
+    "title": "Tropic Thunder",
+    "category": "comedy_standup",
+    "poster": "/posters/comedy_standup_tropic_thunder.jpg"
   },
   {
-    "id": "horror_jeepers_creepers",
-    "title": "Jeepers Creepers",
-    "category": "horror",
-    "poster": "/posters/horror_jeepers_creepers.jpg"
+    "id": "horror_thriller_carrie_1976",
+    "title": "Carrie (1976)",
+    "category": "horror_thriller",
+    "poster": "/posters/horror_thriller_carrie_1976.jpg"
   },
   {
-    "id": "horror_pet",
-    "title": "Pet",
-    "category": "horror",
-    "poster": "/posters/horror_pet.jpg"
+    "id": "horror_thriller_succubus",
+    "title": "Succubus",
+    "category": "horror_thriller",
+    "poster": "/posters/horror_thriller_succubus.jpg"
+  },
+  {
+    "id": "horror_thriller_the_cabin_in_the_woods",
+    "title": "The Cabin in the Woods",
+    "category": "horror_thriller",
+    "poster": "/posters/horror_thriller_the_cabin_in_the_woods.jpg"
+  },
+  {
+    "id": "horror_thriller_you_re_next",
+    "title": "You're Next",
+    "category": "horror_thriller",
+    "poster": "/posters/horror_thriller_you_re_next.jpg"
+  },
+  {
+    "id": "horror_thriller_silent_house",
+    "title": "Silent House",
+    "category": "horror_thriller",
+    "poster": "/posters/horror_thriller_silent_house.jpg"
+  },
+  {
+    "id": "classic_tv_the_twilight_zone",
+    "title": "The Twilight Zone",
+    "category": "classic_tv",
+    "poster": "/posters/classic_tv_the_twilight_zone.jpg"
+  },
+  {
+    "id": "classic_tv_the_outer_limits_1963",
+    "title": "The Outer Limits: 1963",
+    "category": "classic_tv",
+    "poster": "/posters/classic_tv_the_outer_limits_1963.jpg"
+  },
+  {
+    "id": "classic_tv_rawhide",
+    "title": "Rawhide",
+    "category": "classic_tv",
+    "poster": "/posters/classic_tv_rawhide.jpg"
+  },
+  {
+    "id": "classic_tv_the_wild_wild_west",
+    "title": "The Wild Wild West",
+    "category": "classic_tv",
+    "poster": "/posters/classic_tv_the_wild_wild_west.jpg"
+  },
+  {
+    "id": "classic_tv_petticoat_junction",
+    "title": "Petticoat Junction",
+    "category": "classic_tv",
+    "poster": "/posters/classic_tv_petticoat_junction.jpg"
+  },
+  {
+    "id": "martial_arts_cult_man_of_tai_chi",
+    "title": "Man Of Tai Chi",
+    "category": "martial_arts_cult",
+    "poster": "/posters/martial_arts_cult_man_of_tai_chi.jpg"
+  },
+  {
+    "id": "martial_arts_cult_ride_on",
+    "title": "Ride On",
+    "category": "martial_arts_cult",
+    "poster": "/posters/martial_arts_cult_ride_on.jpg"
+  },
+  {
+    "id": "martial_arts_cult_bloodsport",
+    "title": "Bloodsport",
+    "category": "martial_arts_cult",
+    "poster": "/posters/martial_arts_cult_bloodsport.jpg"
+  },
+  {
+    "id": "martial_arts_cult_the_way_of_the_dragon",
+    "title": "The Way Of The Dragon",
+    "category": "martial_arts_cult",
+    "poster": "/posters/martial_arts_cult_the_way_of_the_dragon.jpg"
+  },
+  {
+    "id": "martial_arts_cult_ninja",
+    "title": "Ninja",
+    "category": "martial_arts_cult",
+    "poster": "/posters/martial_arts_cult_ninja.jpg"
   }
 ]
