@@ -217,6 +217,45 @@ async function loadLiveCatalog() {
         top10Row.appendChild(card);
       });
     }
+
+    // 4. Populate Movie & TV Genre Carousel Cards
+    const genreTrack = document.getElementById('genreTrack');
+    if (genreTrack && allItems.length > 0) {
+      const genres = [
+        { name: "Action & Adventure", keyword: "action", fallback: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=400&q=80" },
+        { name: "Comedy & Stand-up", keyword: "comedy", fallback: "https://images.unsplash.com/photo-1514306191717-452ec28c7814?w=400&q=80" },
+        { name: "Sci-Fi & Fantasy", keyword: "sci", fallback: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=400&q=80" },
+        { name: "Horror & Suspense", keyword: "horror", fallback: "https://images.unsplash.com/photo-1509248961158-e54f6934749c?w=400&q=80" },
+        { name: "Crime & Thriller", keyword: "crime", fallback: "https://images.unsplash.com/photo-1453728013993-6d66e9c9123a?w=400&q=80" },
+        { name: "Drama & Romance", keyword: "drama", fallback: "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&q=80" },
+        { name: "Documentaries", keyword: "doc", fallback: "https://images.unsplash.com/photo-1518173946687-a4c8a383392e?w=400&q=80" },
+        { name: "Cult & Archive Cinema", keyword: "archive", fallback: "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400&q=80" },
+        { name: "Anime & Animation", keyword: "anime", fallback: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80" },
+        { name: "Family & Kids", keyword: "family", fallback: "https://images.unsplash.com/photo-1513106580091-1d82408b8cd6?w=400&q=80" },
+      ];
+
+      genreTrack.innerHTML = '';
+      genres.forEach((g) => {
+        const match = allItems.find(i => 
+          (i.genre && i.genre.toLowerCase().includes(g.keyword)) ||
+          (i.title && i.title.toLowerCase().includes(g.keyword))
+        );
+        const posterUrl = (match && match.poster) ? match.poster : g.fallback;
+
+        const card = document.createElement('div');
+        card.className = 'genre-card';
+        card.addEventListener('click', openAuth);
+        card.innerHTML = `
+          <img src="${posterUrl}" alt="${g.name}" />
+          <div class="genre-card-overlay"></div>
+          <div class="genre-card-info">
+            <div class="genre-tag">FEATURED GENRE</div>
+            <div class="genre-title">${g.name}</div>
+          </div>
+        `;
+        genreTrack.appendChild(card);
+      });
+    }
   } catch (err) {
     console.warn('Live catalog hydration error:', err);
   }

@@ -701,61 +701,124 @@
         text-overflow: ellipsis;
       }
 
-      /* Watch The Way You Want Grid */
-      .features-section {
-        padding: 90px 6%;
+      /* Genre Carousel Section */
+      .genre-section {
+        padding: 85px 6%;
         border-bottom: 1px solid var(--border);
+        position: relative;
+        overflow: hidden;
       }
 
-      .features-grid {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 24px;
-        max-width: 1040px;
+      .genre-carousel-container {
+        position: relative;
+        max-width: 1280px;
         margin: 0 auto;
       }
 
-      .feature-box {
-        background: var(--card-bg);
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        padding: 40px;
+      .genre-track {
         display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        min-height: 220px;
-        transition: border-color 0.3s;
+        gap: 20px;
+        overflow-x: auto;
+        scroll-behavior: smooth;
+        padding: 10px 4px 20px;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
       }
 
-      .feature-box:hover {
-        border-color: rgba(255, 255, 255, 0.25);
+      .genre-track::-webkit-scrollbar {
+        display: none;
       }
 
-      .feature-box h3 {
-        font-family: var(--display);
-        font-size: 1.5rem;
+      .genre-card {
+        flex: 0 0 240px;
+        height: 330px;
+        border-radius: 16px;
+        position: relative;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        background: var(--card-bg);
+        cursor: pointer;
+        transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+      }
+
+      .genre-card:hover {
+        transform: translateY(-6px) scale(1.02);
+        border-color: var(--accent);
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.65), 0 0 25px rgba(197, 240, 78, 0.22);
+      }
+
+      .genre-card img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 0.4s ease;
+      }
+
+      .genre-card:hover img {
+        transform: scale(1.08);
+      }
+
+      .genre-card-overlay {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, transparent 35%, rgba(6, 7, 10, 0.95) 100%);
+      }
+
+      .genre-card-info {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        right: 20px;
+        z-index: 2;
+        text-align: left;
+      }
+
+      .genre-tag {
+        font-size: 11px;
         font-weight: 700;
-        margin: 0 0 12px;
-      }
-
-      .feature-box p {
-        color: var(--dim);
-        font-size: 1rem;
-        line-height: 1.6;
-        margin: 0;
-      }
-
-      .feature-icon {
-        width: 48px;
-        height: 48px;
-        border-radius: 12px;
-        background: rgba(197, 240, 78, 0.1);
         color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 6px;
+        font-family: var(--display);
+      }
+
+      .genre-title {
+        font-family: var(--display);
+        font-size: 20px;
+        font-weight: 700;
+        color: #fff;
+        line-height: 1.2;
+      }
+
+      .carousel-btn {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: rgba(16, 20, 30, 0.9);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: #fff;
         display: flex;
         align-items: center;
         justify-content: center;
-        margin-top: 24px;
+        cursor: pointer;
+        z-index: 10;
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        transition: background 0.2s, border-color 0.2s, color 0.2s;
       }
+
+      .carousel-btn:hover {
+        background: var(--accent);
+        color: #06070a;
+        border-color: var(--accent);
+      }
+
+      .carousel-btn-left { left: -14px; }
+      .carousel-btn-right { right: -14px; }
 
       /* Single Access Plan Section */
       .pricing-section {
@@ -1065,51 +1128,23 @@
       </div>
     </section>
 
-    <!-- Watch The Way You Want Grid -->
-    <section class="features-section" id="features">
-      <div class="section-title" style="text-align: center;">Watch the way you want</div>
-      <p class="section-subtitle" style="text-align: center;">Enjoy pristine video streaming tailored for your setup.</p>
+    <!-- Movie Genre Showcase Carousel -->
+    <section class="genre-section" id="features">
+      <h2 class="section-title" style="text-align: center;">Explore Movie &amp; TV Genres</h2>
+      <p class="section-subtitle" style="text-align: center;">Browse curated collections across thousands of streaming titles.</p>
 
-      <div class="features-grid">
-        <div class="feature-box">
-          <div>
-            <h3>Enjoy on your TV</h3>
-            <p>Stream on Smart TVs, Playstation, Xbox, Chromecast, Apple TV, Roku, and web browsers.</p>
-          </div>
-          <div class="feature-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
-          </div>
+      <div class="genre-carousel-container">
+        <button class="carousel-btn carousel-btn-left" onclick="document.getElementById('genreTrack').scrollBy({left: -500, behavior: 'smooth'})">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        
+        <div class="genre-track" id="genreTrack">
+          <!-- Dynamically populated 10 Genre Cards from catalog -->
         </div>
 
-        <div class="feature-box">
-          <div>
-            <h3>Watch everywhere</h3>
-            <p>Stream seamlessly across mobile phones, tablets, laptops, and smart displays.</p>
-          </div>
-          <div class="feature-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
-          </div>
-        </div>
-
-        <div class="feature-box">
-          <div>
-            <h3>Sub-second Playback</h3>
-            <p>Adaptive HLS streaming engine delivers instant buffer-free playback.</p>
-          </div>
-          <div class="feature-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-          </div>
-        </div>
-
-        <div class="feature-box">
-          <div>
-            <h3>Zero Ads &amp; Privacy First</h3>
-            <p>Enjoy uninterrupted viewing with no telemetry, no tracking, and zero ads.</p>
-          </div>
-          <div class="feature-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-          </div>
-        </div>
+        <button class="carousel-btn carousel-btn-right" onclick="document.getElementById('genreTrack').scrollBy({left: 500, behavior: 'smooth'})">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
       </div>
     </section>
 
