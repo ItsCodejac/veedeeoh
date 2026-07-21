@@ -5,7 +5,7 @@ const VOD_URL = "https://service-vod.clusters.pluto.tv/v4/vod";
 const SESSION_TTL = 5 * 60 * 1000;
 const CATALOG_TTL = 5 * 60 * 1000;
 
-const ANIME_RE = /anime|naruto|one piece|dragon ?ball|jojo|sailor moon|gundam|bleach|yu-gi-oh|shonen|ghibli|evangelion|cowboy bebop|akira|slayer/i;
+const ANIME_RE = /anime|animation|manga|japanese|naruto|one piece|dragon ?ball|jojo|sailor moon|gundam|bleach|yu-gi-oh|shonen|shounen|seinen|ghibli|evangelion|bebop|akira|slayer|hunter|hero|titan|subbed|dubbed|crunchyroll|funimation|inuyasha|death note|sword art|fairy tail|demon|jujutsu|chainsaw|tokyo|boruto|yuyu|rurouni|berserk|monster|code geass|fullmetal|mob psycho|overlord|konosuba|re:zero|log horizon|vinland|steins|haikyuu|slam dunk|pokemon|digimon|beyblade|bakugan|cardcaptor|sailor|lupin/i;
 
 let _session: any = null;
 let _catalog: any = null;
@@ -102,17 +102,19 @@ export async function getCatalog(regionCode?: string): Promise<any[]> {
   
   for (const cat of data.categories || []) {
     const items = [];
+    const isAnimeCategory = /anime|manga/i.test(cat.name || "");
     for (const it of cat.items || []) {
       const n = normalize(session, it);
-      if (n) items.push(n);
+      if (n) {
+        items.push(n);
+        if (isAnimeCategory || ANIME_RE.test(`${n.title} ${n.genre || ""} ${cat.name || ""}`)) {
+          if (!n.genre) n.genre = "Anime";
+          seenAnime[n.id] = n;
+        }
+      }
     }
     if (items.length > 0) {
       rails.push({ name: cat.name, items });
-    }
-    for (const n of items) {
-      if (ANIME_RE.test(`${n.title} ${n.genre || ""}`)) {
-        seenAnime[n.id] = n;
-      }
     }
   }
   

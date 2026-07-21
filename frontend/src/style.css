@@ -976,44 +976,27 @@ select { max-width: 190px; }
 .rail { margin-top: 26px; }
 .railHead, .showcaseRailHead {
   display: flex;
-  align-items: baseline;
-  gap: 14px;
-  padding: 0 18px 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 18px 14px;
   cursor: pointer;
   user-select: none;
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
-  width: fit-content;
+  width: 100%;
 }
 
-.railHead:hover, .showcaseRailHead:hover {
-  opacity: 0.85;
-  transform: translateX(4px);
+.railHeadTitle, .showcaseRailHeadTitle {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
 }
 
 .railHead h2, .showcaseRailHead h2 {
   margin: 0;
   font-family: var(--display);
   font-weight: 600;
-  font-size: 16px;
+  font-size: 17px;
   letter-spacing: .5px;
   color: var(--fg);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.railHead h2::after, .showcaseRailHead h2::after {
-  content: "➔";
-  font-size: 11px;
-  color: var(--accent);
-  opacity: 0;
-  transform: translateX(-4px);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.railHead:hover h2::after, .showcaseRailHead:hover h2::after {
-  opacity: 1;
-  transform: translateX(0);
 }
 
 .railTag {
@@ -1021,6 +1004,158 @@ select { max-width: 190px; }
   font-size: 11px;
   letter-spacing: 1px;
   color: var(--dim);
+}
+
+.railExpandBtn {
+  background: rgba(197, 240, 78, 0.1);
+  color: var(--accent);
+  border: 1px solid rgba(197, 240, 78, 0.3);
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.railHead:hover .railExpandBtn,
+.railExpandBtn:hover {
+  background: var(--accent);
+  color: #06070a;
+  box-shadow: 0 4px 16px var(--accent-glow);
+  transform: translateY(-1px);
+}
+
+.railExpandBtn.active {
+  background: var(--accent);
+  color: #06070a;
+}
+
+/* Expanded Category Grid Rules */
+.railScroll.expandedGrid,
+.showcaseScroll.expandedGrid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)) !important;
+  gap: 20px 16px !important;
+  overflow-x: visible !important;
+  overflow-y: visible !important;
+  white-space: normal !important;
+  padding: 12px 18px 28px 18px !important;
+  animation: gridFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.railScroll.expandedGrid > *,
+.showcaseScroll.expandedGrid > * {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  flex: none !important;
+  margin: 0 !important;
+}
+
+/* Dedicated Category View (Netflix/Hulu Pattern) */
+.categoryHeaderBar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.categoryBackBtn {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--fg);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 8px 18px;
+  border-radius: 24px;
+  font-family: var(--display);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.categoryBackBtn:hover {
+  background: var(--accent);
+  color: #06070a;
+  border-color: var(--accent);
+  box-shadow: 0 4px 20px var(--accent-glow);
+  transform: translateX(-2px);
+}
+
+.categoryHeaderTitleGroup {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.categoryHeaderTitleGroup h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: #ffffff;
+}
+
+.categoryCountBadge {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent);
+  background: rgba(197, 240, 78, 0.12);
+  padding: 4px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(197, 240, 78, 0.25);
+}
+
+.categoryGridContainer {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 24px 18px;
+  padding-bottom: 60px;
+  animation: gridFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.categoryGridContainer > * {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+}
+
+@media (max-width: 768px) {
+  .categoryHeaderTitleGroup h1 {
+    font-size: 18px;
+  }
+  .categoryGridContainer {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 14px 10px;
+  }
+}
+
+.railScroll.expandedGrid .vodCard,
+.showcaseScroll.expandedGrid .posterCard,
+.showcaseScroll.expandedGrid .showcaseCard {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+@keyframes gridFadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 768px) {
+  .railScroll.expandedGrid,
+  .showcaseScroll.expandedGrid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)) !important;
+    gap: 14px 10px !important;
+    padding: 8px 12px 20px 12px !important;
+  }
 }
 .railAll {
   background: none;
@@ -2391,36 +2526,64 @@ select { max-width: 190px; }
   align-items: center;
   justify-content: center;
   flex-grow: 1;
+  pointer-events: none;
 }
-.bigPlayBtn {
-  background: var(--accent);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+
+.centerFeedbackBadge {
   width: 84px;
   height: 84px;
   border-radius: 50%;
-  color: #06070a;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
   font-size: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 8px 32px var(--accent-glow), 0 0 24px var(--accent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  transform: scale(0.9);
   opacity: 0;
+  transform: scale(0.7);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
-.vodControlsOverlay:hover .bigPlayBtn,
-#vodPlayerOverlay.paused .bigPlayBtn {
-  opacity: 1;
-  transform: scale(1);
+
+/* Hide center button completely when playing, except during transient ripple */
+#vodPlayerOverlay:not(.paused) .centerFeedbackBadge:not(.yt-ripple) {
+  opacity: 0 !important;
+  visibility: hidden !important;
 }
-.bigPlayBtn:hover {
-  background: #ffffff;
-  color: #06070a;
-  transform: scale(1.08);
-  box-shadow: 0 10px 40px rgba(255, 255, 255, 0.5);
+
+/* Show center play button only when video is paused */
+#vodPlayerOverlay.paused .centerFeedbackBadge {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: scale(1) !important;
+  background: var(--accent) !important;
+  color: #06070a !important;
+  cursor: pointer;
+  pointer-events: auto !important;
+  box-shadow: 0 8px 32px var(--accent-glow), 0 0 24px var(--accent);
+}
+
+.centerFeedbackBadge.yt-ripple {
+  visibility: visible !important;
+  animation: ytRippleAnim 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes ytRippleAnim {
+  0% {
+    opacity: 0.95;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.18);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.45);
+  }
 }
 
 .vodControlsTopRight {

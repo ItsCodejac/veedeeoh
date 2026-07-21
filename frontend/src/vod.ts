@@ -205,23 +205,41 @@ export function openVodPlayer(ch: any, streamIdx: number, startTime: number = 0)
   };
   overlay.onmousemove = onMouseMove;
 
+  const centerFeedback = $("vodCenterFeedback");
+  let rippleTimer = 0;
+  const triggerCenterFeedback = (iconText: string) => {
+    if (!centerFeedback) return;
+    centerFeedback.textContent = iconText;
+    centerFeedback.classList.remove("yt-ripple");
+    void centerFeedback.offsetWidth;
+    centerFeedback.classList.add("yt-ripple");
+    clearTimeout(rippleTimer);
+    rippleTimer = window.setTimeout(() => {
+      centerFeedback.classList.remove("yt-ripple");
+    }, 600);
+  };
+
   const togglePlay = () => {
     if (video.paused) {
+      triggerCenterFeedback("▶");
       void video.play();
     } else {
+      triggerCenterFeedback("❚❚");
       video.pause();
     }
   };
   playBtn.onclick = togglePlay;
-  bigPlayBtn.onclick = togglePlay;
   video.onclick = togglePlay;
+  if (centerFeedback) centerFeedback.onclick = togglePlay;
 
   rewindBtn.onclick = () => {
     video.currentTime = Math.max(0, video.currentTime - 10);
+    triggerCenterFeedback("↺ 10s");
     onMouseMove();
   };
   forwardBtn.onclick = () => {
     video.currentTime = Math.min(video.duration, video.currentTime + 10);
+    triggerCenterFeedback("↻ 10s");
     onMouseMove();
   };
 
@@ -875,6 +893,51 @@ export function wireSearchInputs(): void {
   }
 }
 
+let previousActivePanelId = "homeView";
+let previousScrollPos = 0;
+
+export function openCategoryView(titleName: string, items: VodItem[]): void {
+  const scrollable = $("scrollableArea");
+  if (scrollable) previousScrollPos = scrollable.scrollTop;
+
+  const panels = ["homeView", "showsView", "moviesView"];
+  for (const id of panels) {
+    const p = $(id);
+    if (p && !p.hasAttribute("hidden")) {
+      previousActivePanelId = id;
+      p.setAttribute("hidden", "");
+    }
+  }
+
+  const categoryView = $("categoryView");
+  const titleNameEl = $("categoryTitleName");
+  const itemCountEl = $("categoryItemCount");
+  const grid = $("categoryGrid");
+  const backBtn = $("categoryBackBtn");
+
+  if (!categoryView || !grid) return;
+
+  if (titleNameEl) titleNameEl.textContent = titleName;
+  if (itemCountEl) itemCountEl.textContent = `${items.length} titles`;
+
+  grid.replaceChildren();
+  items.forEach((item) => {
+    grid.append(vodCard(item));
+  });
+
+  categoryView.removeAttribute("hidden");
+  if (scrollable) scrollable.scrollTop = 0;
+
+  if (backBtn) {
+    backBtn.onclick = () => {
+      categoryView.setAttribute("hidden", "");
+      const prev = $(previousActivePanelId);
+      if (prev) prev.removeAttribute("hidden");
+      if (scrollable) scrollable.scrollTop = previousScrollPos;
+    };
+  }
+}
+
 /** Render Shows (Series) only */
 export function renderShows(container: HTMLElement): void {
   container.replaceChildren();
@@ -969,24 +1032,27 @@ export function renderShows(container: HTMLElement): void {
       const el = document.createElement("div");
       el.className = "rail";
       el.innerHTML = `
-        <div class="railHead" title="Click to filter by ${escapeHtml(rail.name)}">
-          <h2>${escapeHtml(rail.name)}</h2>
-          <span class="railTag">${rail.items.length} series</span>
+        <div class="railHead">
+          <div class="railHeadTitle">
+            <h2>${escapeHtml(rail.name)}</h2>
+            <span class="railTag">${rail.items.length} series</span>
+          </div>
+          <button class="railExpandBtn">See All (${rail.items.length}) ➔</button>
         </div>
       `;
-      const railHead = el.querySelector(".railHead");
-      if (railHead) {
-        railHead.addEventListener("click", () => {
-          const genre = rail.name.replace(/^⛩\s*/, "").replace(/\s+(Series|Shows)$/i, "").trim();
-          showsActiveGenre = genre;
-          renderShows(container);
-        });
-      }
       const scroller = document.createElement("div");
       scroller.className = "railScroll";
-      for (const item of rail.items.slice(0, 30)) {
-        scroller.append(vodCard(item));
+
+      rail.items.slice(0, 30).forEach((item) => scroller.append(vodCard(item)));
+
+      const railHead = el.querySelector(".railHead") as HTMLElement;
+      if (railHead) {
+        railHead.onclick = (e) => {
+          e.stopPropagation();
+          openCategoryView(rail.name, rail.items);
+        };
       }
+
       el.append(scroller);
       setupHorizontalScroll(scroller, el);
       container.append(el);
@@ -1089,24 +1155,27 @@ export function renderMovies(container: HTMLElement): void {
       const el = document.createElement("div");
       el.className = "rail";
       el.innerHTML = `
-        <div class="railHead" title="Click to filter by ${escapeHtml(rail.name)}">
-          <h2>${escapeHtml(rail.name)}</h2>
-          <span class="railTag">${rail.items.length} movies</span>
+        <div class="railHead">
+          <div class="railHeadTitle">
+            <h2>${escapeHtml(rail.name)}</h2>
+            <span class="railTag">${rail.items.length} movies</span>
+          </div>
+          <button class="railExpandBtn">See All (${rail.items.length}) ➔</button>
         </div>
       `;
-      const railHead = el.querySelector(".railHead");
-      if (railHead) {
-        railHead.addEventListener("click", () => {
-          const genre = rail.name.replace(/^⛩\s*/, "").replace(/\s+(Movies|Films)$/i, "").trim();
-          moviesActiveGenre = genre;
-          renderMovies(container);
-        });
-      }
       const scroller = document.createElement("div");
       scroller.className = "railScroll";
-      for (const item of rail.items.slice(0, 30)) {
-        scroller.append(vodCard(item));
+
+      rail.items.slice(0, 30).forEach((item) => scroller.append(vodCard(item)));
+
+      const railHead = el.querySelector(".railHead") as HTMLElement;
+      if (railHead) {
+        railHead.onclick = (e) => {
+          e.stopPropagation();
+          openCategoryView(rail.name, rail.items);
+        };
       }
+
       el.append(scroller);
       setupHorizontalScroll(scroller, el);
       container.append(el);
@@ -1284,29 +1353,16 @@ export async function renderHome(): Promise<void> {
       const el = document.createElement("div");
       el.className = "showcaseRail";
       el.innerHTML = `
-        <div class="showcaseRailHead" title="Click to view all in ${escapeHtml(title)}">
-          <h2>${escapeHtml(title)}</h2>
+        <div class="showcaseRailHead">
+          <div class="showcaseRailHeadTitle">
+            <h2>${escapeHtml(title)}</h2>
+          </div>
+          <button class="railExpandBtn">See All (${items.length}) ➔</button>
         </div>
       `;
-      const head = el.querySelector(".showcaseRailHead");
-      if (head) {
-        head.addEventListener("click", () => {
-          const isMovie = title.toLowerCase().includes("movie") || title.toLowerCase().includes("film");
-          const cleanGenre = title.replace(/^⛩\s*/, "").replace(/\s+(Movies|Series|Shows|Films)$/i, "").trim();
-          if (isMovie) {
-            moviesActiveGenre = cleanGenre;
-            const tabMovies = $("tabMovies");
-            if (tabMovies) tabMovies.click();
-          } else {
-            showsActiveGenre = cleanGenre;
-            const tabShows = $("tabShows");
-            if (tabShows) tabShows.click();
-          }
-        });
-      }
       const scroller = document.createElement("div");
       scroller.className = "showcaseScroll";
-      
+
       items.slice(0, 20).forEach((item: VodItem) => {
         const card = document.createElement("button");
         const useBanner = prioritizeBanner && item.banner;
@@ -1326,6 +1382,15 @@ export async function renderHome(): Promise<void> {
         };
         scroller.append(card);
       });
+
+      const head = el.querySelector(".showcaseRailHead") as HTMLElement;
+      if (head) {
+        head.onclick = (e) => {
+          e.stopPropagation();
+          openCategoryView(title, items);
+        };
+      }
+
       el.append(scroller);
       setupHorizontalScroll(scroller, el);
       railsContainer.append(el);

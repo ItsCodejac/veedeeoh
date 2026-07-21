@@ -17,9 +17,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Archivo:wght@400;500;600;700&family=Bricolage+Grotesque:wght@700;800&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-  <script type="module" crossorigin src="/assets/main-qSJaUMrJ.js"></script>
+  <script type="module" crossorigin src="/assets/main-DXfznCvT.js"></script>
   <link rel="modulepreload" crossorigin href="/assets/auth-Dq18GEHP.js">
-  <link rel="stylesheet" crossorigin href="/assets/main-BTu_VO-3.css">
+  <link rel="stylesheet" crossorigin href="/assets/main-De2y-ZeD.css">
 </head>
 <body>
 
@@ -111,7 +111,17 @@
         <div id="moviesRails"></div>
       </div>
 
-      <!-- VOD Views only -->
+      <!-- Dedicated Category View Panel (Netflix / Hulu Pattern) -->
+      <div id="categoryView" class="viewPanel" hidden>
+        <div class="categoryHeaderBar">
+          <button id="categoryBackBtn" class="categoryBackBtn">← Back</button>
+          <div class="categoryHeaderTitleGroup">
+            <h1 id="categoryTitleName">Category Name</h1>
+            <span id="categoryItemCount" class="categoryCountBadge">0 titles</span>
+          </div>
+        </div>
+        <div id="categoryGrid" class="categoryGridContainer"></div>
+      </div>
 
     </div>
   </main>
@@ -163,9 +173,9 @@
         </div>
       </div>
 
-      <!-- Center Big Play Button -->
-      <div class="vodControlsCenter">
-        <button id="vodBigPlayBtn" class="bigPlayBtn">▶</button>
+      <!-- Center Feedback Ripple Badge (YouTube Style) -->
+      <div class="vodControlsCenter" id="vodControlsCenter">
+        <div id="vodCenterFeedback" class="centerFeedbackBadge">▶</div>
       </div>
 
       <!-- Bottom Bar -->

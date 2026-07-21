@@ -108,7 +108,17 @@
         <div id="moviesRails"></div>
       </div>
 
-      <!-- VOD Views only -->
+      <!-- Dedicated Category View Panel (Netflix / Hulu Pattern) -->
+      <div id="categoryView" class="viewPanel" hidden>
+        <div class="categoryHeaderBar">
+          <button id="categoryBackBtn" class="categoryBackBtn">← Back</button>
+          <div class="categoryHeaderTitleGroup">
+            <h1 id="categoryTitleName">Category Name</h1>
+            <span id="categoryItemCount" class="categoryCountBadge">0 titles</span>
+          </div>
+        </div>
+        <div id="categoryGrid" class="categoryGridContainer"></div>
+      </div>
 
     </div>
   </main>
@@ -160,9 +170,9 @@
         </div>
       </div>
 
-      <!-- Center Big Play Button -->
-      <div class="vodControlsCenter">
-        <button id="vodBigPlayBtn" class="bigPlayBtn">▶</button>
+      <!-- Center Feedback Ripple Badge (YouTube Style) -->
+      <div class="vodControlsCenter" id="vodControlsCenter">
+        <div id="vodCenterFeedback" class="centerFeedbackBadge">▶</div>
       </div>
 
       <!-- Bottom Bar -->
