@@ -427,10 +427,11 @@ export function openVodPlayer(ch: any, streamIdx: number, startTime: number = 0)
     };
     video.ontimeupdate = handleProgress;
     
-    const streamSourceUrl = url.startsWith("http") ? url : proxiedUrl;
+    const isDirectMp4 = /\.(mp4|m4v|webm|ogv)(\?|$)/i.test(url);
+    const targetUrl = isDirectMp4 ? url : proxiedUrl;
 
-    if (/\.(mp4|m4v|webm|ogv)(\?|$)/i.test(url)) {
-      video.src = streamSourceUrl;
+    if (isDirectMp4) {
+      video.src = targetUrl;
       void video.play().catch(() => {});
     } else if (Hls.isSupported()) {
       vodHls = new Hls({
@@ -440,31 +441,28 @@ export function openVodPlayer(ch: any, streamIdx: number, startTime: number = 0)
         fragLoadingTimeOut: 30000,
         startPosition: idx === streamIdx ? startTime : -1,
       });
-      vodHls.loadSource(streamSourceUrl);
+      vodHls.loadSource(targetUrl);
       vodHls.attachMedia(video);
       vodHls.on(Hls.Events.MANIFEST_PARSED, () => {
         void video.play().catch(() => {});
       });
       vodHls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
-          console.warn("HLS fatal error, trying proxy fallback:", data.type);
-          if (vodHls) {
-            vodHls.destroy();
-            vodHls = null;
-          }
-          if (video.src !== proxiedUrl) {
-            video.src = proxiedUrl;
-            void video.play().catch(() => {});
+          console.warn("HLS fatal error:", data.type, data.details);
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            vodHls?.startLoad();
+          } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            vodHls?.recoverMediaError();
           }
         }
       });
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = streamSourceUrl;
+      video.src = targetUrl;
       video.addEventListener("loadedmetadata", () => {
         void video.play().catch(() => {});
       }, { once: true });
     } else {
-      video.src = streamSourceUrl;
+      video.src = targetUrl;
       void video.play().catch(() => {});
     }
 

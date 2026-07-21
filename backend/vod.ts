@@ -10,24 +10,19 @@ const ANIME_RE = /anime|naruto|one piece|dragon ?ball|jojo|sailor moon|gundam|bl
 let _session: any = null;
 let _catalog: any = null;
 
-function plutoHeaders(regionCode?: string): Record<string, string> {
+function plutoHeaders(clientIp?: string): Record<string, string> {
   const headers: Record<string, string> = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
     "Referer": "https://pluto.tv/",
     "Origin": "https://pluto.tv",
   };
-  const code = (regionCode || "US").toUpperCase();
-  const spoofIps: Record<string, string> = {
-    "US": "76.81.9.69",
-    "CA": "192.206.151.131",
-    "GB": "178.238.11.6",
-    "FR": "193.169.64.141",
-  };
-  headers["X-Forwarded-For"] = spoofIps[code] || "76.81.9.69";
+  if (clientIp && clientIp !== "127.0.0.1" && clientIp !== "::1") {
+    headers["X-Forwarded-For"] = clientIp.split(',')[0].trim();
+  }
   return headers;
 }
 
-async function boot(regionCode?: string): Promise<any> {
+async function boot(clientIp?: string): Promise<any> {
   const params = new URLSearchParams({
     appName: "web", appVersion: "8.0.0", deviceVersion: "120.0.0",
     deviceModel: "web", deviceMake: "chrome", deviceType: "web",
@@ -35,7 +30,7 @@ async function boot(regionCode?: string): Promise<any> {
     serverSideAds: "true",
   });
   const res = await fetch(`${BOOT_URL}?${params.toString()}`, {
-    headers: plutoHeaders(regionCode)
+    headers: plutoHeaders(clientIp)
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
@@ -47,9 +42,9 @@ async function boot(regionCode?: string): Promise<any> {
   };
 }
 
-async function getSession(regionCode?: string, forceRefresh = false): Promise<any> {
+async function getSession(clientIp?: string, forceRefresh = false): Promise<any> {
   if (forceRefresh || !_session || Date.now() - _session.at > SESSION_TTL) {
-    _session = await boot(regionCode);
+    _session = await boot(clientIp);
   }
   return _session;
 }

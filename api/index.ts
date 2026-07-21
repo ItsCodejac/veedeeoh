@@ -59,9 +59,10 @@ app.get('/waitlist', (c: Context) => {
 });
 
 app.get('/vod', async (c: Context) => {
+  const clientIp = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || undefined;
   const rails: any[] = [];
   try {
-    const plutoRails = await vod.getCatalog('US');
+    const plutoRails = await vod.getCatalog(clientIp);
     rails.push(...plutoRails);
   } catch (e) {
     console.error("Pluto VOD error:", e);
@@ -77,8 +78,9 @@ app.get('/vod', async (c: Context) => {
 
 app.get('/vod/series/:id', async (c: Context) => {
   try {
+    const clientIp = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || undefined;
     const seriesId = c.req.param('id') || '';
-    const episodes = await vod.getSeries(seriesId, 'US');
+    const episodes = await vod.getSeries(seriesId, clientIp);
     return c.json({ episodes });
   } catch (e: any) {
     return c.json({ error: e.message }, 502);

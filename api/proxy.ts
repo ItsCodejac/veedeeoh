@@ -18,8 +18,7 @@ app.get('/proxy', async (c: Context) => {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
         'Referer': 'https://pluto.tv/',
-        'Origin': 'https://pluto.tv',
-        'X-Forwarded-For': '76.81.9.69'
+        'Origin': 'https://pluto.tv'
       }
     });
 
@@ -31,25 +30,35 @@ app.get('/proxy', async (c: Context) => {
     if (contentType.includes('mpegurl') || contentType.includes('m3u') || url.includes('.m3u8')) {
       let text = await res.text();
       const baseUrl = new URL(url);
-      
-      // Rewrite relative URLs inside m3u8 playlist to absolute /proxy?url=
-      text = text.replace(/^(?!\s*#)(?!\s*$)(.+)$/gm, (line) => {
-        const trimmed = line.trim();
-        if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-          return `/proxy?url=${encodeURIComponent(trimmed)}`;
-        }
+
+      // 1. Rewrite URI="..." attributes in tags (#EXT-X-KEY, #EXT-X-MEDIA, #EXT-X-MAP)
+      text = text.replace(/(URI=["'])([^"']+)(["'])/gi, (_match, p1, p2, p3) => {
         try {
-          const absolute = new URL(trimmed, baseUrl).toString();
-          return `/proxy?url=${encodeURIComponent(absolute)}`;
+          const abs = new URL(p2, baseUrl).toString();
+          return `${p1}/proxy?url=${encodeURIComponent(abs)}${p3}`;
         } catch {
-          return trimmed;
+          return _match;
+        }
+      });
+      
+      // 2. Rewrite non-comment playlist lines (sub-playlists, .ts segments)
+      const lines = text.split('\n');
+      const rewrittenLines = lines.map((line) => {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) return line;
+        try {
+          const abs = new URL(trimmed, baseUrl).toString();
+          return `/proxy?url=${encodeURIComponent(abs)}`;
+        } catch {
+          return line;
         }
       });
 
-      return c.text(text, 200, {
+      return c.text(rewrittenLines.join('\n'), 200, {
         'Content-Type': 'application/x-mpegURL',
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': '*'
+        'Access-Control-Allow-Headers': '*',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS'
       });
     }
 
@@ -57,7 +66,8 @@ app.get('/proxy', async (c: Context) => {
     return c.body(body, 200, {
       'Content-Type': contentType || 'application/octet-stream',
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': '*'
+      'Access-Control-Allow-Headers': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS'
     });
   } catch (e: any) {
     return c.text(e.message || 'proxy error', 500);
