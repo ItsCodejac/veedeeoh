@@ -1,27 +1,25 @@
 # veedeeoh.
 
-Stream Video-on-Demand (movies, TV series, and classic cinema) across your devices without subscription fees. **veedeeoh.** is an open-core, self-hostable web application built with Hono (TypeScript) and Vite.
+**veedeeoh.** is a web application for browsing and streaming Video-on-Demand (movies, TV series, and classic cinema) across your devices. Built with Hono (TypeScript) and Vite.
 
 ## Features
 
 - 🍿 **VOD Catalog** — Pluto TV movies & TV shows, plus Internet Archive cinema classics
-- ▶️ **In-Page Playback** — Native HLS streaming with CORS stream proxying
-- ★ **Favorites & History** — Atomic JSON persistence for user state
-- 🐳 **1-Click Self-Hosting** — Docker & Docker Compose support out of the box
-- ⚡ **Sub-Second Response** — Pre-warmed VOD catalog caching and zero-dependency production builds
+- ▶️ **In-Page Playback** — Native HLS video player with CORS proxying
+- ★ **Favorites & History** — Local JSON persistence for user state
+- 🐳 **Self-Hosting** — Docker and Docker Compose support out of the box
 
 ---
 
 ## 🐳 Self-Hosting (Docker Compose)
 
-The easiest way to self-host **veedeeoh.** is using Docker Compose:
+To run **veedeeoh.** with Docker Compose:
 
 ```yaml
 version: '3.8'
 
 services:
   veedeeoh:
-    image: ghcr.io/itscodejac/veedeeoh:latest # or build from source
     build: .
     container_name: veedeeoh
     ports:
@@ -42,7 +40,7 @@ Run:
 docker compose up -d
 ```
 
-Open `http://localhost:8321` (or `http://<your-server-ip>:8321`) in your browser to start streaming.
+Access `http://localhost:8321` (or `http://<your-server-ip>:8321`) in your browser.
 
 ---
 
@@ -50,21 +48,21 @@ Open `http://localhost:8321` (or `http://<your-server-ip>:8321`) in your browser
 
 Requires [Node.js 20+](https://nodejs.org/).
 
-### 1. Build the Frontend
+### 1. Build Frontend
 ```sh
 cd frontend
 npm install
 npm run build
 ```
 
-### 2. Start the Backend Server
+### 2. Start Backend Server
 ```sh
 cd ../backend
 npm install
 npm run start
 ```
 
-Open `http://localhost:8321` in your browser.
+Access `http://localhost:8321` in your browser.
 
 ---
 
@@ -80,7 +78,7 @@ Open `http://localhost:8321` in your browser.
 
 ## Development
 
-- **Backend** (Node.js / Hono):
+- **Backend** (Hono / Node.js):
   ```sh
   cd backend
   npm run dev   # auto-reloading dev server
@@ -96,4 +94,4 @@ Open `http://localhost:8321` in your browser.
 
 ## Credits
 
-Content indexed from public video APIs including Pluto TV and Internet Archive.
+Content indexed from public video sources including Pluto TV and Internet Archive.
