@@ -2964,6 +2964,12 @@ select { max-width: 190px; }
   box-shadow: 0 0 10px rgba(197, 240, 78, 0.25);
   background: rgba(255, 255, 255, 0.14);
 }
+@media (max-width: 600px) {
+  .region-selector-pill {
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+}
 
   #searchBar {
     background: rgba(13, 16, 23, 0.98);
