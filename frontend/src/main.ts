@@ -1,18 +1,19 @@
 import "./style.css";
-import { fetchCatalog, fetchNowPlaying, fetchWatched } from "./api";
-import { openPlayer, wirePlayer } from "./player";
-import { categoryNames, countryNames, filters, state, visible } from "./state";
+import { fetchCatalog, fetchWatched } from "./api";
+import { state } from "./state";
 import { $ } from "./util";
-import { applyFilters, goHome, refreshNowInfo, renderMore, renderHome, renderVibeBlocks } from "./view";
-import { wireVodDetails, renderShows, renderMovies, wireSearchInputs } from "./vod";
-import { closePartyPlayer } from "./party";
-import { renderMusic } from "./music";
+import { wireVodDetails, renderShows, renderMovies, wireSearchInputs, renderHome } from "./vod";
+import { getSession } from "./auth";
 
 async function boot(): Promise<void> {
+  // const session = await getSession();
+  // if (!session) {
+  //   window.location.href = '/landing.html';
+  //   return;
+  // }
+
   const [data, watchedList] = await Promise.all([fetchCatalog(), fetchWatched()]);
-  state.channels = data.channels;
-  state.countries = data.countries;
-  state.categories = data.categories;
+
   state.region = data.region;
   state.favorites = new Set(data.favorites);
   state.watched = new Set(watchedList);
@@ -20,18 +21,22 @@ async function boot(): Promise<void> {
 
   // Removed Live TV header population
   renderHome();
-  renderVibeBlocks();
-
-  // Vibe blocks & Live TV polling disabled for VOD-only pivot
   wireSearchInputs();
 }
 
 function wireSidebar(): void {
-  const tabs = ["tabHome", "tabShows", "tabMovies", "tabPodcasts"];
-  const views = ["homeView", "showsView", "moviesView", "podcastsView"];
+  const tabs = ["tabHome", "tabShows", "tabMovies", "tabFavs"];
+  const views = ["homeView", "showsView", "moviesView"];
 
   function switchView(activeTabId: string) {
-    closePartyPlayer();
+
+    // Auto-minimize the player to PiP mode when navigating away
+    const playerSuite = document.getElementById("playerSuite");
+    if (playerSuite && !playerSuite.hasAttribute("hidden") && !playerSuite.classList.contains("docked")) {
+      playerSuite.classList.add("docked");
+      const pMin = document.getElementById("pMin");
+      if (pMin) pMin.textContent = "🗗 Expand";
+    }
 
     tabs.forEach((t) => {
       const btn = $(t);
@@ -62,18 +67,16 @@ function wireSidebar(): void {
       if (!$("moviesRails").querySelector(".rail")) {
         import("./vod").then(vod => vod.renderMovies($("moviesRails")));
       }
-    } else if (activeTabId === "tabPodcasts") {
-      $("podcastsView").removeAttribute("hidden");
-      if (!$("podcastsRails").querySelector(".rail")) {
-        import("./vod").then(vod => vod.renderPodcasts($("podcastsRails")));
-      }
     }
   }
 
   tabs.forEach((tabId) => {
-    $(tabId).addEventListener("click", () => {
-      switchView(tabId);
-    });
+    const el = $(tabId);
+    if (el) {
+      el.addEventListener("click", () => {
+        switchView(tabId);
+      });
+    }
   });
 }
 
@@ -91,25 +94,9 @@ function wireHeader(): void {
       }, 150);
     });
   }
-
-  $("tabExport").addEventListener("click", () => {
-    const f = filters();
-    const params = new URLSearchParams();
-    if (f.country) params.set("country", f.country);
-    if (f.category) params.set("category", f.category);
-    if (f.q) params.set("q", f.q);
-    if (f.favorites) params.set("favorites", "true");
-    params.set("alive", "true");
-    window.location.href = `/playlist.m3u?${params}`;
-  });
 }
-
-new IntersectionObserver((entries) => {
-  if (entries[0]?.isIntersecting) renderMore();
-}).observe($("sentinel"));
 
 wireSidebar();
 wireHeader();
-wirePlayer();
 wireVodDetails();
 void boot();

@@ -1,0 +1,1235 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>veedeeoh. | Stream Movies & TV Shows</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=Instrument+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --bg: #06070a;
+        --card-bg: #10141e;
+        --card-hover: #181f2e;
+        --border: rgba(255, 255, 255, 0.1);
+        --text: #ffffff;
+        --dim: #9aa5b5;
+        --accent: #c5f04e;
+        --accent-hover: #b4df40;
+        --accent-glow: rgba(197, 240, 78, 0.22);
+        --display: "Space Grotesk", sans-serif;
+        --body: "Instrument Sans", sans-serif;
+        --brand: "Bricolage Grotesque", sans-serif;
+      }
+
+      * { box-sizing: border-box; }
+
+      html, body {
+        margin: 0;
+        padding: 0;
+        font-family: var(--body);
+        background-color: var(--bg);
+        color: var(--text);
+        overflow-x: hidden;
+        scroll-behavior: smooth;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* Sticky Navbar */
+      nav {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 6%;
+        background: linear-gradient(180deg, rgba(6, 7, 10, 0.95) 0%, rgba(6, 7, 10, 0.4) 80%, rgba(6, 7, 10, 0) 100%);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      }
+
+      .logo {
+        font-family: var(--brand);
+        font-size: 32px;
+        font-weight: 800;
+        letter-spacing: -1px;
+        color: var(--text);
+        text-decoration: none;
+      }
+
+      .logo span { color: var(--accent); }
+
+      .nav-links {
+        display: flex;
+        align-items: center;
+        gap: 28px;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      .nav-links a {
+        color: var(--dim);
+        text-decoration: none;
+        font-family: var(--display);
+        font-size: 14px;
+        font-weight: 600;
+        transition: color 0.2s;
+      }
+
+      .nav-links a:hover {
+        color: #fff;
+      }
+
+      .nav-actions {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 11px 24px;
+        border-radius: 8px;
+        font-family: var(--display);
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        text-decoration: none;
+        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        border: none;
+      }
+
+      .btn-accent {
+        background: var(--accent);
+        color: #06070a;
+        box-shadow: 0 4px 20px var(--accent-glow);
+      }
+
+      .btn-accent:hover {
+        background: var(--accent-hover);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 24px rgba(197, 240, 78, 0.35);
+      }
+
+      .btn-outline {
+        background: rgba(255, 255, 255, 0.06);
+        color: #fff;
+        border: 1px solid var(--border);
+      }
+
+      .btn-outline:hover {
+        background: rgba(255, 255, 255, 0.14);
+        border-color: rgba(255, 255, 255, 0.25);
+      }
+
+      /* Hero Section */
+      .hero {
+        position: relative;
+        min-height: 92vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 160px 20px 90px;
+        overflow: hidden;
+        background: #07090e;
+      }
+
+      /* Animated Ambient Background Glows */
+      .hero-glow-1 {
+        position: absolute;
+        top: 20%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 750px;
+        height: 480px;
+        background: radial-gradient(ellipse at center, rgba(197, 240, 78, 0.16) 0%, rgba(0, 242, 254, 0.08) 50%, transparent 70%);
+        filter: blur(90px);
+        pointer-events: none;
+        z-index: 0;
+        animation: glowPulse 8s ease-in-out infinite alternate;
+      }
+
+      .hero-glow-2 {
+        position: absolute;
+        top: 35%;
+        left: 15%;
+        width: 550px;
+        height: 550px;
+        background: radial-gradient(circle at center, rgba(124, 58, 237, 0.15) 0%, transparent 65%);
+        filter: blur(100px);
+        pointer-events: none;
+        z-index: 0;
+        animation: glowFloat 12s ease-in-out infinite alternate;
+      }
+
+      .hero-glow-3 {
+        position: absolute;
+        bottom: 10%;
+        right: 12%;
+        width: 500px;
+        height: 500px;
+        background: radial-gradient(circle at center, rgba(0, 242, 254, 0.14) 0%, transparent 65%);
+        filter: blur(90px);
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      .hero-grid-bg {
+        position: absolute;
+        inset: 0;
+        background-image: 
+          linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+          linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+        background-size: 50px 50px;
+        mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
+        -webkit-mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      @keyframes glowPulse {
+        0% { opacity: 0.6; transform: translate(-50%, -50%) scale(0.95); }
+        100% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+      }
+
+      @keyframes glowFloat {
+        0% { transform: translateY(0) scale(1); }
+        100% { transform: translateY(-30px) scale(1.15); }
+      }
+
+      /* Infinite Marquee Wall Background */
+      .hero-marquee-container {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 20px;
+        opacity: 0.38;
+        mask-image: linear-gradient(180deg, transparent 0%, black 25%, black 75%, transparent 100%);
+        -webkit-mask-image: linear-gradient(180deg, transparent 0%, black 25%, black 75%, transparent 100%);
+        pointer-events: none;
+        z-index: 0;
+        overflow: hidden;
+      }
+
+      .marquee-row {
+        display: flex;
+        overflow: hidden;
+        user-select: none;
+        gap: 16px;
+        width: 100%;
+      }
+
+      .marquee-track {
+        display: flex;
+        gap: 16px;
+        flex-shrink: 0;
+        min-width: 100%;
+        animation: marqueeScrollLeft 45s linear infinite;
+      }
+
+      .marquee-track-reverse {
+        animation: marqueeScrollRight 50s linear infinite;
+      }
+
+      @keyframes marqueeScrollLeft {
+        0% { transform: translateX(0); }
+        100% { transform: translateX(-50%); }
+      }
+
+      @keyframes marqueeScrollRight {
+        0% { transform: translateX(-50%); }
+        100% { transform: translateX(0); }
+      }
+
+      .marquee-card {
+        width: 220px;
+        height: 135px;
+        border-radius: 12px;
+        background: rgba(16, 20, 30, 0.85);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        overflow: hidden;
+        position: relative;
+        flex-shrink: 0;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      }
+
+      .marquee-card img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        opacity: 0.85;
+      }
+
+      .marquee-card-overlay {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, transparent 35%, rgba(6, 7, 10, 0.92) 100%);
+      }
+
+      .marquee-card-title {
+        position: absolute;
+        bottom: 10px;
+        left: 12px;
+        right: 12px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #fff;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-family: var(--display);
+      }
+
+      .hero-overlay {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at 50% 45%, rgba(7, 9, 14, 0.35) 0%, rgba(7, 9, 14, 0.85) 65%, #07090e 100%);
+        z-index: 1;
+      }
+
+      .hero-content {
+        position: relative;
+        z-index: 2;
+        max-width: 900px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 20px;
+        border-radius: 30px;
+        background: rgba(197, 240, 78, 0.09);
+        border: 1px solid rgba(197, 240, 78, 0.32);
+        color: var(--accent);
+        font-family: var(--display);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+        margin-bottom: 28px;
+        box-shadow: 0 0 24px rgba(197, 240, 78, 0.18);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+      }
+
+      .live-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: var(--accent);
+        box-shadow: 0 0 10px var(--accent);
+        animation: pulseDot 1.5s ease-in-out infinite;
+      }
+
+      @keyframes pulseDot {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.4; transform: scale(0.85); }
+      }
+
+      .hero h1 {
+        font-family: var(--display);
+        font-size: clamp(3rem, 6.5vw, 5.2rem);
+        font-weight: 800;
+        line-height: 1.05;
+        letter-spacing: -2px;
+        margin: 0 0 24px;
+        color: #ffffff;
+      }
+
+      .hero-gradient-text {
+        background: linear-gradient(135deg, #c5f04e 0%, #00f2fe 55%, #a8ff78 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        display: inline-block;
+      }
+
+      .hero-subtitle {
+        font-size: clamp(1.15rem, 2.2vw, 1.35rem);
+        color: var(--dim);
+        margin: 0 0 40px;
+        line-height: 1.6;
+        max-width: 740px;
+      }
+
+      .hero-form-container {
+        position: relative;
+        width: 100%;
+        max-width: 560px;
+        margin: 0 auto 28px;
+      }
+
+      .hero-form {
+        display: flex;
+        gap: 10px;
+        padding: 8px;
+        border-radius: 14px;
+        background: rgba(16, 20, 30, 0.8);
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55), 0 0 30px rgba(197, 240, 78, 0.1);
+        transition: border-color 0.3s, box-shadow 0.3s;
+      }
+
+      .hero-form:focus-within {
+        border-color: rgba(197, 240, 78, 0.6);
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65), 0 0 40px rgba(197, 240, 78, 0.28);
+      }
+
+      .hero-form input {
+        flex: 1;
+        padding: 14px 20px;
+        border-radius: 10px;
+        border: none;
+        background: transparent;
+        color: #fff;
+        font-size: 16px;
+        font-family: inherit;
+        outline: none;
+      }
+
+      .hero-form input::placeholder {
+        color: rgba(154, 165, 181, 0.6);
+      }
+
+      .hero-form button {
+        padding: 14px 28px;
+        font-size: 15px;
+        border-radius: 10px;
+        white-space: nowrap;
+      }
+
+      /* Hero Feature Pills */
+      .hero-pills {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 24px;
+        flex-wrap: wrap;
+        margin-top: 8px;
+      }
+
+      .hero-pill-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #b0bac9;
+        font-family: var(--display);
+      }
+
+      .hero-pill-item svg {
+        color: var(--accent);
+      }
+
+      /* Spotlight Widget */
+      .hero-spotlight {
+        margin-top: 48px;
+        width: 100%;
+        max-width: 780px;
+        border-radius: 20px;
+        background: rgba(16, 22, 34, 0.82);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        padding: 18px 24px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        box-shadow: 0 25px 60px rgba(0, 0, 0, 0.65), 0 0 30px rgba(0, 242, 254, 0.06);
+        transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+      }
+
+      .hero-spotlight:hover {
+        transform: translateY(-4px);
+        border-color: rgba(197, 240, 78, 0.45);
+        box-shadow: 0 30px 70px rgba(0, 0, 0, 0.7), 0 0 35px rgba(197, 240, 78, 0.18);
+      }
+
+      .spotlight-left {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        text-align: left;
+      }
+
+      .spotlight-thumb {
+        width: 78px;
+        height: 52px;
+        border-radius: 10px;
+        background: #0f1420;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        overflow: hidden;
+        flex-shrink: 0;
+        position: relative;
+      }
+
+      .spotlight-thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .spotlight-info-tag {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-family: var(--display);
+      }
+
+      .spotlight-title {
+        font-family: var(--display);
+        font-size: 16px;
+        font-weight: 700;
+        color: #fff;
+        margin-top: 2px;
+      }
+
+      .spotlight-subtitle {
+        font-size: 12px;
+        color: var(--dim);
+      }
+
+      .spotlight-eq {
+        display: flex;
+        align-items: flex-end;
+        gap: 3px;
+        height: 16px;
+      }
+
+      .eq-bar {
+        width: 3px;
+        background: var(--accent);
+        border-radius: 2px;
+        animation: eqAnim 1.2s ease-in-out infinite alternate;
+      }
+
+      .eq-bar:nth-child(1) { height: 60%; animation-delay: 0.1s; }
+      .eq-bar:nth-child(2) { height: 100%; animation-delay: 0.3s; }
+      .eq-bar:nth-child(3) { height: 40%; animation-delay: 0.5s; }
+      .eq-bar:nth-child(4) { height: 80%; animation-delay: 0.2s; }
+
+      @keyframes eqAnim {
+        0% { height: 20%; }
+        100% { height: 100%; }
+      }
+
+      /* Category Hub Showcase */
+      .hub-section {
+        padding: 70px 6%;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .section-title {
+        font-family: var(--display);
+        font-size: clamp(1.8rem, 3.5vw, 2.5rem);
+        font-weight: 700;
+        margin: 0 0 10px;
+        letter-spacing: -1px;
+      }
+
+      .section-subtitle {
+        color: var(--dim);
+        font-size: 1.05rem;
+        margin: 0 0 36px;
+      }
+
+      .hub-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 20px;
+      }
+
+      .hub-card {
+        height: 260px;
+        border-radius: 14px;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        position: relative;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        background: var(--card-bg);
+        cursor: pointer;
+        transition: transform 0.3s ease, border-color 0.3s ease;
+      }
+
+      .hub-card:hover {
+        transform: translateY(-6px);
+        border-color: var(--accent);
+      }
+
+      .hub-card img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        z-index: 0;
+        transition: transform 0.4s ease;
+      }
+
+      .hub-card:hover img {
+        transform: scale(1.06);
+      }
+
+      .hub-card-overlay {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, transparent 30%, rgba(6, 7, 10, 0.95) 100%);
+        z-index: 1;
+      }
+
+      .hub-info {
+        position: relative;
+        z-index: 2;
+      }
+
+      .hub-tag {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 4px;
+      }
+
+      .hub-title {
+        font-family: var(--display);
+        font-size: 20px;
+        font-weight: 700;
+      }
+
+      /* Top 10 Ranked Section */
+      .top10-section {
+        padding: 80px 6%;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .top10-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+        gap: 20px;
+      }
+
+      .top10-card {
+        display: flex;
+        align-items: flex-end;
+        position: relative;
+        height: 250px;
+        cursor: pointer;
+      }
+
+      .top10-num {
+        font-family: var(--brand);
+        font-size: 110px;
+        font-weight: 800;
+        line-height: 0.75;
+        color: var(--bg);
+        -webkit-text-stroke: 3px rgba(255, 255, 255, 0.4);
+        margin-right: -28px;
+        z-index: 3;
+        user-select: none;
+      }
+
+      .top10-poster {
+        flex: 1;
+        height: 100%;
+        border-radius: 10px;
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        position: relative;
+        overflow: hidden;
+        z-index: 2;
+        transition: transform 0.3s ease, border-color 0.3s ease;
+      }
+
+      .top10-poster img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .top10-poster-overlay {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, transparent 50%, rgba(6, 7, 10, 0.9) 100%);
+      }
+
+      .top10-poster:hover {
+        transform: scale(1.04);
+        border-color: var(--accent);
+      }
+
+      .top10-poster-title {
+        position: absolute;
+        bottom: 14px;
+        left: 14px;
+        right: 14px;
+        font-family: var(--display);
+        font-size: 14px;
+        font-weight: 700;
+        z-index: 3;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* Watch The Way You Want Grid */
+      .features-section {
+        padding: 90px 6%;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .features-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 24px;
+        max-width: 1040px;
+        margin: 0 auto;
+      }
+
+      .feature-box {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 40px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        min-height: 220px;
+        transition: border-color 0.3s;
+      }
+
+      .feature-box:hover {
+        border-color: rgba(255, 255, 255, 0.25);
+      }
+
+      .feature-box h3 {
+        font-family: var(--display);
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin: 0 0 12px;
+      }
+
+      .feature-box p {
+        color: var(--dim);
+        font-size: 1rem;
+        line-height: 1.6;
+        margin: 0;
+      }
+
+      .feature-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        background: rgba(197, 240, 78, 0.1);
+        color: var(--accent);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-top: 24px;
+      }
+
+      /* Single Access Plan Section */
+      .pricing-section {
+        padding: 90px 6%;
+        text-align: center;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .pricing-card {
+        max-width: 580px;
+        margin: 0 auto;
+        background: var(--card-bg);
+        border: 1px solid var(--accent);
+        box-shadow: 0 0 40px var(--accent-glow);
+        border-radius: 20px;
+        padding: 48px 40px;
+        text-align: left;
+      }
+
+      .pricing-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 16px;
+      }
+
+      .pricing-title {
+        font-family: var(--display);
+        font-size: 1.8rem;
+        font-weight: 700;
+      }
+
+      .pricing-cost {
+        font-family: var(--display);
+        font-size: 3rem;
+        font-weight: 700;
+        color: var(--accent);
+      }
+
+      .pricing-cost span {
+        font-size: 1rem;
+        color: var(--dim);
+        font-weight: 400;
+      }
+
+      .pricing-desc {
+        color: var(--dim);
+        font-size: 15px;
+        line-height: 1.6;
+        margin-bottom: 32px;
+      }
+
+      .pricing-list {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 36px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .pricing-list li {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 15px;
+      }
+
+      .pricing-list svg {
+        color: var(--accent);
+        flex-shrink: 0;
+      }
+
+      /* Dedicated Self-Hosting Banner */
+      .selfhost-banner {
+        padding: 70px 6%;
+        background: linear-gradient(90deg, #0d121c 0%, #080b12 100%);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .selfhost-content {
+        max-width: 1040px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 36px;
+        flex-wrap: wrap;
+      }
+
+      .selfhost-text h3 {
+        font-family: var(--display);
+        font-size: 1.7rem;
+        font-weight: 700;
+        margin: 0 0 8px;
+      }
+
+      .selfhost-text p {
+        color: var(--dim);
+        font-size: 1rem;
+        line-height: 1.5;
+        margin: 0;
+        max-width: 620px;
+      }
+
+      /* Expandable FAQ Accordion Section */
+      .faq-section {
+        padding: 90px 6%;
+        max-width: 860px;
+        margin: 0 auto;
+      }
+
+      .faq-header {
+        text-align: center;
+        margin-bottom: 48px;
+      }
+
+      .faq-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .faq-item {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .faq-button {
+        width: 100%;
+        padding: 24px;
+        background: none;
+        border: none;
+        color: #fff;
+        font-family: var(--display);
+        font-size: 1.25rem;
+        font-weight: 700;
+        text-align: left;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+      }
+
+      .faq-icon {
+        font-size: 24px;
+        transition: transform 0.3s;
+      }
+
+      .faq-answer {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease, padding 0.3s ease;
+        padding: 0 24px;
+        color: var(--dim);
+        font-size: 1.05rem;
+        line-height: 1.6;
+      }
+
+      .faq-item.active .faq-answer {
+        max-height: 200px;
+        padding: 0 24px 24px;
+      }
+
+      .faq-item.active .faq-icon {
+        transform: rotate(45deg);
+      }
+
+      /* Footer */
+      footer {
+        padding: 60px 6% 40px;
+        text-align: center;
+        color: var(--dim);
+        font-size: 14px;
+        border-top: 1px solid var(--border);
+      }
+
+      footer .logo {
+        display: inline-block;
+        margin-bottom: 16px;
+      }
+
+      /* Auth Modal */
+      #authModal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        background: rgba(4, 5, 8, 0.88);
+        backdrop-filter: blur(14px);
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+
+      .modal-box {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 40px;
+        width: 100%;
+        max-width: 420px;
+        position: relative;
+      }
+
+      .close-btn {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: none;
+        border: none;
+        color: var(--dim);
+        font-size: 24px;
+        cursor: pointer;
+      }
+
+      .modal-box h2 {
+        font-family: var(--display);
+        font-size: 1.8rem;
+        margin: 0 0 8px;
+      }
+
+      .modal-box p {
+        color: var(--dim);
+        font-size: 14px;
+        margin: 0 0 24px;
+      }
+
+      @media (max-width: 768px) {
+        .features-grid { grid-template-columns: 1fr; }
+        .hero-wall { grid-template-columns: repeat(3, 1fr); }
+      }
+    </style>
+    <script type="module" crossorigin src="/assets/landing-B9EIDqXq.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/auth-DHKRvX96.js">
+  </head>
+  <body>
+
+    <!-- Header Navigation -->
+    <nav>
+      <a href="#" class="logo">veedeeoh<span>.</span></a>
+      <ul class="nav-links">
+        <li><a href="#catalog">Catalog</a></li>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+        <li><a href="#selfhost">Self-Hosting</a></li>
+        <li><a href="#faq">FAQ</a></li>
+      </ul>
+      <div class="nav-actions">
+        <button class="btn btn-outline" id="navAuthBtn">Sign In</button>
+      </div>
+    </nav>
+
+    <!-- Hero Section with Dynamic Ambient Background & Infinite Marquee Wall -->
+    <section class="hero">
+      <div class="hero-glow-1"></div>
+      <div class="hero-glow-2"></div>
+      <div class="hero-glow-3"></div>
+      <div class="hero-grid-bg"></div>
+
+      <div class="hero-marquee-container">
+        <div class="marquee-row">
+          <div class="marquee-track" id="marqueeTrack1">
+            <!-- Dynamically populated from live catalog -->
+          </div>
+        </div>
+        <div class="marquee-row">
+          <div class="marquee-track marquee-track-reverse" id="marqueeTrack2">
+            <!-- Dynamically populated from live catalog -->
+          </div>
+        </div>
+      </div>
+      <div class="hero-overlay"></div>
+
+      <div class="hero-content">
+        <div class="badge">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+          OPEN-CORE STREAMING ENGINE
+        </div>
+        
+        <h1>All your movies &amp; TV shows. <span class="hero-gradient-text">One place.</span></h1>
+        <p class="hero-subtitle">Stream unlimited Video-on-Demand across all your devices. Pristine high-definition playback with zero ad interruptions.</p>
+        
+        <div class="hero-form-container">
+          <form class="hero-form" id="heroForm" onsubmit="event.preventDefault(); document.getElementById('authModal').style.display='flex';">
+            <input type="email" placeholder="Enter your email address..." required />
+            <button type="submit" class="btn btn-accent" id="heroAuthBtn">Get Started &gt;</button>
+          </form>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Category Hub Showcase (Hydrated from real VOD Rails) -->
+    <section class="hub-section" id="catalog">
+      <h2 class="section-title">Explore Content</h2>
+      <p class="section-subtitle">Discover titles currently live in our streaming catalog.</p>
+
+      <div class="hub-grid" id="hubGrid">
+        <!-- Dynamically populated from live VOD rails -->
+      </div>
+    </section>
+
+    <!-- Top Watched Showcase (Hydrated from real VOD Catalog) -->
+    <section class="top10-section">
+      <h2 class="section-title">Top Watched Catalog</h2>
+      <p class="section-subtitle">Popular VOD titles available to stream instantly on veedeeoh.</p>
+
+      <div class="top10-row" id="top10Row">
+        <!-- Dynamically populated with real top catalog items -->
+      </div>
+    </section>
+
+    <!-- Watch The Way You Want Grid -->
+    <section class="features-section" id="features">
+      <div class="section-title" style="text-align: center;">Watch the way you want</div>
+      <p class="section-subtitle" style="text-align: center;">Enjoy pristine video streaming tailored for your setup.</p>
+
+      <div class="features-grid">
+        <div class="feature-box">
+          <div>
+            <h3>Enjoy on your TV</h3>
+            <p>Stream on Smart TVs, Playstation, Xbox, Chromecast, Apple TV, Roku, and web browsers.</p>
+          </div>
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+          </div>
+        </div>
+
+        <div class="feature-box">
+          <div>
+            <h3>Watch everywhere</h3>
+            <p>Stream seamlessly across mobile phones, tablets, laptops, and smart displays.</p>
+          </div>
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+          </div>
+        </div>
+
+        <div class="feature-box">
+          <div>
+            <h3>Sub-second Playback</h3>
+            <p>Adaptive HLS streaming engine delivers instant buffer-free playback.</p>
+          </div>
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+          </div>
+        </div>
+
+        <div class="feature-box">
+          <div>
+            <h3>Zero Ads &amp; Privacy First</h3>
+            <p>Enjoy uninterrupted viewing with no telemetry, no tracking, and zero ads.</p>
+          </div>
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Hosted Infrastructure Pricing Plan -->
+    <section class="pricing-section" id="pricing">
+      <h2 class="section-title">Hosted Access Plan</h2>
+      <p class="section-subtitle">Simple, honest pricing to support managed cloud server upkeep.</p>
+
+      <div class="pricing-card">
+        <div class="pricing-header">
+          <div class="pricing-title">Full Platform Access</div>
+          <div class="pricing-cost">$5 <span>/ mo</span></div>
+        </div>
+        <div class="pricing-desc">
+          Covers hosted server infrastructure, proxy bandwidth, and platform updates.
+        </div>
+        <ul class="pricing-list">
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Unlimited VOD Streaming Access</li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Adaptive HLS resolution scaling</li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Resume progress across devices</li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Cancel anytime with 1-click</li>
+        </ul>
+        <button class="btn btn-accent" style="width: 100%; padding: 16px;" onclick="document.getElementById('authModal').style.display='flex'">Get Started Now</button>
+      </div>
+    </section>
+
+    <!-- Dedicated Self-Hosting Section -->
+    <section class="selfhost-banner" id="selfhost">
+      <div class="selfhost-content">
+        <div class="selfhost-text">
+          <div class="badge" style="background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.2); color: #fff;">100% FREE FOR HOME LABS</div>
+          <h3>Self-Host on your own hardware</h3>
+          <p>veedeeoh is open-core. Deploy locally on your NAS, Docker host, or home server with zero subscription or telemetry fees.</p>
+          
+          <div style="margin-top: 20px; font-family: monospace; background: rgba(0,0,0,0.5); padding: 12px 18px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); display: inline-flex; align-items: center; gap: 12px; font-size: 13px; color: var(--accent);">
+            <span style="color: var(--dim);">&gt;</span> docker run -d -p 8321:8321 veedeeoh/server:latest
+          </div>
+        </div>
+        <a href="https://github.com" target="_blank" class="btn btn-outline" style="gap: 8px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          Self-Hosting Docs &amp; GitHub
+        </a>
+      </div>
+    </section>
+
+    <!-- Expandable FAQ Accordion Section -->
+    <section class="faq-section" id="faq">
+      <div class="faq-header">
+        <h2 class="section-title">Frequently Asked Questions</h2>
+      </div>
+
+      <div class="faq-list">
+        <div class="faq-item">
+          <button class="faq-button" onclick="this.parentElement.classList.toggle('active')">
+            <span>What is veedeeoh?</span>
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer">
+            veedeeoh is a modern streaming platform for Video-on-Demand. It provides seamless playback of movies and TV shows across smart TVs, phones, tablets, and browsers.
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-button" onclick="this.parentElement.classList.toggle('active')">
+            <span>How much does access cost?</span>
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer">
+            Hosted access is $5/month to cover server infrastructure and bandwidth. If you want to host it yourself on your own computer or home lab, it is 100% free and open-source.
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-button" onclick="this.parentElement.classList.toggle('active')">
+            <span>Where can I watch?</span>
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer">
+            You can stream from any web browser, smartphone, tablet, laptop, or smart TV device with no app downloads required.
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-button" onclick="this.parentElement.classList.toggle('active')">
+            <span>How do I self-host the project?</span>
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer">
+            We provide pre-built Docker containers and Railway templates. Simply pull the repository from GitHub and run `docker compose up` to start your personal media server.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+      <a href="#" class="logo">veedeeoh<span>.</span></a>
+      <p>&copy; 2026 veedeeoh. All rights reserved.</p>
+    </footer>
+
+    <!-- Auth Modal -->
+    <div id="authModal">
+      <div class="modal-box">
+        <button class="close-btn" id="closeAuthBtn">&times;</button>
+        <h2>Sign In / Sign Up</h2>
+        <p>Enter your email address to log in or request access.</p>
+        <form id="authForm">
+          <div style="margin-bottom: 20px;">
+            <input type="email" id="email" placeholder="name@example.com" required style="width: 100%; padding: 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: #fff; outline: none;" />
+          </div>
+          <button type="submit" class="btn btn-accent" id="submitBtn" style="width: 100%; padding: 14px;">Send Magic Link</button>
+        </form>
+        <div id="authMessage" style="margin-top: 16px; font-size: 14px; text-align: center; color: var(--accent); display: none;"></div>
+      </div>
+    </div>
+
+  </body>
+</html>

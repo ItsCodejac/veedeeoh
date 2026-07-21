@@ -7,8 +7,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Archivo:wght@400;500;600;700&family=Bricolage+Grotesque:wght@700;800&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-  <script type="module" crossorigin src="/assets/index-B4DCm8Dp.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-B5bsshw6.css">
+  <script type="module" crossorigin src="/assets/main-30Ut8et3.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/auth-DHKRvX96.js">
+  <link rel="stylesheet" crossorigin href="/assets/main-VMyrRqAr.css">
 </head>
 <body>
 
@@ -19,36 +20,18 @@
       <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
       <span>Home</span>
     </button>
-    <button id="tabLive" title="Live TV" class="navBtn" style="display: none;">
-      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line></svg>
-      <span>Live TV</span>
+    <button id="tabShows" title="Shows" class="navBtn">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>
+      <span>Shows</span>
     </button>
-    <button id="tabShows" title="VOD Shows" class="navBtn">
-      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><path d="M7 2h10v20H7z"></path></svg>
-      <span>TV Shows</span>
-    </button>
-    <button id="tabMovies" title="VOD Movies" class="navBtn">
-      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="2" rx="2" ry="2"></rect><path d="M12 2v20M2 7h20M2 17h20"></path></svg>
+    <button id="tabMovies" title="Movies" class="navBtn">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="2" y1="7" x2="7" y2="7"></line><line x1="2" y1="17" x2="7" y2="17"></line><line x1="17" y1="17" x2="22" y2="17"></line><line x1="17" y1="7" x2="22" y2="7"></line></svg>
       <span>Movies</span>
-    </button>
-    <button id="tabPodcasts" title="Podcasts" class="navBtn">
-      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
-      <span>Podcasts</span>
-    </button>
-    <button id="tabMusic" title="Music & Party" class="navBtn" style="display: none;">
-      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
-      <span>Music</span>
     </button>
     <button id="tabFavs" title="Favorites" class="navBtn" style="display: none;">
       <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
       <span>Favorites</span>
     </button>
-    <div style="margin-top: auto; width: 100%;">
-      <button id="tabExport" title="Export M3U Playlist" class="navBtn">
-        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"></path></svg>
-        <span>Export M3U</span>
-      </button>
-    </div>
   </aside>
 
   <!-- Main Area -->
@@ -57,9 +40,14 @@
 
     <!-- Header bar -->
     <header>
-      <div id="searchBar">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-        <input id="search" type="search" placeholder="Search movies and shows..." autocomplete="off">
+      <div id="searchContainer">
+        <div id="searchBar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input id="search" type="search" placeholder="Search movies and shows..." autocomplete="off">
+        </div>
+        <div id="searchResultsOverlay" hidden>
+          <!-- Search results dynamically populated here -->
+        </div>
       </div>
     </header>
 
@@ -69,87 +57,6 @@
       <div id="homeView" class="viewPanel">
         <div id="homeHero"></div>
         <div id="homeRails"></div>
-      </div>
-
-      <!-- Panel 2: Live TV View -->
-      <div id="liveView" class="viewPanel" hidden>
-        <!-- 3-Column Player Suite -->
-        <section id="playerSuite" hidden>
-          <!-- Collapsible Info Column (Left) -->
-          <div id="infoCol">
-            <div class="liveIndicator"><span></span> ON AIR</div>
-            <h2 class="showTitle" id="activeShowName">TVP World</h2>
-            <div id="activeShowMeta" class="showMeta">Poland · News · English</div>
-            
-            <div class="programBox">
-              <div class="progTitle" id="activeProgTitle">Eastern Express</div>
-              <div id="activeProgTime" class="progTime">until 9:00 PM · next: World Review</div>
-              <div class="progProgress">
-                <div id="activeProgProgressBar" class="progProgressBar" style="width: 65%;"></div>
-              </div>
-            </div>
-
-            <div style="display: flex; gap: 8px; margin-top: 4px;">
-              <button id="btnWatchLive" class="actionBtn primary" style="padding: 11px 20px;">▶ WATCH</button>
-              <button id="btnWatchVlc" class="actionBtn" style="padding: 11px 18px;">Open in VLC</button>
-            </div>
-          </div>
-
-          <!-- Center Player -->
-          <div id="playerCol">
-            <button id="leftTrigger" class="drawerTrigger" title="Toggle info panel">◀</button>
-            <div class="videoWrapper">
-              <video id="video" autoplay playsinline controls></video>
-              <div id="pCaptions" hidden></div>
-              <div class="simulatedScreen" hidden>
-                <span>TUNING STREAM...</span>
-              </div>
-              <div id="pAdOverlay" hidden>
-                <div class="adBumper">
-                  <div class="adBumperLogo">veedeeoh<span>.</span></div>
-                  <div class="adBumperText">Ad break in progress • Muted for your comfort</div>
-                  <div class="adBumperSpinner"></div>
-                </div>
-              </div>
-            </div>
-            <button id="rightTrigger" class="drawerTrigger" title="Toggle queue panel">▶</button>
-            
-            <div id="playerActions">
-              <button id="pClose" title="Hide Player">✕ Hide Player</button>
-              <button id="pMin" title="Minimize player to corner">🗗 Minimize</button>
-              <button id="pVlc">▶ Open in VLC</button>
-              <button id="pFav">★ Favorite</button>
-              <button id="pCc" title="Live captions (local Whisper)">CC</button>
-              <button id="pNextEp" hidden>Next Episode ➔</button>
-              <select id="pStreams" hidden></select>
-              <span id="pStatus"></span>
-            </div>
-          </div>
-
-          <!-- Collapsible Queue/On Deck Column (Right) -->
-          <div id="deckCol">
-            <div class="deckHeader">
-              <span>ON DECK</span>
-              <button id="btnQueueShuffle">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
-                SHUFFLE
-              </button>
-            </div>
-            <div id="deckList"></div>
-          </div>
-        </section>
-
-        <!-- Vibe Blocks row -->
-        <h3 class="sectionTitle">Curated vibe blocks</h3>
-        <div id="vibeBlocksRow" class="vibeRow">
-          <!-- Populated dynamically: Cartoon Breakfast, Doomscroll, etc. -->
-        </div>
-
-        <!-- Live Grid -->
-        <h3 id="liveGridTitle" class="sectionTitle">Browse Channels</h3>
-        <div id="stats"></div>
-        <div id="grid" class="channelsGrid"></div>
-        <div id="sentinel"></div>
       </div>
 
       <!-- Panel 3: Shows View -->
@@ -172,16 +79,7 @@
         <div id="moviesRails"></div>
       </div>
 
-      <!-- Podcasts View -->
-      <section id="podcastsView" hidden>
-        <div id="podcastsRails"></div>
-      </section>
-
-      <!-- Music View -->
-      <div id="musicView" class="viewPanel" hidden style="display: none !important;">
-        <div id="musicHero"></div>
-        <div id="musicRails"></div>
-      </div>
+      <!-- VOD Views only -->
 
     </div>
   </main>

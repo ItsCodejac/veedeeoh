@@ -1,0 +1,13 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "cd backend && tsx server.ts"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 100
+restartPolicyType = "ON_FAILURE"
+
+[env]
+PORT = "8321"
+# Ensure the user sets SUPABASE_URL and SUPABASE_ANON_KEY in Railway dashboard.

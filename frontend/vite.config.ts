@@ -4,6 +4,12 @@ export default defineConfig({
   build: {
     outDir: "../src/tvlc/static",
     emptyOutDir: true,
+    rollupOptions: {
+      input: {
+        main: 'index.html',
+        landing: 'landing.html'
+      }
+    }
   },
   server: {
     proxy: {

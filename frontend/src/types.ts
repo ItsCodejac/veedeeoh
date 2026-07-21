@@ -5,32 +5,6 @@ export interface Stream {
   id?: string;
 }
 
-export interface Channel {
-  id: string;
-  name: string;
-  country: string | null;
-  categories: string[];
-  nsfw: boolean;
-  logo: string | null;
-  logos: string[];
-  streams: Stream[];
-  source: string;
-  vodPoster?: string | null;
-  vodBanner?: string | null;
-  vodItem?: any;
-}
-
-export interface Country {
-  code: string;
-  name: string;
-  flag: string;
-}
-
-export interface Category {
-  id: string;
-  name: string;
-}
-
 export interface Region {
   code: string | null;
   name?: string;
@@ -39,29 +13,9 @@ export interface Region {
 }
 
 export interface Catalog {
-  channels: Channel[];
-  countries: Country[];
-  categories: Category[];
   region: Region;
   favorites: string[];
   health: Record<string, boolean>;
-}
-
-export interface CheckResult {
-  url: string;
-  ok: boolean;
-  cached: boolean;
-}
-
-export interface EpgProgram {
-  title: string;
-  start: number;
-  stop: number;
-}
-
-export interface NowNext {
-  now?: EpgProgram;
-  next?: EpgProgram;
 }
 
 export interface VodItem {

@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  veedeeoh:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: veedeeoh
+    ports:
+      - "8321:8321"
+    environment:
+      - PORT=8321
+      - NODE_ENV=production
+      # - SUPABASE_URL=https://your-project.supabase.co
+      # - SUPABASE_ANON_KEY=your-anon-key
+    volumes:
+      - veedeeoh_data:/root/.local/share/tvlc
+    restart: unless-stopped
+
+volumes:
+  veedeeoh_data:

@@ -1,9 +1,8 @@
 import Hls from "hls.js";
 import { fetchArchiveStream, fetchVod, fetchVodSeries, toggleWatched } from "./api";
-import { openPlayer } from "./player";
 import { state } from "./state";
-import type { Channel, Stream, VodItem, VodEpisode, VodRail } from "./types";
-import { escapeHtml, $ } from "./util";
+import type { Stream, VodItem, VodEpisode, VodRail } from "./types";
+import { escapeHtml, $, setupHorizontalScroll } from "./util";
 
 let vodHls: Hls | null = null;
 let cachedVodRails: VodRail[] | null = null;
@@ -11,35 +10,96 @@ let showsSearchQuery = "";
 let showsActiveGenre = "";
 let moviesSearchQuery = "";
 let moviesActiveGenre = "";
-let podcastsSearchQuery = "";
 let lastSaveTime = 0;
 
-export function setGlobalSearchQuery(query: string): void {
-  showsSearchQuery = query;
-  moviesSearchQuery = query;
+export async function setGlobalSearchQuery(query: string): Promise<void> {
+  const overlay = $("searchResultsOverlay");
+  const searchBar = $("searchBar");
   
-  // Trigger re-renders if elements are present and not hidden
-  const showsContainer = $("showsRails");
-  if (showsContainer && !showsContainer.parentElement?.hidden) {
-    void import("./vod").then(vod => vod.renderShows(showsContainer));
+  if (!query) {
+    overlay.hidden = true;
+    searchBar.classList.remove("active");
+    return;
   }
   
-  const moviesContainer = $("moviesRails");
-  if (moviesContainer && !moviesContainer.parentElement?.hidden) {
-    void import("./vod").then(vod => vod.renderMovies(moviesContainer));
+  overlay.hidden = false;
+  searchBar.classList.add("active");
+  
+  overlay.innerHTML = `<div class="searchNoResults">Searching...</div>`;
+  
+  const rails = await getVodRails();
+  const allItems = rails.flatMap(r => r.items);
+  
+  const q = query.toLowerCase();
+  const matched = allItems.filter(item => 
+    item.title.toLowerCase().includes(q) || 
+    (item.summary && item.summary.toLowerCase().includes(q))
+  );
+  
+  const unique = new Map<string, VodItem>();
+  for (const item of matched) {
+    if (!unique.has(item.id)) unique.set(item.id, item);
+  }
+  const results = Array.from(unique.values());
+
+  if (results.length === 0) {
+    overlay.innerHTML = `<div class="searchNoResults">No results found for "${escapeHtml(query)}"</div>`;
+    return;
   }
   
-  const podcastsContainer = $("podcastsRails");
-  if (podcastsContainer && !podcastsContainer.parentElement?.hidden) {
-    void import("./vod").then(vod => vod.renderPodcasts(podcastsContainer));
-  }
+  const movies = results.filter(i => !i.series_id).slice(0, 5);
+  const shows = results.filter(i => !!i.series_id).slice(0, 5);
   
-  const homeView = $("homeView");
-  if (homeView && !homeView.hidden && query.length > 0) {
-    // Automatically switch to Movies tab when searching from Home
-    $("tabMovies")?.click();
-  }
+  let html = "";
+
+  const renderGroup = (title: string, items: VodItem[]) => {
+    if (items.length === 0) return;
+    html += `<div class="searchGroupTitle">${title}</div>`;
+    items.forEach(item => {
+      const img = item.banner || item.poster || "";
+      const rating = item.rating ? ` · ${item.rating}` : "";
+      html += `
+        <button class="searchResultItem vodResult" data-id="${item.id}">
+          <img class="searchResultImage" src="${escapeHtml(img)}" alt="">
+          <div class="searchResultMeta">
+            <div class="searchResultTitle">${escapeHtml(item.title)}</div>
+            <div class="searchResultDesc">${escapeHtml(item.genre || "")}${rating}</div>
+          </div>
+        </button>
+      `;
+    });
+  };
+  
+  renderGroup("Movies", movies);
+  renderGroup("TV Shows", shows);
+  
+  overlay.innerHTML = html;
+  
+  // Bind clicks
+  overlay.querySelectorAll(".vodResult").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = (btn as HTMLElement).dataset.id;
+      const item = unique.get(id!);
+      if (item) {
+        openVodDetails(item);
+        overlay.hidden = true;
+        searchBar.classList.remove("active");
+      }
+    });
+  });
 }
+
+// Click outside to close
+document.addEventListener("click", (e) => {
+  const overlay = document.getElementById("searchResultsOverlay");
+  const container = document.getElementById("searchContainer");
+  if (overlay && container && !overlay.hidden) {
+    if (!container.contains(e.target as Node)) {
+      overlay.hidden = true;
+      document.getElementById("searchBar")?.classList.remove("active");
+    }
+  }
+});
 
 export async function getVodRails(): Promise<VodRail[]> {
   if (cachedVodRails) return cachedVodRails;
@@ -47,7 +107,7 @@ export async function getVodRails(): Promise<VodRail[]> {
   return cachedVodRails;
 }
 
-function saveResumeProgress(ch: Channel, streamIdx: number, time: number, duration: number, percentage: number): void {
+function saveResumeProgress(ch: any, streamIdx: number, time: number, duration: number, percentage: number): void {
   if (Date.now() - lastSaveTime < 3000) return;
   lastSaveTime = Date.now();
 
@@ -90,7 +150,7 @@ function saveResumeProgress(ch: Channel, streamIdx: number, time: number, durati
 }
 
 export function resumeVodPlayback(resumeItem: any): void {
-  const ch: Channel = {
+  const ch: any = {
     id: `vod:${resumeItem.itemId}`,
     name: resumeItem.title,
     country: null,
@@ -108,7 +168,7 @@ export function resumeVodPlayback(resumeItem: any): void {
   openVodPlayer(ch, resumeItem.streamIdx, resumeItem.time);
 }
 
-export function openVodPlayer(ch: Channel, streamIdx: number, startTime: number = 0): void {
+export function openVodPlayer(ch: any, streamIdx: number, startTime: number = 0): void {
   const overlay = $("vodPlayerOverlay");
   const video = $<HTMLVideoElement>("vodVideo");
   const title = $("vodPlayerTitle");
@@ -432,7 +492,7 @@ export function wireVodDetails(): void {
   });
 }
 
-function asChannel(item: VodItem, streams: Stream[]): Channel {
+function asChannel(item: VodItem, streams: Stream[]): any {
   return {
     id: `vod:${item.id}`,
     name: item.title,
@@ -672,7 +732,7 @@ export async function openVodDetails(item: VodItem): Promise<void> {
       try {
         const url = await fetchArchiveStream(item.identifier!);
         overlay.setAttribute("hidden", "");
-        openPlayer(asChannel(item, [{ url, quality: null, source: "Internet Archive" }]));
+        openVodPlayer(asChannel(item, [{ url, quality: null, source: "Internet Archive" }]), 0);
       } catch (err) {
         alert(`Failed to load archive stream: ${err}`);
       } finally {
@@ -816,7 +876,8 @@ export function renderShows(container: HTMLElement): void {
       const msg = document.createElement("div");
       msg.style.color = "var(--dim)";
       msg.style.padding = "24px";
-      msg.textContent = "No On Demand Shows available matching filters.";
+      const debugInfo = `DEBUG: rails.length=${rails.length}, rails[0].items.length=${rails[0]?.items?.length}, type=${rails[0]?.items?.[0]?.type}, series_id=${rails[0]?.items?.[0]?.series_id}`;
+      msg.textContent = `No On Demand Shows available matching filters. (${debugInfo})`;
       container.append(msg);
       return;
     }
@@ -865,6 +926,7 @@ export function renderShows(container: HTMLElement): void {
         scroller.append(vodCard(item));
       }
       el.append(scroller);
+      setupHorizontalScroll(scroller, el);
       container.append(el);
     }
   }).catch((err) => {
@@ -976,6 +1038,7 @@ export function renderMovies(container: HTMLElement): void {
         scroller.append(vodCard(item));
       }
       el.append(scroller);
+      setupHorizontalScroll(scroller, el);
       container.append(el);
     }
   }).catch((err) => {
@@ -984,61 +1047,221 @@ export function renderMovies(container: HTMLElement): void {
 }
 
 /** Render Podcasts only */
-export async function renderPodcasts(container: HTMLElement): Promise<void> {
+let heroCarouselInterval: number | undefined;
+
+export async function renderHome(): Promise<void> {
+  const homeContainer = $("homeView");
+  if (!homeContainer) return;
+  homeContainer.replaceChildren();
+
+  // Create loading indicator
+  const loading = document.createElement("div");
+  loading.style.color = "var(--dim)";
+  loading.style.padding = "24px";
+  loading.textContent = "Loading Home Screen...";
+  homeContainer.append(loading);
+
   try {
-    const rawRails = await getVodRails();
+    const rails = await getVodRails();
+    loading.remove();
+
+    // Recreate the Hero and Rails containers that were wiped by replaceChildren
+    const hero = document.createElement("div");
+    hero.id = "homeHero";
+    hero.className = "vodHeroBlock";
+    hero.style.display = "none";
+    homeContainer.append(hero);
+
+    const railsContainer = document.createElement("div");
+    railsContainer.id = "homeRails";
+    homeContainer.append(railsContainer);
+
+    // 1. Continue Watching (Recent Resumes) from localStorage
+    const resumeHistoryStr = localStorage.getItem("tvlc_resume_history") || "[]";
+    let resumeHistory: any[] = [];
+    try {
+      resumeHistory = JSON.parse(resumeHistoryStr);
+    } catch (e) {
+      resumeHistory = [];
+    }
+
+    if (resumeHistory.length > 0) {
+      const continueRail = document.createElement("div");
+      continueRail.className = "rail";
+      continueRail.innerHTML = `
+        <div class="railHead">
+          <h2>Continue Watching</h2>
+          <span class="railTag">Resume where you left off</span>
+        </div>
+      `;
+      const continueScroller = document.createElement("div");
+      continueScroller.className = "railScroll";
+
+      resumeHistory.forEach((item) => {
+        const card = document.createElement("button");
+        card.className = "continueCard";
+        const imgUrl = item.banner || item.poster || "";
+        card.innerHTML = `
+          <div class="continueImage">
+            ${imgUrl ? `<img loading="lazy" alt="" src="${escapeHtml(imgUrl)}">` : "🎬"}
+            <div class="continueProgressWrap">
+              <div class="continueProgressBar" style="width: ${item.percentage}%;"></div>
+            </div>
+          </div>
+          <span class="showcaseTitle">${escapeHtml(item.title)}</span>
+          <span class="showcaseMeta">${escapeHtml(item.episodeTitle || "Movie")}</span>
+        `;
+        card.onclick = () => {
+          resumeVodPlayback(item);
+        };
+        continueScroller.append(card);
+      });
+      continueRail.append(continueScroller);
+      setupHorizontalScroll(continueScroller, continueRail);
+      railsContainer.append(continueRail);
+    }
+
+    // Clear interval if re-rendering
+    if (heroCarouselInterval) clearInterval(heroCarouselInterval);
+
+    // Flatten all items and extract a featured pool for the rotating hero
+    const allItems = rails.flatMap(r => r.items);
+    const featuredPool = allItems.filter(i => i.banner && i.banner.length > 0).slice(0, 5);
+    if (featuredPool.length === 0) {
+      featuredPool.push(...allItems.filter(i => i.poster && i.poster.length > 0).slice(0, 5));
+    }
+
+    // 2. Add Spotlight VOD Hero Carousel
+    if (hero && featuredPool.length > 0) {
+      let heroIdx = 0;
+      
+      const renderHero = () => {
+        const featured = featuredPool[heroIdx];
+        if (!featured) return;
+        const bannerImg = featured.banner || featured.poster || "";
+        hero.style.backgroundImage = bannerImg ? `url(${bannerImg})` : "";
+        hero.innerHTML = `
+          <div class="vodHeroOverlay"></div>
+          <div class="vodHeroContent" style="animation: fadeIn 0.5s;">
+            <span class="vodHeroGenre">${escapeHtml(featured.genre || "Featured Showcase")}</span>
+            <h2 class="vodHeroTitle">${escapeHtml(featured.title)}</h2>
+            <div class="vodHeroMeta">${escapeHtml(featured.rating || "TV-MA")}</div>
+            <p class="vodHeroSummary">${escapeHtml(featured.summary || "Start watching now.")}</p>
+            <div style="display: flex; gap: 16px; margin-top: 16px;">
+              <button class="actionBtn primary" style="padding: 12px 32px; font-size: 16px; border-radius: 8px; font-weight: 700;">
+                ▶ WATCH NOW
+              </button>
+              <button class="actionBtn" style="padding: 12px 24px; font-size: 16px; border-radius: 8px;">
+                More Info
+              </button>
+            </div>
+          </div>
+          <div class="vodHeroCarouselDots">
+            ${featuredPool.map((_, i) => `<div class="vodHeroDot ${i === heroIdx ? 'active' : ''}" data-idx="${i}"></div>`).join("")}
+          </div>
+        `;
+        
+        const dots = hero.querySelectorAll(".vodHeroDot");
+        dots.forEach(d => {
+           d.addEventListener("click", (e) => {
+             e.stopPropagation();
+             heroIdx = parseInt((e.target as HTMLElement).dataset.idx || "0");
+             renderHero();
+             resetInterval();
+           });
+        });
+        
+        hero.onclick = () => {
+          void openVodDetails(featured);
+        };
+      };
+      
+      const resetInterval = () => {
+        if (heroCarouselInterval) clearInterval(heroCarouselInterval);
+        heroCarouselInterval = window.setInterval(() => {
+          heroIdx = (heroIdx + 1) % featuredPool.length;
+          renderHero();
+        }, 8000);
+      };
+      
+      renderHero();
+      resetInterval();
+      hero.style.display = "flex";
+    }
+
+    // 3. Separate TV and Movies, and Group by Genre
+    const moviesItems = allItems.filter(i => (i.type === "movie" || (!i.series_id && i.type !== "series")) && i.type !== "podcast");
+    const tvItems = allItems.filter(i => i.type === "series" || i.series_id);
     
-    // Extract only podcast items
-    let allPodcasts: VodItem[] = [];
-    rawRails.forEach(r => {
-      allPodcasts.push(...r.items.filter(i => i.type === "podcast"));
+    const uniqueMovies = Array.from(new Map(moviesItems.map(m => [m.title, m])).values()).filter(i => i.poster || i.banner);
+    const uniqueTv = Array.from(new Map(tvItems.map(m => [m.title, m])).values()).filter(i => i.poster || i.banner);
+    
+    const groupIntoGenres = (items: VodItem[], fallbackGenre: string) => {
+      const groups: Record<string, VodItem[]> = {};
+      items.forEach(item => {
+        const g = item.genre || fallbackGenre;
+        if (!groups[g]) groups[g] = [];
+        groups[g].push(item);
+      });
+      return groups;
+    };
+
+    const movieGenres = groupIntoGenres(uniqueMovies, "Hit Films");
+    const tvGenres = groupIntoGenres(uniqueTv, "Binge-Worthy Series");
+    
+    const renderGenreRail = (title: string, items: VodItem[], prioritizeBanner: boolean) => {
+      if (items.length === 0) return;
+      const el = document.createElement("div");
+      el.className = "showcaseRail";
+      el.innerHTML = `
+        <div class="showcaseRailHead">
+          <h2>${escapeHtml(title)}</h2>
+        </div>
+      `;
+      const scroller = document.createElement("div");
+      scroller.className = "showcaseScroll";
+      
+      items.slice(0, 20).forEach((item: VodItem) => {
+        const card = document.createElement("button");
+        const useBanner = prioritizeBanner && item.banner;
+        card.className = useBanner ? "showcaseCard" : "posterCard";
+        card.title = item.summary || item.title;
+        
+        const imgUrl = useBanner ? item.banner : (item.poster || item.banner || "");
+        const imageClass = useBanner ? "showcasePoster" : "posterImage";
+        
+        card.innerHTML = `
+          <span class="${imageClass}">${imgUrl ? `<img loading="lazy" alt="" src="${escapeHtml(imgUrl)}">` : "🎬"}</span>
+          <span class="showcaseTitle">${escapeHtml(item.title)}</span>
+          <span class="showcaseMeta">${escapeHtml([item.genre, item.rating].filter(Boolean).join(" · "))}</span>
+        `;
+        card.onclick = () => {
+          void openVodDetails(item);
+        };
+        scroller.append(card);
+      });
+      el.append(scroller);
+      setupHorizontalScroll(scroller, el);
+      railsContainer.append(el);
+    };
+
+    // Render Featured / Top Level (Banners)
+    renderGenreRail("Trending Movies", uniqueMovies.filter(m => m.banner), true);
+    renderGenreRail("Popular Series", uniqueTv.filter(t => t.banner), true);
+
+    // Render Genre Rails (Posters)
+    Object.entries(movieGenres).forEach(([genre, items]) => {
+      if (items.length >= 3 && genre !== "Hit Films") {
+        renderGenreRail(`${genre} Movies`, items, false);
+      }
     });
     
-    // Remove duplicates
-    const uniquePodcasts = Array.from(new Map(allPodcasts.map(m => [m.title, m])).values());
-
-    if (podcastsSearchQuery) {
-      allPodcasts = uniquePodcasts.filter(item => {
-        return item.title.toLowerCase().includes(podcastsSearchQuery) || 
-               (item.summary && item.summary.toLowerCase().includes(podcastsSearchQuery));
-      });
-    } else {
-      allPodcasts = uniquePodcasts;
-    }
-
-    container.replaceChildren();
-
-    if (!allPodcasts.length) {
-      const msg = document.createElement("div");
-      msg.style.color = "var(--dim)";
-      msg.style.padding = "24px";
-      msg.textContent = "No Podcasts available matching filters.";
-      container.append(msg);
-      return;
-    }
-
-    const title = document.createElement("div");
-    title.className = "sectionTitle";
-    title.textContent = "Video Podcasts";
-    container.append(title);
-
-    const el = document.createElement("div");
-    el.className = "rail";
-    el.innerHTML = `
-      <div class="railHead">
-        <h2>Featured Channels</h2>
-        <span class="railTag">${allPodcasts.length} shows</span>
-      </div>
-    `;
-    const scroller = document.createElement("div");
-    scroller.className = "railScroll";
-    for (const item of allPodcasts) {
-      scroller.append(vodCard(item));
-    }
-    el.append(scroller);
-    container.append(el);
-
+    Object.entries(tvGenres).forEach(([genre, items]) => {
+      if (items.length >= 3 && genre !== "Binge-Worthy Series") {
+        renderGenreRail(`${genre} TV`, items, false);
+      }
+    });
   } catch (err) {
-    container.innerHTML = `<div style="padding: 24px; color: var(--dim)">Failed to load podcasts: ${err}</div>`;
+    loading.textContent = `Failed to load Home dashboard: ${err}`;
   }
 }

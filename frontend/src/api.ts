@@ -1,26 +1,25 @@
-import type { Catalog, Channel, CheckResult, NowNext, VodEpisode, VodRail } from "./types";
+import type { Catalog, VodEpisode, VodRail } from "./types";
 import { state } from "./state";
+import { getSession } from "./auth";
+
+async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const session = await getSession();
+  const headers = new Headers(init?.headers);
+  if (session?.access_token) {
+    headers.set('Authorization', `Bearer ${session.access_token}`);
+  }
+  return fetch(input, { ...init, headers });
+}
 
 export async function fetchCatalog(): Promise<Catalog> {
-  const res = await fetch("/api/catalog");
+  const res = await apiFetch("/api/catalog");
   if (!res.ok) throw new Error(`catalog fetch failed: ${res.status}`);
   return res.json();
 }
 
-export async function fetchNowPlaying(): Promise<void> {
-  try {
-    const res = await fetch("/api/now");
-    if (!res.ok) return;
-    const data: Record<string, NowNext> = await res.json();
-    state.epg = new Map(Object.entries(data));
-  } catch {
-    /* guide is a nice-to-have; the app works without it */
-  }
-}
-
 export async function fetchVod(): Promise<VodRail[]> {
   try {
-    const res = await fetch("/api/vod");
+    const res = await apiFetch("/api/vod");
     if (!res.ok) return [];
     return (await res.json()).rails ?? [];
   } catch {
@@ -29,52 +28,20 @@ export async function fetchVod(): Promise<VodRail[]> {
 }
 
 export async function fetchVodSeries(seriesId: string): Promise<VodEpisode[]> {
-  const res = await fetch(`/api/vod/series/${encodeURIComponent(seriesId)}`);
+  const res = await apiFetch(`/api/vod/series/${encodeURIComponent(seriesId)}`);
   if (!res.ok) throw new Error(`series fetch failed: ${res.status}`);
   return (await res.json()).episodes ?? [];
 }
 
 export async function fetchArchiveStream(identifier: string): Promise<string> {
-  const res = await fetch(`/api/vod/archive/${encodeURIComponent(identifier)}`);
+  const res = await apiFetch(`/api/vod/archive/${encodeURIComponent(identifier)}`);
   if (!res.ok) throw new Error(`archive fetch failed: ${res.status}`);
   return (await res.json()).url;
 }
 
-export function checkStream(url: string): Promise<CheckResult> {
-  return fetch("/api/check", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url }),
-  }).then((r) => r.json());
-}
-
-export function openInVlc(url: string): Promise<Response> {
-  return fetch("/api/vlc", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url }),
-  });
-}
-
-/** Flip a channel's favorite state locally and persist it; returns the new state. */
-export async function toggleFavorite(ch: Channel): Promise<boolean> {
-  if (state.favorites.has(ch.id)) {
-    state.favorites.delete(ch.id);
-    await fetch(`/api/favorites/${encodeURIComponent(ch.id)}`, { method: "DELETE" });
-    return false;
-  }
-  state.favorites.add(ch.id);
-  await fetch("/api/favorites", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id: ch.id }),
-  });
-  return true;
-}
-
 export async function fetchWatched(): Promise<string[]> {
   try {
-    const res = await fetch("/api/watched");
+    const res = await apiFetch("/api/watched");
     if (!res.ok) return [];
     return res.json();
   } catch {
@@ -90,7 +57,7 @@ export async function toggleWatched(episodeId: string, force?: boolean): Promise
 
   if (target) {
     state.watched.add(episodeId);
-    await fetch("/api/watched", {
+    await apiFetch("/api/watched", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: episodeId }),
@@ -98,7 +65,7 @@ export async function toggleWatched(episodeId: string, force?: boolean): Promise
     return true;
   } else {
     state.watched.delete(episodeId);
-    await fetch(`/api/watched/${encodeURIComponent(episodeId)}`, { method: "DELETE" });
+    await apiFetch(`/api/watched/${encodeURIComponent(episodeId)}`, { method: "DELETE" });
     return false;
   }
 }
