@@ -133,21 +133,26 @@ if (authForm) {
 }
 
 const LOCAL_POSTERS = [
-  { title: "Ghost In The Shell", poster: "/posters/poster_0.jpg", genre: "Anime & Sci-Fi" },
-  { title: "Space Adventure Cobra", poster: "/posters/poster_1.jpg", genre: "Anime & Action" },
-  { title: "Naruto", poster: "/posters/poster_2.jpg", genre: "Anime & Adventure" },
-  { title: "Yu-Gi-Oh!", poster: "/posters/poster_3.jpg", genre: "Anime & Fantasy" },
-  { title: "Death Note", poster: "/posters/poster_4.jpg", genre: "Anime & Mystery" },
-  { title: "Zom 100", poster: "/posters/poster_5.jpg", genre: "Anime & Comedy" },
-  { title: "Hunter x Hunter", poster: "/posters/poster_6.jpg", genre: "Anime & Action" },
-  { title: "JoJo's Bizarre Adventure", poster: "/posters/poster_7.jpg", genre: "Anime & Action" },
-  { title: "Inuyasha", poster: "/posters/poster_9.jpg", genre: "Anime & Fantasy" },
-  { title: "Captain Tsubasa", poster: "/posters/poster_12.jpg", genre: "Anime & Sports" },
-  { title: "Pop Team Epic", poster: "/posters/poster_14.jpg", genre: "Anime & Comedy" },
-  { title: "Saint Seiya", poster: "/posters/poster_16.jpg", genre: "Anime & Action" },
-  { title: "Digimon Adventure", poster: "/posters/poster_19.jpg", genre: "Anime & Fantasy" },
-  { title: "Love Hina", poster: "/posters/poster_22.jpg", genre: "Anime & Romance" },
-  { title: "Interlude", poster: "/posters/poster_23.jpg", genre: "Anime & Sci-Fi" }
+  { title: "Ghost In The Shell", poster: "/posters/ghost_in_the_shell.jpg", genre: "Anime & Sci-Fi" },
+  { title: "Space Adventure Cobra", poster: "/posters/space_adventure_cobra.jpg", genre: "Anime & Action" },
+  { title: "Naruto", poster: "/posters/naruto.jpg", genre: "Anime & Adventure" },
+  { title: "Yu-Gi-Oh!", poster: "/posters/yugioh_espanol.jpg", genre: "Anime & Fantasy" },
+  { title: "Death Note", poster: "/posters/death_note.jpg", genre: "Anime & Mystery" },
+  { title: "Zom 100: Bucket List of the Dead", poster: "/posters/zom_100.jpg", genre: "Anime & Comedy" },
+  { title: "Hunter x Hunter", poster: "/posters/hunter_x_hunter.jpg", genre: "Anime & Action" },
+  { title: "JoJo's Bizarre Adventure", poster: "/posters/jojo_bizarre_adventure.jpg", genre: "Anime & Action" },
+  { title: "Inuyasha", poster: "/posters/inuyasha.jpg", genre: "Anime & Fantasy" },
+  { title: "Captain Tsubasa", poster: "/posters/captain_tsubasa.jpg", genre: "Anime & Sports" },
+  { title: "Pop Team Epic", poster: "/posters/pop_team_epic.jpg", genre: "Anime & Comedy" },
+  { title: "Saint Seiya", poster: "/posters/saint_seiya.jpg", genre: "Anime & Action" },
+  { title: "Digimon Adventure", poster: "/posters/digimon.jpg", genre: "Anime & Fantasy" },
+  { title: "Love Hina", poster: "/posters/love_hina.jpg", genre: "Anime & Romance" },
+  { title: "Interlude", poster: "/posters/interlude.jpg", genre: "Anime & Sci-Fi" },
+  { title: "Inuyasha: The Final Act", poster: "/posters/inuyasha_final_act.jpg", genre: "Anime & Fantasy" },
+  { title: "Yashahime", poster: "/posters/yashahime.jpg", genre: "Anime & Fantasy" },
+  { title: "Mr. Osomatsu", poster: "/posters/mr_osomatsu.jpg", genre: "Anime & Comedy" },
+  { title: "Gaiking", poster: "/posters/gaiking.jpg", genre: "Anime & Mecha" },
+  { title: "Tiger Mask W", poster: "/posters/tiger_mask.jpg", genre: "Anime & Sports" }
 ];
 
 const DEFAULT_ITEMS = LOCAL_POSTERS;
