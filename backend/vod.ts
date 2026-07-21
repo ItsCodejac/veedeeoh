@@ -90,55 +90,120 @@ function normalize(session: any, item: any): any | null {
   return out;
 }
 
+import { fetchTubiCatalog } from './tubi';
+
 const SPANISH_RE = /en español|en espanol|\(español\)|\(espanol\)|spanish/i;
+
+function normalizeTitleKey(title: string): string {
+  return title.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
 
 export async function getCatalog(regionCode?: string): Promise<any[]> {
   const code = (regionCode || "US").toUpperCase();
   if (_catalogs[code] && Date.now() - _catalogs[code].at < CATALOG_TTL) {
     return _catalogs[code].rails;
   }
-  const session = await getSession(code);
-  const params = new URLSearchParams({ offset: "0", page: "1", includeItems: "true" });
-  
-  const res = await fetch(`${VOD_URL}/categories?${params.toString()}`, {
-    headers: {
-      "Authorization": `Bearer ${session.token}`,
-      ...plutoHeaders(code)
-    }
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = await res.json();
-  
-  const rails: any[] = [];
+
+  const [plutoResult, tubiRails] = await Promise.allSettled([
+    (async () => {
+      const session = await getSession(code);
+      const params = new URLSearchParams({ offset: "0", page: "1", includeItems: "true" });
+      const res = await fetch(`${VOD_URL}/categories?${params.toString()}`, {
+        headers: {
+          "Authorization": `Bearer ${session.token}`,
+          ...plutoHeaders(code)
+        }
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return { session, data: await res.json() };
+    })(),
+    fetchTubiCatalog()
+  ]);
+
+  const plutoData = plutoResult.status === "fulfilled" ? plutoResult.value.data : null;
+  const plutoSession = plutoResult.status === "fulfilled" ? plutoResult.value.session : null;
+  const tRails = tubiRails.status === "fulfilled" ? tubiRails.value : [];
+
+  const rawRails: any[] = [];
   const seenAnime: Record<string, any> = {};
-  
-  for (const cat of data.categories || []) {
-    const items = [];
-    for (const it of cat.items || []) {
-      const n = normalize(session, it);
-      if (n) items.push(n);
-    }
-    if (items.length > 0) {
-      rails.push({ name: cat.name, items });
-    }
-    for (const n of items) {
-      if (ANIME_RE.test(`${n.title} ${n.genre || ""}`)) {
-        seenAnime[n.id] = n;
+
+  if (plutoData && plutoSession) {
+    for (const cat of plutoData.categories || []) {
+      const items = [];
+      for (const it of cat.items || []) {
+        const n = normalize(plutoSession, it);
+        if (n) {
+          n.provider = "Pluto TV";
+          items.push(n);
+        }
+      }
+      if (items.length > 0) {
+        rawRails.push({ name: cat.name, items });
+      }
+      for (const n of items) {
+        if (ANIME_RE.test(`${n.title} ${n.genre || ""}`)) {
+          seenAnime[n.id] = n;
+        }
       }
     }
   }
-  
+
+  // Include Tubi rails
+  for (const tr of tRails) {
+    rawRails.push(tr);
+    for (const item of tr.items) {
+      if (ANIME_RE.test(`${item.title} ${item.genre || ""}`)) {
+        seenAnime[item.id] = item;
+      }
+    }
+  }
+
   const allAnime = Object.values(seenAnime);
   const englishAnime = allAnime.filter(n => !SPANISH_RE.test(`${n.title} ${n.summary || ""}`));
   const spanishAnime = allAnime.filter(n => SPANISH_RE.test(`${n.title} ${n.summary || ""}`));
 
   if (spanishAnime.length > 0) {
-    rails.unshift({ name: "🇲🇽 Anime en Español", items: spanishAnime });
+    rawRails.unshift({ name: "🇲🇽 Anime en Español", items: spanishAnime });
   }
   if (englishAnime.length > 0) {
-    rails.unshift({ name: "⛩ Anime", items: englishAnime });
+    rawRails.unshift({ name: "⛩ Anime", items: englishAnime });
   }
-  
+
+  // Merge & Deduplicate rails by category name & title
+  const mergedMap: Record<string, Map<string, any>> = {};
+  for (const rail of rawRails) {
+    let catName = rail.name;
+    if (/anime/i.test(catName) && !catName.includes("Español")) catName = "⛩ Anime";
+    if (/sci-?fi/i.test(catName)) catName = "Sci-fi & Fantasy";
+
+    if (!mergedMap[catName]) mergedMap[catName] = new Map();
+
+    for (const item of rail.items) {
+      const key = normalizeTitleKey(item.title);
+      if (!mergedMap[catName].has(key)) {
+        mergedMap[catName].set(key, item);
+      } else {
+        // Deduplicate: merge alternative source streams into existing item
+        const existing = mergedMap[catName].get(key);
+        if (!existing.streams) {
+          existing.streams = [];
+          if (existing.url) existing.streams.push({ url: existing.url, source: existing.provider || "Stream 1" });
+        }
+        if (item.url) {
+          existing.streams.push({ url: item.url, source: item.provider || "Stream 2" });
+        }
+      }
+    }
+  }
+
+  const rails: any[] = [];
+  for (const [name, map] of Object.entries(mergedMap)) {
+    const items = Array.from(map.values());
+    if (items.length > 0) {
+      rails.push({ name, items });
+    }
+  }
+
   _catalogs[code] = { rails, at: Date.now() };
   return rails;
 }
