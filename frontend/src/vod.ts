@@ -174,7 +174,7 @@ export function openVodPlayer(ch: any, streamIdx: number, startTime: number = 0)
   const title = $("vodPlayerTitle");
   
   const playBtn = $("vodPlayBtn");
-  const bigPlayBtn = $("vodBigPlayBtn");
+  const bigPlayBtn = document.getElementById("vodBigPlayBtn");
   const timeline = $("vodTimelineContainer");
   const progress = $("vodTimelineProgress");
   const handle = $("vodTimelineHandle");
@@ -954,7 +954,7 @@ export function renderShows(container: HTMLElement): void {
     loading.remove();
     let showRails = rails
       .map((rail) => {
-        const items = rail.name.includes("Anime") ? rail.items : rail.items.filter((item) => item.series_id);
+        const items = rail.items.filter((item) => item.series_id);
         return { name: rail.name, items };
       })
       .filter((rail) => rail.items.length > 0);
@@ -1078,7 +1078,7 @@ export function renderMovies(container: HTMLElement): void {
     loading.remove();
     let movieRails = rails
       .map((rail) => {
-        const items = rail.name.includes("Anime") ? rail.items : rail.items.filter((item) => !item.series_id);
+        const items = rail.items.filter((item) => !item.series_id);
         return { name: rail.name, items };
       })
       .filter((rail) => rail.items.length > 0);
@@ -1396,12 +1396,22 @@ export async function renderHome(): Promise<void> {
       railsContainer.append(el);
     };
 
-    // Render all catalog rails directly (⛩ Anime, Animation, Cartoons, Movies, Shows, etc.)
-    for (const rail of rails) {
-      if (rail.items && rail.items.length > 0) {
-        renderGenreRail(rail.name, rail.items, false);
+    // Render Featured / Top Level (Banners)
+    renderGenreRail("Trending Movies", uniqueMovies.filter(m => m.banner), true);
+    renderGenreRail("Popular Series", uniqueTv.filter(t => t.banner), true);
+
+    // Render Genre Rails (Posters)
+    Object.entries(movieGenres).forEach(([genre, items]) => {
+      if (items.length >= 3 && genre !== "Hit Films") {
+        renderGenreRail(`${genre} Movies`, items, false);
       }
-    }
+    });
+    
+    Object.entries(tvGenres).forEach(([genre, items]) => {
+      if (items.length >= 3 && genre !== "Binge-Worthy Series") {
+        renderGenreRail(`${genre} TV`, items, false);
+      }
+    });
   } catch (err) {
     loading.textContent = `Failed to load Home dashboard: ${err}`;
   }
