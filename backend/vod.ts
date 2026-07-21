@@ -19,8 +19,11 @@ function plutoHeaders(regionCode?: string): Record<string, string> {
   const code = (regionCode || "US").toUpperCase();
   const spoofIps: Record<string, string> = {
     "US": "76.81.9.69",
-    "CA": "192.206.151.131",
     "GB": "178.238.11.6",
+    "CA": "192.206.151.131",
+    "DE": "138.201.55.10",
+    "ES": "185.183.104.1",
+    "MX": "200.68.128.1",
     "FR": "193.169.64.141",
   };
   headers["X-Forwarded-For"] = spoofIps[code] || "76.81.9.69";
@@ -87,6 +90,8 @@ function normalize(session: any, item: any): any | null {
   return out;
 }
 
+const SPANISH_RE = /en español|en espanol|\(español\)|\(espanol\)|spanish/i;
+
 export async function getCatalog(regionCode?: string): Promise<any[]> {
   const code = (regionCode || "US").toUpperCase();
   if (_catalogs[code] && Date.now() - _catalogs[code].at < CATALOG_TTL) {
@@ -123,8 +128,15 @@ export async function getCatalog(regionCode?: string): Promise<any[]> {
     }
   }
   
-  if (Object.keys(seenAnime).length > 0) {
-    rails.unshift({ name: "⛩ Anime", items: Object.values(seenAnime) });
+  const allAnime = Object.values(seenAnime);
+  const englishAnime = allAnime.filter(n => !SPANISH_RE.test(`${n.title} ${n.summary || ""}`));
+  const spanishAnime = allAnime.filter(n => SPANISH_RE.test(`${n.title} ${n.summary || ""}`));
+
+  if (spanishAnime.length > 0) {
+    rails.unshift({ name: "🇲🇽 Anime en Español", items: spanishAnime });
+  }
+  if (englishAnime.length > 0) {
+    rails.unshift({ name: "⛩ Anime", items: englishAnime });
   }
   
   _catalogs[code] = { rails, at: Date.now() };
