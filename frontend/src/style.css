@@ -2928,6 +2928,17 @@ select { max-width: 190px; }
 
   .header-user-badge {
     display: flex;
+    padding: 4px;
+  }
+
+  #headerEmail {
+    display: none;
+  }
+
+  .region-selector-pill {
+    max-width: 90px;
+    padding: 4px 6px;
+    font-size: 12px;
   }
 
   #searchContainer {
