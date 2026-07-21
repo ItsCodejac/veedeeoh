@@ -139,11 +139,11 @@ Schedule: ${c.map(y=>$e(y))} pos: ${this.timelinePos}`),d.length&&this.log(`Remo
             <h2 class="vodHeroTitle">${te(S.title)}</h2>
             <div class="vodHeroMeta">${te(S.rating||"TV-MA")}</div>
             <p class="vodHeroSummary">${te(S.summary||"Start watching now.")}</p>
-            <div style="display: flex; gap: 16px; margin-top: 16px;">
-              <button class="actionBtn primary" style="padding: 12px 32px; font-size: 16px; border-radius: 8px; font-weight: 700;">
+            <div style="display: flex; gap: 10px; margin-top: 14px;">
+              <button class="actionBtn primary" style="padding: 9px 18px; font-size: 13px; border-radius: 8px; font-weight: 700;">
                 ▶ WATCH NOW
               </button>
-              <button class="actionBtn" style="padding: 12px 24px; font-size: 16px; border-radius: 8px;">
+              <button class="actionBtn" style="padding: 9px 16px; font-size: 13px; border-radius: 8px;">
                 More Info
               </button>
             </div>

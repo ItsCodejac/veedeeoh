@@ -1022,17 +1022,18 @@
         backdrop-filter: blur(14px);
         align-items: center;
         justify-content: center;
-        padding: 20px;
+        padding: 16px;
       }
 
       .modal-box {
         background: var(--card-bg);
         border: 1px solid var(--border);
         border-radius: 16px;
-        padding: 40px;
+        padding: 32px 28px;
         width: 100%;
         max-width: 420px;
         position: relative;
+        box-sizing: border-box;
       }
 
       .close-btn {
@@ -1508,10 +1509,10 @@ Health Check: /api/health</div>
         <p>Enter your email and password to access your library.</p>
         <form id="authForm">
           <div style="margin-bottom: 14px;">
-            <input type="email" id="emailInput" placeholder="Email address" required style="width: 100%; padding: 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: #fff; outline: none; box-sizing: border-box;" />
+            <input type="email" id="emailInput" placeholder="Email address" required style="width: 100%; padding: 14px; font-size: 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: #fff; outline: none; box-sizing: border-box;" />
           </div>
           <div style="margin-bottom: 20px;">
-            <input type="password" id="passwordInput" placeholder="Password" required style="width: 100%; padding: 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: #fff; outline: none; box-sizing: border-box;" />
+            <input type="password" id="passwordInput" placeholder="Password" required style="width: 100%; padding: 14px; font-size: 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: #fff; outline: none; box-sizing: border-box;" />
           </div>
           <button type="submit" class="btn btn-accent" id="submitBtn" style="width: 100%; padding: 14px;">Sign In &gt;</button>
         </form>
