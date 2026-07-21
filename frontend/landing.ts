@@ -28,9 +28,24 @@ function closeAuth() {
   }
 }
 
+const heroForm = document.getElementById('heroForm') as HTMLFormElement;
+const heroWaitlistBtn = document.getElementById('heroWaitlistBtn') as HTMLButtonElement;
+const heroWaitlistMessage = document.getElementById('heroWaitlistMessage') as HTMLDivElement;
+
 if (navAuthBtn) navAuthBtn.addEventListener('click', openAuth);
-if (heroAuthBtn) heroAuthBtn.addEventListener('click', openAuth);
 if (closeAuthBtn) closeAuthBtn.addEventListener('click', closeAuth);
+
+if (heroForm) {
+  heroForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (heroWaitlistBtn) heroWaitlistBtn.disabled = true;
+    heroForm.style.display = 'none';
+    if (heroWaitlistMessage) {
+      heroWaitlistMessage.style.display = 'block';
+      heroWaitlistMessage.textContent = "You've been added to the cloud waitlist! We'll notify you when access is available.";
+    }
+  });
+}
 
 if (authModal) {
   authModal.addEventListener('click', (e) => {

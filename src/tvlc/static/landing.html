@@ -990,7 +990,7 @@
         .hero-wall { grid-template-columns: repeat(3, 1fr); }
       }
     </style>
-    <script type="module" crossorigin src="/assets/landing-B9EIDqXq.js"></script>
+    <script type="module" crossorigin src="/assets/landing-kmoCvER9.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/auth-DHKRvX96.js">
   </head>
   <body>
@@ -1041,10 +1041,11 @@
         <p class="hero-subtitle">Stream unlimited Video-on-Demand across all your devices. Pristine high-definition playback with zero ad interruptions.</p>
         
         <div class="hero-form-container">
-          <form class="hero-form" id="heroForm" onsubmit="event.preventDefault(); document.getElementById('authModal').style.display='flex';">
-            <input type="email" placeholder="Enter your email address..." required />
-            <button type="submit" class="btn btn-accent" id="heroAuthBtn">Get Started &gt;</button>
+          <form class="hero-form" id="heroForm">
+            <input type="email" id="heroEmailInput" placeholder="Enter email for cloud waitlist..." required />
+            <button type="submit" class="btn btn-accent" id="heroWaitlistBtn">Join Waitlist &gt;</button>
           </form>
+          <div id="heroWaitlistMessage" style="margin-top: 14px; font-size: 14px; font-weight: 600; color: var(--accent); display: none; text-align: center;"></div>
         </div>
 
       </div>
@@ -1219,11 +1220,11 @@
     <div id="authModal">
       <div class="modal-box">
         <button class="close-btn" id="closeAuthBtn">&times;</button>
-        <h2>Sign In / Sign Up</h2>
-        <p>Enter your email address to log in or request access.</p>
+        <h2>Sign In</h2>
+        <p>Enter your authorized email address to receive a magic link.</p>
         <form id="authForm">
           <div style="margin-bottom: 20px;">
-            <input type="email" id="email" placeholder="name@example.com" required style="width: 100%; padding: 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: #fff; outline: none;" />
+            <input type="email" id="email" placeholder="authorized@example.com" required style="width: 100%; padding: 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: #fff; outline: none;" />
           </div>
           <button type="submit" class="btn btn-accent" id="submitBtn" style="width: 100%; padding: 14px;">Send Magic Link</button>
         </form>
