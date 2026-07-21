@@ -103,7 +103,8 @@ document.addEventListener("click", (e) => {
 
 export async function getVodRails(): Promise<VodRail[]> {
   if (cachedVodRails) return cachedVodRails;
-  cachedVodRails = await fetchVod();
+  const res = await fetchVod();
+  cachedVodRails = res.rails;
   return cachedVodRails;
 }
 

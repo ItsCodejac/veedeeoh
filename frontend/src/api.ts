@@ -25,14 +25,29 @@ export function setActiveRegion(region: string): void {
   localStorage.setItem("tvlc_region", region);
 }
 
-export async function fetchVod(region?: string): Promise<VodRail[]> {
+export interface CatalogStats {
+  totalTitles: number;
+  moviesCount: number;
+  showsCount: number;
+}
+
+export interface VodResponse {
+  rails: VodRail[];
+  stats: CatalogStats;
+}
+
+export async function fetchVod(region?: string): Promise<VodResponse> {
   try {
     const reg = region || getActiveRegion();
     const res = await apiFetch(`/api/vod?region=${encodeURIComponent(reg)}`);
-    if (!res.ok) return [];
-    return (await res.json()).rails ?? [];
+    if (!res.ok) return { rails: [], stats: { totalTitles: 0, moviesCount: 0, showsCount: 0 } };
+    const data = await res.json();
+    return {
+      rails: data.rails ?? [],
+      stats: data.stats ?? { totalTitles: 0, moviesCount: 0, showsCount: 0 }
+    };
   } catch {
-    return [];
+    return { rails: [], stats: { totalTitles: 0, moviesCount: 0, showsCount: 0 } };
   }
 }
 

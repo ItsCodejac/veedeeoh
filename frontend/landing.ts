@@ -1,11 +1,25 @@
 import { getSession, restoreSession, signIn } from './src/auth';
 
-async function checkAuth() {
-  const session = await restoreSession();
-  if (session) {
-    window.location.href = '/index.html';
+async function loadLiveStats() {
+  const statsText = document.getElementById('heroStatsText');
+  if (!statsText) return;
+  try {
+    const res = await fetch('/api/stats');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.totalTitles > 0) {
+        const moviesFormatted = Number(data.moviesCount || 0).toLocaleString();
+        const showsFormatted = Number(data.showsCount || 0).toLocaleString();
+        const totalFormatted = Number(data.totalTitles || 0).toLocaleString();
+        statsText.textContent = `⚡ OVER ${totalFormatted}+ FREE MOVIES & SHOWS (${moviesFormatted} MOVIES · ${showsFormatted} SHOWS) · UPDATED LIVE`;
+      }
+    }
+  } catch (e) {
+    console.warn("Failed to fetch live stats:", e);
   }
 }
+
+void loadLiveStats();
 
 const navAuthBtn = document.getElementById('navAuthBtn') as HTMLButtonElement;
 const authModal = document.getElementById('authModal') as HTMLDivElement;

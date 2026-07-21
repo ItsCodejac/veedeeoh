@@ -98,10 +98,10 @@ function normalizeTitleKey(title: string): string {
   return title.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-export async function getCatalog(regionCode?: string): Promise<any[]> {
+export async function getCatalog(regionCode?: string): Promise<{ rails: any[]; stats: any }> {
   const code = (regionCode || "US").toUpperCase();
   if (_catalogs[code] && Date.now() - _catalogs[code].at < CATALOG_TTL) {
-    return _catalogs[code].rails;
+    return _catalogs[code].output;
   }
 
   const [plutoResult, tubiRails] = await Promise.allSettled([
@@ -204,8 +204,29 @@ export async function getCatalog(regionCode?: string): Promise<any[]> {
     }
   }
 
-  _catalogs[code] = { rails, at: Date.now() };
-  return rails;
+  const uniqueMovies = new Map<string, any>();
+  const uniqueShows = new Map<string, any>();
+
+  for (const rail of rails) {
+    for (const item of rail.items) {
+      const key = normalizeTitleKey(item.title);
+      if (item.type === "movie" || item.url) {
+        uniqueMovies.set(key, item);
+      } else {
+        uniqueShows.set(key, item);
+      }
+    }
+  }
+
+  const stats = {
+    totalTitles: uniqueMovies.size + uniqueShows.size,
+    moviesCount: uniqueMovies.size,
+    showsCount: uniqueShows.size,
+  };
+
+  const output = { rails, stats };
+  _catalogs[code] = { output, at: Date.now() };
+  return output;
 }
 
 export async function getSeries(seriesId: string, regionCode?: string): Promise<any[]> {
