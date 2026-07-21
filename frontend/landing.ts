@@ -170,8 +170,16 @@ function renderCatalogUI(items: any[], rails: any[]) {
     const comedyItems = CURATED_POSTERS.filter(i => i.category === 'comedy_standup' || i.category === 'black_cinema');
     const horrorItems = CURATED_POSTERS.filter(i => i.category === 'horror_thriller' || i.category === 'classic_tv' || i.category === 'martial_arts_cult');
 
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    document.body.classList.add('pause-animations');
+  } else {
+    document.body.classList.remove('pause-animations');
+  }
+});
+
     const renderTrack = (trackElement: HTMLElement, trackItems: any[]) => {
-      const loopItems = trackItems.length > 0 ? [...trackItems, ...trackItems, ...trackItems] : DEFAULT_ITEMS;
+      const loopItems = trackItems.length > 0 ? [...trackItems, ...trackItems] : DEFAULT_ITEMS;
       loopItems.forEach((item, idx) => {
         const card = document.createElement('div');
         card.className = 'marquee-card';

@@ -155,42 +155,39 @@
         background: #07090e;
       }
 
-      /* Animated Ambient Background Glows */
+      /* Optimized Static Hardware-Accelerated Ambient Background Glows */
       .hero-glow-1 {
         position: absolute;
         top: 20%;
         left: 50%;
-        transform: translate(-50%, -50%);
+        transform: translate3d(-50%, -50%, 0);
         width: 750px;
         height: 480px;
-        background: radial-gradient(ellipse at center, rgba(197, 240, 78, 0.16) 0%, rgba(0, 242, 254, 0.08) 50%, transparent 70%);
-        filter: blur(90px);
+        background: radial-gradient(ellipse at center, rgba(197, 240, 78, 0.12) 0%, rgba(0, 242, 254, 0.05) 45%, transparent 70%);
         pointer-events: none;
         z-index: 0;
-        animation: glowPulse 8s ease-in-out infinite alternate;
       }
 
       .hero-glow-2 {
         position: absolute;
         top: 35%;
         left: 15%;
+        transform: translate3d(0, 0, 0);
         width: 550px;
         height: 550px;
-        background: radial-gradient(circle at center, rgba(124, 58, 237, 0.15) 0%, transparent 65%);
-        filter: blur(100px);
+        background: radial-gradient(circle at center, rgba(124, 58, 237, 0.12) 0%, transparent 65%);
         pointer-events: none;
         z-index: 0;
-        animation: glowFloat 12s ease-in-out infinite alternate;
       }
 
       .hero-glow-3 {
         position: absolute;
         bottom: 10%;
         right: 12%;
+        transform: translate3d(0, 0, 0);
         width: 500px;
         height: 500px;
-        background: radial-gradient(circle at center, rgba(0, 242, 254, 0.14) 0%, transparent 65%);
-        filter: blur(90px);
+        background: radial-gradient(circle at center, rgba(0, 242, 254, 0.1) 0%, transparent 65%);
         pointer-events: none;
         z-index: 0;
       }
@@ -249,13 +246,19 @@
         min-width: 100%;
         will-change: transform;
         transform: translate3d(0, 0, 0);
+        backface-visibility: hidden;
         animation: marqueeScrollLeft 50s linear infinite;
       }
 
       .marquee-track-reverse {
         will-change: transform;
         transform: translate3d(0, 0, 0);
+        backface-visibility: hidden;
         animation: marqueeScrollRight 55s linear infinite;
+      }
+
+      body.pause-animations .marquee-track {
+        animation-play-state: paused !important;
       }
 
       @keyframes marqueeScrollLeft {
@@ -278,6 +281,8 @@
         position: relative;
         flex-shrink: 0;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+        contain: layout paint;
+        backface-visibility: hidden;
       }
 
       .marquee-card img {
