@@ -1,10 +1,18 @@
 /// <reference types="vite/client" />
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+// Lazy Supabase client — only created when sign-in is attempted.
+// This prevents a module-level crash from killing the entire landing page.
+let _supabase: SupabaseClient | null = null;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export function getSupabase(): SupabaseClient {
+  if (!_supabase) {
+    const url = import.meta.env.VITE_SUPABASE_URL as string;
+    const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+    _supabase = createClient(url, key);
+  }
+  return _supabase;
+}
 
 export interface AuthSession {
   email: string;
@@ -42,16 +50,12 @@ export function setSession(email: string, access_token?: string): void {
 
 export function signOut(): void {
   localStorage.removeItem(AUTH_KEY);
-  supabase.auth.signOut();
+  getSupabase().auth.signOut();
   window.location.href = '/landing.html';
 }
 
-/**
- * Sign in with email + password.
- * Returns { mustChangePassword: true } if the user has a temp password that must be changed.
- */
 export async function signIn(email: string, password: string): Promise<{ mustChangePassword: boolean }> {
-  const { data, error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await getSupabase().auth.signInWithPassword({
     email: email.trim().toLowerCase(),
     password
   });

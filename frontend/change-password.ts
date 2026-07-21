@@ -1,4 +1,4 @@
-import { supabase, getSession, signOut } from './src/auth';
+import { getSupabase, getSession } from './src/auth';
 
 // Guard: must be logged in to access this page
 const session = getSession();
@@ -55,7 +55,7 @@ form.addEventListener('submit', async (e) => {
 
   try {
     // Update password and clear the must_change_password flag
-    const { error } = await supabase.auth.updateUser({
+    const { error } = await getSupabase().auth.updateUser({
       password: newPassword.value,
       data: { must_change_password: false }
     });
