@@ -165,10 +165,10 @@ function renderCatalogUI(items: any[], rails: any[]) {
     marqueeTrack3.innerHTML = '';
     marqueeTrack4.innerHTML = '';
 
-    const actionItems = CURATED_POSTERS.filter(i => i.category === 'action' || i.category === 'scifi');
+    const actionItems = CURATED_POSTERS.filter(i => i.category === 'a24_award' || i.category === 'action_franchise');
     const animeItems = CURATED_POSTERS.filter(i => i.category === 'anime');
-    const comedyItems = CURATED_POSTERS.filter(i => i.category === 'comedy' || i.category === 'black');
-    const horrorItems = CURATED_POSTERS.filter(i => i.category === 'horror' || i.category === 'drama' || i.category === 'archive');
+    const comedyItems = CURATED_POSTERS.filter(i => i.category === 'comedy_standup' || i.category === 'black_cinema');
+    const horrorItems = CURATED_POSTERS.filter(i => i.category === 'horror_thriller' || i.category === 'classic_tv' || i.category === 'martial_arts_cult');
 
     const renderTrack = (trackElement: HTMLElement, trackItems: any[]) => {
       const loopItems = trackItems.length > 0 ? [...trackItems, ...trackItems, ...trackItems] : DEFAULT_ITEMS;
