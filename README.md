@@ -5,16 +5,23 @@
 
 **veedeeoh.** is a self-hosted Video-on-Demand (VOD) streaming application for movies, TV series, and classic cinema across your devices. Built with Hono (TypeScript), Vite, and Docker.
 
-![veedeeoh. Self-Hosted VOD Player Interface](.github/media/dashboard.png)
+![veedeeoh. Home Dashboard](.github/media/dashboard.png)
 
-## Features
+## 🍿 Interface & Features
 
 - 🍿 **VOD Catalog** — Pluto TV movies & TV shows, plus Internet Archive cinema classics
 - ▶️ **In-Page Playback** — Native HLS video player with CORS proxying
 - ★ **Favorites & History** — Local JSON persistence for user state
 - 🐳 **Self-Hosting** — Docker and Docker Compose support out of the box
 
-![veedeeoh. Movies & Shows Catalog](.github/media/catalog.png)
+### Movies & Shows Catalog Grid
+![veedeeoh. Movies & Shows Catalog Grid](.github/media/catalog.png)
+
+### Episode & Series Details Modal
+![veedeeoh. Series & Movie Details Modal](.github/media/details.png)
+
+### Native HLS Video Player
+![veedeeoh. HLS Video Player](.github/media/player.png)
 
 ---
 
