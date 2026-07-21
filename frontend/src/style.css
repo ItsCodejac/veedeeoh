@@ -2364,18 +2364,18 @@ select { max-width: 190px; }
   flex-grow: 1;
 }
 .bigPlayBtn {
-  background: rgba(255, 98, 71, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: var(--accent);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   width: 84px;
   height: 84px;
   border-radius: 50%;
-  color: #fff;
+  color: #06070a;
   font-size: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 8px 32px rgba(255, 98, 71, 0.3);
+  box-shadow: 0 8px 32px var(--accent-glow), 0 0 24px var(--accent);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -2388,10 +2388,99 @@ select { max-width: 190px; }
   transform: scale(1);
 }
 .bigPlayBtn:hover {
-  background: #fff;
-  color: var(--accent);
+  background: #ffffff;
+  color: #06070a;
   transform: scale(1.08);
-  box-shadow: 0 10px 40px rgba(255, 255, 255, 0.4);
+  box-shadow: 0 10px 40px rgba(255, 255, 255, 0.5);
+}
+
+.vodControlsTopRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Floating Mini-Player Mode */
+#vodPlayerOverlay.mini-player {
+  position: fixed !important;
+  inset: auto !important;
+  bottom: 80px !important;
+  right: 24px !important;
+  width: 340px !important;
+  height: 190px !important;
+  z-index: 2800 !important;
+  border-radius: 16px !important;
+  overflow: hidden !important;
+  border: 1.5px solid var(--accent) !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.85), 0 0 24px var(--accent-glow) !important;
+  animation: miniPlayerPop 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  background: #000000 !important;
+}
+
+@keyframes miniPlayerPop {
+  from { opacity: 0; transform: scale(0.8) translateY(20px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+#vodPlayerOverlay.mini-player .bigPlayBtn,
+#vodPlayerOverlay.mini-player #vodPlayerPrompts,
+#vodPlayerOverlay.mini-player .vodTimelineContainer,
+#vodPlayerOverlay.mini-player .vodVolumeControl,
+#vodPlayerOverlay.mini-player #vodCcBtn,
+#vodPlayerOverlay.mini-player #vodPipBtn,
+#vodPlayerOverlay.mini-player #vodFullscreenBtn,
+#vodPlayerOverlay.mini-player #vodRewindBtn,
+#vodPlayerOverlay.mini-player #vodForwardBtn,
+#vodPlayerOverlay.mini-player #vodNextEpBtn {
+  display: none !important;
+}
+
+#vodPlayerOverlay.mini-player .vodControlsOverlay {
+  opacity: 1 !important;
+  background: linear-gradient(180deg, rgba(6, 7, 10, 0.75) 0%, transparent 35%, rgba(6, 7, 10, 0.9) 100%) !important;
+  padding: 8px 12px !important;
+}
+
+#vodPlayerOverlay.mini-player .vodControlsTop {
+  padding: 0 !important;
+  background: none !important;
+}
+
+#vodPlayerOverlay.mini-player #vodPlayerClose {
+  display: none !important;
+}
+
+#vodPlayerOverlay.mini-player #vodPlayerTitle {
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px;
+}
+
+#vodPlayerOverlay.mini-player .vodControlsBottom {
+  padding: 0 !important;
+  gap: 0 !important;
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  width: 100% !important;
+  margin: 0 !important;
+}
+
+#vodPlayerOverlay.mini-player .vodControlsRow {
+  justify-content: space-between !important;
+}
+
+@media (max-width: 768px) {
+  #vodPlayerOverlay.mini-player {
+    bottom: 74px !important;
+    right: 12px !important;
+    left: 12px !important;
+    width: auto !important;
+    height: 100px !important;
+    border-radius: 14px !important;
+  }
 }
 
 .vodControlsBottom {

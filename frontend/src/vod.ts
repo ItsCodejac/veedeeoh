@@ -427,8 +427,11 @@ export function openVodPlayer(ch: any, streamIdx: number, startTime: number = 0)
     };
     video.ontimeupdate = handleProgress;
     
+    const streamSourceUrl = url.startsWith("http") ? url : proxiedUrl;
+
     if (/\.(mp4|m4v|webm|ogv)(\?|$)/i.test(url)) {
-      video.src = proxiedUrl;
+      video.src = streamSourceUrl;
+      void video.play().catch(() => {});
     } else if (Hls.isSupported()) {
       vodHls = new Hls({
         maxBufferLength: 15,
@@ -437,10 +440,32 @@ export function openVodPlayer(ch: any, streamIdx: number, startTime: number = 0)
         fragLoadingTimeOut: 30000,
         startPosition: idx === streamIdx ? startTime : -1,
       });
-      vodHls.loadSource(proxiedUrl);
+      vodHls.loadSource(streamSourceUrl);
       vodHls.attachMedia(video);
+      vodHls.on(Hls.Events.MANIFEST_PARSED, () => {
+        void video.play().catch(() => {});
+      });
+      vodHls.on(Hls.Events.ERROR, (_event, data) => {
+        if (data.fatal) {
+          console.warn("HLS fatal error, trying proxy fallback:", data.type);
+          if (vodHls) {
+            vodHls.destroy();
+            vodHls = null;
+          }
+          if (video.src !== proxiedUrl) {
+            video.src = proxiedUrl;
+            void video.play().catch(() => {});
+          }
+        }
+      });
+    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      video.src = streamSourceUrl;
+      video.addEventListener("loadedmetadata", () => {
+        void video.play().catch(() => {});
+      }, { once: true });
     } else {
-      video.src = proxiedUrl;
+      video.src = streamSourceUrl;
+      void video.play().catch(() => {});
     }
 
     if (idx === streamIdx && startTime > 0) {
@@ -472,10 +497,35 @@ export function openVodPlayer(ch: any, streamIdx: number, startTime: number = 0)
     nextEpPromptBtn.onclick = null;
     rewindBtn.onclick = null;
     forwardBtn.onclick = null;
+    overlay.classList.remove("mini-player");
     overlay.setAttribute("hidden", "");
   };
   
-  $("vodPlayerClose").onclick = closePlayer;
+  const expandBtn = $("vodPlayerExpand");
+  const stopBtn = $("vodPlayerStop");
+
+  const minimizePlayer = () => {
+    overlay.classList.add("mini-player");
+    expandBtn.style.display = "inline-flex";
+    stopBtn.style.display = "inline-flex";
+  };
+
+  const expandPlayer = () => {
+    overlay.classList.remove("mini-player");
+    expandBtn.style.display = "none";
+    stopBtn.style.display = "none";
+  };
+
+  $("vodPlayerClose").onclick = () => {
+    if (!video.paused || video.currentTime > 0) {
+      minimizePlayer();
+    } else {
+      closePlayer();
+    }
+  };
+
+  expandBtn.onclick = expandPlayer;
+  stopBtn.onclick = closePlayer;
   
   playStream(streamIdx);
 }
