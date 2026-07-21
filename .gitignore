@@ -12,4 +12,6 @@ nohup.out
 .DS_Store
 .env
 .env.local
+.env.*
+*.env
 *.spec~
