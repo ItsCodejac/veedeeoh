@@ -137,47 +137,44 @@ function renderCatalogUI(items: any[], rails: any[]) {
   const genreTrack = document.getElementById('genreTrack');
   const marqueeTrack1 = document.getElementById('marqueeTrack1');
   const marqueeTrack2 = document.getElementById('marqueeTrack2');
+  const marqueeTrack3 = document.getElementById('marqueeTrack3');
+  const marqueeTrack4 = document.getElementById('marqueeTrack4');
 
   const activeItems = items.length > 0 ? items : DEFAULT_ITEMS;
 
-  // 1. Populate Top Hero Marquee Tracks (#marqueeTrack1 and #marqueeTrack2)
-  if (marqueeTrack1 && marqueeTrack2) {
-    marqueeTrack1.innerHTML = '';
-    marqueeTrack2.innerHTML = '';
+  // 1. Populate Top Hero Marquee Tracks (4 Full Wall Rows)
+  const tracks = [marqueeTrack1, marqueeTrack2, marqueeTrack3, marqueeTrack4];
+  tracks.forEach((track, tIdx) => {
+    if (!track) return;
+    track.innerHTML = '';
+    const sliceStart = (tIdx * 2.5) % activeItems.length;
+    const trackItems = activeItems.slice(sliceStart).concat(activeItems.slice(0, sliceStart));
+    const loopItems = [...trackItems, ...trackItems];
 
-    const row1Items = activeItems.slice(0, 5);
-    const row2Items = activeItems.slice(5, 10);
+    loopItems.forEach((item, idx) => {
+      const card = document.createElement('div');
+      card.className = 'marquee-card';
 
-    const renderTrack = (trackElement: HTMLElement, trackItems: any[]) => {
-      const loopItems = [...trackItems, ...trackItems, ...trackItems, ...trackItems];
-      loopItems.forEach((item, idx) => {
-        const card = document.createElement('div');
-        card.className = 'marquee-card';
+      const fallback = DEFAULT_ITEMS[idx % DEFAULT_ITEMS.length].poster;
+      const img = document.createElement('img');
+      img.src = item.poster || fallback;
+      img.alt = item.title || 'Movie';
+      img.referrerPolicy = 'no-referrer';
+      img.onerror = () => { img.src = fallback; };
 
-        const fallback = DEFAULT_ITEMS[idx % DEFAULT_ITEMS.length].poster;
-        const img = document.createElement('img');
-        img.src = item.poster || fallback;
-        img.alt = item.title || 'Movie';
-        img.referrerPolicy = 'no-referrer';
-        img.onerror = () => { img.src = fallback; };
+      const overlay = document.createElement('div');
+      overlay.className = 'marquee-card-overlay';
 
-        const overlay = document.createElement('div');
-        overlay.className = 'marquee-card-overlay';
+      const title = document.createElement('div');
+      title.className = 'marquee-card-title';
+      title.textContent = item.title || 'Movie & TV Show';
 
-        const title = document.createElement('div');
-        title.className = 'marquee-card-title';
-        title.textContent = item.title || 'Movie & TV Show';
-
-        card.appendChild(img);
-        card.appendChild(overlay);
-        card.appendChild(title);
-        trackElement.appendChild(card);
-      });
-    };
-
-    renderTrack(marqueeTrack1, row1Items);
-    renderTrack(marqueeTrack2, row2Items);
-  }
+      card.appendChild(img);
+      card.appendChild(overlay);
+      card.appendChild(title);
+      track.appendChild(card);
+    });
+  });
 
   // 2. Populate Category Hub Grid
   if (hubGrid) {

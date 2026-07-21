@@ -208,62 +208,68 @@
         100% { transform: translateY(-30px) scale(1.15); }
       }
 
-      /* Infinite Marquee Wall Background */
+      /* Infinite Marquee Wall Background - Optimized GPU Hardware Acceleration */
       .hero-marquee-container {
         position: absolute;
-        inset: 0;
+        inset: -20px 0;
         display: flex;
         flex-direction: column;
-        justify-content: center;
-        gap: 20px;
-        opacity: 0.38;
-        mask-image: linear-gradient(180deg, transparent 0%, black 25%, black 75%, transparent 100%);
-        -webkit-mask-image: linear-gradient(180deg, transparent 0%, black 25%, black 75%, transparent 100%);
+        justify-content: space-around;
+        gap: 14px;
+        opacity: 0.65;
+        mask-image: linear-gradient(180deg, transparent 0%, black 15%, black 85%, transparent 100%);
+        -webkit-mask-image: linear-gradient(180deg, transparent 0%, black 15%, black 85%, transparent 100%);
         pointer-events: none;
         z-index: 0;
         overflow: hidden;
+        contain: strict;
       }
 
       .marquee-row {
         display: flex;
         overflow: hidden;
         user-select: none;
-        gap: 16px;
+        gap: 14px;
         width: 100%;
+        contain: content;
       }
 
       .marquee-track {
         display: flex;
-        gap: 16px;
+        gap: 14px;
         flex-shrink: 0;
         min-width: 100%;
-        animation: marqueeScrollLeft 45s linear infinite;
+        will-change: transform;
+        transform: translateZ(0);
+        animation: marqueeScrollLeft 55s linear infinite;
       }
 
       .marquee-track-reverse {
-        animation: marqueeScrollRight 50s linear infinite;
+        will-change: transform;
+        transform: translateZ(0);
+        animation: marqueeScrollRight 60s linear infinite;
       }
 
       @keyframes marqueeScrollLeft {
-        0% { transform: translateX(0); }
-        100% { transform: translateX(-50%); }
+        0% { transform: translate3d(0, 0, 0); }
+        100% { transform: translate3d(-50%, 0, 0); }
       }
 
       @keyframes marqueeScrollRight {
-        0% { transform: translateX(-50%); }
-        100% { transform: translateX(0); }
+        0% { transform: translate3d(-50%, 0, 0); }
+        100% { transform: translate3d(0, 0, 0); }
       }
 
       .marquee-card {
-        width: 220px;
-        height: 135px;
-        border-radius: 12px;
-        background: rgba(16, 20, 30, 0.85);
+        width: 200px;
+        height: 120px;
+        border-radius: 10px;
+        background: #10141e;
         border: 1px solid rgba(255, 255, 255, 0.12);
         overflow: hidden;
         position: relative;
         flex-shrink: 0;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+        contain: content;
       }
 
       .marquee-card img {
@@ -271,21 +277,22 @@
         height: 100%;
         object-fit: cover;
         opacity: 0.85;
+        loading: lazy;
       }
 
       .marquee-card-overlay {
         position: absolute;
         inset: 0;
-        background: linear-gradient(180deg, transparent 35%, rgba(6, 7, 10, 0.92) 100%);
+        background: linear-gradient(180deg, transparent 40%, rgba(6, 7, 10, 0.85) 100%);
       }
 
       .marquee-card-title {
         position: absolute;
-        bottom: 10px;
-        left: 12px;
-        right: 12px;
-        font-size: 12px;
-        font-weight: 600;
+        bottom: 8px;
+        left: 10px;
+        right: 10px;
+        font-size: 11px;
+        font-weight: 700;
         color: #fff;
         white-space: nowrap;
         overflow: hidden;
@@ -296,7 +303,7 @@
       .hero-overlay {
         position: absolute;
         inset: 0;
-        background: radial-gradient(circle at 50% 45%, rgba(7, 9, 14, 0.35) 0%, rgba(7, 9, 14, 0.85) 65%, #07090e 100%);
+        background: radial-gradient(circle at 50% 50%, rgba(7, 9, 14, 0.45) 0%, rgba(7, 9, 14, 0.8) 60%, rgba(7, 9, 14, 0.95) 100%);
         z-index: 1;
       }
 
@@ -357,6 +364,7 @@
       .hero-gradient-text {
         background: linear-gradient(135deg, #c5f04e 0%, #00f2fe 55%, #a8ff78 100%);
         -webkit-background-clip: text;
+        background-clip: text;
         -webkit-text-fill-color: transparent;
         display: inline-block;
       }
@@ -1074,14 +1082,16 @@
 
       <div class="hero-marquee-container">
         <div class="marquee-row">
-          <div class="marquee-track" id="marqueeTrack1">
-            <!-- Dynamically populated from live catalog -->
-          </div>
+          <div class="marquee-track" id="marqueeTrack1"></div>
         </div>
         <div class="marquee-row">
-          <div class="marquee-track marquee-track-reverse" id="marqueeTrack2">
-            <!-- Dynamically populated from live catalog -->
-          </div>
+          <div class="marquee-track marquee-track-reverse" id="marqueeTrack2"></div>
+        </div>
+        <div class="marquee-row">
+          <div class="marquee-track" id="marqueeTrack3"></div>
+        </div>
+        <div class="marquee-row">
+          <div class="marquee-track marquee-track-reverse" id="marqueeTrack4"></div>
         </div>
       </div>
       <div class="hero-overlay"></div>
