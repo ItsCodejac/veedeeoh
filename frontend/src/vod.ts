@@ -304,6 +304,12 @@ export function openVodPlayer(ch: any, streamIdx: number, startTime: number = 0)
   const handleKeyDown = (e: KeyboardEvent) => {
     if (overlay.hasAttribute("hidden")) return;
 
+    // Ignore hotkeys when typing in search inputs or text fields
+    const target = e.target as HTMLElement | null;
+    if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+      return;
+    }
+
     if (["Space", " ", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) {
       e.preventDefault();
     }
@@ -963,11 +969,19 @@ export function renderShows(container: HTMLElement): void {
       const el = document.createElement("div");
       el.className = "rail";
       el.innerHTML = `
-        <div class="railHead">
+        <div class="railHead" title="Click to filter by ${escapeHtml(rail.name)}">
           <h2>${escapeHtml(rail.name)}</h2>
           <span class="railTag">${rail.items.length} series</span>
         </div>
       `;
+      const railHead = el.querySelector(".railHead");
+      if (railHead) {
+        railHead.addEventListener("click", () => {
+          const genre = rail.name.replace(/^⛩\s*/, "").replace(/\s+(Series|Shows)$/i, "").trim();
+          showsActiveGenre = genre;
+          renderShows(container);
+        });
+      }
       const scroller = document.createElement("div");
       scroller.className = "railScroll";
       for (const item of rail.items.slice(0, 30)) {
@@ -1075,11 +1089,19 @@ export function renderMovies(container: HTMLElement): void {
       const el = document.createElement("div");
       el.className = "rail";
       el.innerHTML = `
-        <div class="railHead">
+        <div class="railHead" title="Click to filter by ${escapeHtml(rail.name)}">
           <h2>${escapeHtml(rail.name)}</h2>
           <span class="railTag">${rail.items.length} movies</span>
         </div>
       `;
+      const railHead = el.querySelector(".railHead");
+      if (railHead) {
+        railHead.addEventListener("click", () => {
+          const genre = rail.name.replace(/^⛩\s*/, "").replace(/\s+(Movies|Films)$/i, "").trim();
+          moviesActiveGenre = genre;
+          renderMovies(container);
+        });
+      }
       const scroller = document.createElement("div");
       scroller.className = "railScroll";
       for (const item of rail.items.slice(0, 30)) {
@@ -1262,10 +1284,26 @@ export async function renderHome(): Promise<void> {
       const el = document.createElement("div");
       el.className = "showcaseRail";
       el.innerHTML = `
-        <div class="showcaseRailHead">
+        <div class="showcaseRailHead" title="Click to view all in ${escapeHtml(title)}">
           <h2>${escapeHtml(title)}</h2>
         </div>
       `;
+      const head = el.querySelector(".showcaseRailHead");
+      if (head) {
+        head.addEventListener("click", () => {
+          const isMovie = title.toLowerCase().includes("movie") || title.toLowerCase().includes("film");
+          const cleanGenre = title.replace(/^⛩\s*/, "").replace(/\s+(Movies|Series|Shows|Films)$/i, "").trim();
+          if (isMovie) {
+            moviesActiveGenre = cleanGenre;
+            const tabMovies = $("tabMovies");
+            if (tabMovies) tabMovies.click();
+          } else {
+            showsActiveGenre = cleanGenre;
+            const tabShows = $("tabShows");
+            if (tabShows) tabShows.click();
+          }
+        });
+      }
       const scroller = document.createElement("div");
       scroller.className = "showcaseScroll";
       
