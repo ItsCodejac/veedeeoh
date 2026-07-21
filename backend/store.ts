@@ -109,3 +109,28 @@ export class HealthCache {
     this.store.save(this.data);
   }
 }
+
+export interface WaitlistEntry {
+  email: string;
+  created_at: string;
+}
+
+export class Waitlist {
+  store: JsonStore<WaitlistEntry[]>;
+  entries: WaitlistEntry[];
+
+  constructor(filePath?: string) {
+    this.store = new JsonStore<WaitlistEntry[]>(filePath || path.join(DATA_DIR, 'waitlist.json'), []);
+    this.entries = this.store.load();
+  }
+
+  add(email: string): WaitlistEntry {
+    const normalized = email.trim().toLowerCase();
+    const existing = this.entries.find(e => e.email.toLowerCase() === normalized);
+    if (existing) return existing;
+    const entry: WaitlistEntry = { email: normalized, created_at: new Date().toISOString() };
+    this.entries.push(entry);
+    this.store.save(this.entries);
+    return entry;
+  }
+}

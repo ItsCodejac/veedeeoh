@@ -48,6 +48,7 @@ const state = {
   favorites: new store.Favorites(),
   watched: new store.Watched(),
   health: new store.HealthCache(),
+  waitlist: new store.Waitlist(),
   region: { code: 'US', source: 'default' }
 };
 
@@ -62,6 +63,29 @@ async function init() {
 init().catch(console.error);
 
 app.get('/api/health', (c) => c.json({ status: 'ok', version: '1.0.0-ts' }));
+
+app.post('/api/waitlist', async (c) => {
+  try {
+    const body = await c.req.json();
+    const email = body?.email;
+    if (!email || typeof email !== 'string' || !email.includes('@')) {
+      return c.json({ error: 'Please enter a valid email address.' }, 400);
+    }
+    const entry = state.waitlist.add(email);
+
+    if (supabaseUrl && !supabaseUrl.includes('placeholder')) {
+      supabase.from('waitlist').insert({ email: entry.email, created_at: entry.created_at }).then(() => {}).catch(() => {});
+    }
+
+    return c.json({ ok: true, message: "You're on the waitlist! We'll email you as cloud spots open.", entry });
+  } catch (err: any) {
+    return c.json({ error: 'Failed to record waitlist submission.' }, 500);
+  }
+});
+
+app.get('/api/waitlist', (c) => {
+  return c.json({ count: state.waitlist.entries.length, waitlist: state.waitlist.entries });
+});
 
 app.get('/api/catalog', (c) => {
   const healthVerdicts: Record<string, boolean> = {};

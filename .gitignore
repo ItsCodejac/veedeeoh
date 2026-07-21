@@ -14,4 +14,5 @@ nohup.out
 .env.local
 .env.*
 *.env
+emails.txt
 *.spec~

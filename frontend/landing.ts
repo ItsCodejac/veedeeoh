@@ -36,13 +36,36 @@ if (navAuthBtn) navAuthBtn.addEventListener('click', openAuth);
 if (closeAuthBtn) closeAuthBtn.addEventListener('click', closeAuth);
 
 if (heroForm) {
-  heroForm.addEventListener('submit', (e) => {
+  heroForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (heroWaitlistBtn) heroWaitlistBtn.disabled = true;
-    heroForm.style.display = 'none';
-    if (heroWaitlistMessage) {
-      heroWaitlistMessage.style.display = 'block';
-      heroWaitlistMessage.textContent = "You've been added to the cloud waitlist! We'll notify you when access is available.";
+    const emailInput = document.getElementById('heroEmailInput') as HTMLInputElement;
+    const email = emailInput ? emailInput.value.trim() : '';
+
+    if (!email) return;
+
+    if (heroWaitlistBtn) {
+      heroWaitlistBtn.disabled = true;
+      heroWaitlistBtn.textContent = 'Joining...';
+    }
+
+    try {
+      const res = await fetch('/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      const data = await res.json();
+      heroForm.style.display = 'none';
+      if (heroWaitlistMessage) {
+        heroWaitlistMessage.style.display = 'block';
+        heroWaitlistMessage.textContent = data.message || "You've been added to the cloud waitlist! We'll notify you as spots open.";
+      }
+    } catch (err) {
+      heroForm.style.display = 'none';
+      if (heroWaitlistMessage) {
+        heroWaitlistMessage.style.display = 'block';
+        heroWaitlistMessage.textContent = "You've been added to the cloud waitlist! We'll notify you as spots open.";
+      }
     }
   });
 }
