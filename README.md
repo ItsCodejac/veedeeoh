@@ -1,5 +1,8 @@
 # veedeeoh.
 
+[![CI](https://github.com/ItsCodejac/veedeeoh/actions/workflows/ci.yml/badge.svg)](https://github.com/ItsCodejac/veedeeoh/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 **veedeeoh.** is a web application for browsing and streaming Video-on-Demand (movies, TV series, and classic cinema) across your devices. Built with Hono (TypeScript) and Vite.
 
 ## Features
