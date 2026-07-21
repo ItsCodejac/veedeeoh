@@ -7,9 +7,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Archivo:wght@400;500;600;700&family=Bricolage+Grotesque:wght@700;800&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-  <script type="module" crossorigin src="/assets/main-CbKFUxw6.js"></script>
-  <link rel="modulepreload" crossorigin href="/assets/auth-iaLJVx88.js">
-  <link rel="stylesheet" crossorigin href="/assets/main-JSq2h70f.css">
+  <script type="module" crossorigin src="/assets/main-D-NRWFLA.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/auth-CSuyz-3Y.js">
+  <link rel="stylesheet" crossorigin href="/assets/main-uOX2KV4I.css">
 </head>
 <body>
 
@@ -28,7 +28,7 @@
       <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="2" y1="7" x2="7" y2="7"></line><line x1="2" y1="17" x2="7" y2="17"></line><line x1="17" y1="17" x2="22" y2="17"></line><line x1="17" y1="7" x2="22" y2="7"></line></svg>
       <span>Movies</span>
     </button>
-    <button id="tabFavs" title="Favorites" class="navBtn" style="display: none;">
+    <button id="tabFavs" title="Favorites" class="navBtn">
       <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
       <span>Favorites</span>
     </button>
@@ -51,13 +51,24 @@
 
     <!-- Header bar -->
     <header>
+      <a href="#" class="mobile-brand">veedeeoh<span>.</span></a>
       <div id="searchContainer">
         <div id="searchBar">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
           <input id="search" type="search" placeholder="Search movies and shows..." autocomplete="off">
+          <button id="searchCloseBtn" class="search-close-btn" title="Close search">✕</button>
         </div>
         <div id="searchResultsOverlay" hidden>
           <!-- Search results dynamically populated here -->
+        </div>
+      </div>
+      <div class="header-right-group">
+        <button id="searchToggleBtn" class="search-toggle-btn" title="Search">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        </button>
+        <div class="header-user-badge" id="headerUserBadge">
+          <div class="sidebar-avatar" id="headerAvatar">?</div>
+          <span class="sidebar-email" id="headerEmail"></span>
         </div>
       </div>
     </header>

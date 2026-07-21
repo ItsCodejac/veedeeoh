@@ -2528,3 +2528,760 @@ select { max-width: 190px; }
   border-color: var(--accent);
   transform: scale(1.05);
 }
+
+/* ---- Mobile & Responsive Viewports ---- */
+
+.mobile-brand {
+  display: none;
+  font-family: var(--brand);
+  font-weight: 800;
+  font-size: 22px;
+  color: #fff;
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.mobile-brand span {
+  color: var(--accent);
+}
+
+.header-right-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.search-toggle-btn, .search-close-btn {
+  display: none;
+}
+
+.header-user-badge {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 4px 10px 4px 4px;
+  flex-shrink: 0;
+}
+.header-user-badge .sidebar-avatar {
+  width: 24px;
+  height: 24px;
+  font-size: 12px;
+}
+.header-user-badge .sidebar-email {
+  font-size: 11px;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes searchSlideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 768px) {
+  body {
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  /* ---- Header ---- */
+  header {
+    padding: 12px 16px;
+    gap: 8px;
+    position: relative;
+    justify-content: space-between;
+  }
+
+  .mobile-brand {
+    display: block;
+  }
+
+  .header-right-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+
+  .search-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--panel);
+    border: 1px solid #1a2029;
+    color: var(--dim);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+  }
+  .search-toggle-btn:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .search-close-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: var(--dim);
+    font-size: 14px;
+    cursor: pointer;
+    padding: 4px 8px;
+  }
+  .search-close-btn:hover {
+    color: var(--dead);
+  }
+
+  .header-user-badge {
+    display: flex;
+  }
+
+  #searchContainer {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-width: none;
+    z-index: 1000;
+  }
+
+  #searchContainer.mobile-open {
+    display: block;
+    animation: searchSlideDown 0.2s ease-out;
+  }
+
+  #searchBar {
+    background: rgba(13, 16, 23, 0.98);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--accent);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.85);
+    padding: 10px 14px;
+    border-radius: 12px;
+  }
+
+  #searchResultsOverlay {
+    position: relative;
+    top: 8px;
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-height: calc(100vh - 160px);
+  }
+
+  /* ---- Bottom Navigation Dock ---- */
+  aside {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: 64px;
+    border-right: none;
+    border-top: 1px solid #141822;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-around;
+    padding: 0 8px;
+    gap: 0;
+    background: rgba(9, 10, 15, 0.95);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    z-index: 1000;
+  }
+
+  aside .brand {
+    display: none;
+  }
+
+  .sidebar-spacer {
+    display: none;
+  }
+
+  .sidebar-user {
+    display: none;
+  }
+
+  .navBtn {
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 3px;
+    height: 100%;
+    padding: 6px 4px;
+    font-size: 11px;
+    border-radius: 8px;
+    flex: 1;
+    min-width: 0;
+    background: none;
+  }
+
+  .navBtn svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .navBtn span {
+    font-size: 10px;
+    font-weight: 500;
+  }
+
+  .sidebar-logout {
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 3px;
+    height: 100%;
+    padding: 6px 4px;
+    font-size: 11px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .sidebar-logout span {
+    font-size: 10px;
+  }
+
+  /* ---- Main Area ---- */
+  #mainContent {
+    flex: 1;
+    height: calc(100vh - 64px);
+    height: calc(100dvh - 64px);
+    overflow: hidden;
+  }
+
+  #scrollableArea {
+    padding: 16px 16px 80px;
+  }
+
+  /* ---- 3-Column Player Suite ---- */
+  #playerSuite {
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  #playerCol {
+    order: 1;
+    width: 100%;
+  }
+
+  #infoCol {
+    order: 2;
+    width: 100% !important;
+    max-width: 100%;
+  }
+
+  #deckCol {
+    order: 3;
+    width: 100% !important;
+    max-width: 100%;
+  }
+
+  #infoCol.collapsed, #deckCol.collapsed {
+    width: 100% !important;
+    display: none;
+  }
+
+  .drawerTrigger {
+    display: none !important;
+  }
+
+  .showTitle {
+    font-size: 22px;
+  }
+
+  /* ---- Hero Blocks & Carousels ---- */
+  #hero {
+    padding: 8px 0;
+  }
+
+  .vodHeroBlock {
+    height: 360px;
+    border-radius: 14px;
+    margin-bottom: 24px;
+  }
+
+  .vodHeroContent {
+    padding: 20px;
+    gap: 10px;
+    max-width: 100%;
+  }
+
+  .vodHeroTitle {
+    font-size: 32px;
+  }
+
+  .vodHeroSummary {
+    font-size: 13px;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  .caroScreen {
+    width: 100%;
+  }
+
+  /* ---- Rails & Showcase Cards ---- */
+  .showcaseRailHead h2 {
+    font-size: 18px;
+  }
+
+  .showcaseCard {
+    width: 260px;
+  }
+
+  .posterCard {
+    width: 140px;
+  }
+
+  .continueCard {
+    width: 240px;
+  }
+
+  .scrollArrow {
+    display: none !important;
+  }
+
+  .vibeRow {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 8px;
+  }
+
+  #grid, .channelsGrid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+  }
+
+  .card {
+    padding: 8px;
+  }
+
+  .cname {
+    font-size: 13px;
+  }
+
+  /* ---- VOD Details Modal ---- */
+  /* ---- VOD Details Overlay (Mobile) ---- */
+  /* ---- VOD Details Modal (Mobile Compact Hero & High Density Episode List) ---- */
+  #vodDetailsOverlay {
+    z-index: 2500;
+  }
+
+  #vodDetails {
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100vh;
+    max-height: 100dvh;
+    border-radius: 0;
+    border: none;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    overflow: hidden;
+  }
+
+  #vdHero {
+    position: relative;
+    min-height: auto;
+    background: #000;
+    flex-shrink: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  #vdBanner {
+    filter: brightness(0.2) blur(6px);
+  }
+
+  #vdHeroContent {
+    flex-direction: row;
+    align-items: center;
+    text-align: left;
+    padding: 44px 16px 14px 16px;
+    gap: 14px;
+    position: relative;
+    z-index: 2;
+  }
+
+  #vdPosterWrap {
+    width: 72px;
+    height: 104px;
+    aspect-ratio: 2 / 3;
+    margin: 0;
+    border-radius: 6px;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.7);
+    flex-shrink: 0;
+  }
+
+  #vdHeroMeta {
+    align-items: flex-start;
+    text-align: left;
+    width: 100%;
+    gap: 3px;
+    min-width: 0;
+  }
+
+  #vdTitle {
+    font-size: 17px;
+    font-weight: 800;
+    text-align: left;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    margin: 0;
+  }
+
+  #vdMeta {
+    font-size: 11px;
+    color: var(--accent);
+    text-align: left;
+    font-weight: 600;
+  }
+
+  #vdStars {
+    font-size: 11px;
+    text-align: left;
+    margin: 0;
+  }
+
+  #vdActions {
+    width: auto;
+    justify-content: flex-start;
+    margin: 4px 0 0 0;
+  }
+
+  #vdPlayBtn {
+    width: auto;
+    padding: 8px 16px;
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(244,117,33,0.3);
+  }
+
+  #vdSummary {
+    display: none;
+  }
+
+  #vdClose {
+    position: fixed;
+    top: 10px;
+    right: 12px;
+    z-index: 2600;
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    font-size: 16px;
+    color: #fff;
+  }
+
+  #vodDetailsBody {
+    padding: 12px 14px;
+    overflow-y: auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  #vdSeasonSelect {
+    width: 100%;
+    min-width: 0;
+    font-size: 13px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: var(--panel2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  #vdEpisodeGrid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-right: 0;
+    overflow-y: visible;
+  }
+
+  /* Modern Mobile Episode Card */
+  .episodeCard {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    background: rgba(18, 22, 32, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 12px;
+    padding: 10px;
+    text-align: left;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .episodeCard:active {
+    background: rgba(255, 98, 71, 0.12);
+    border-color: var(--accent);
+  }
+
+  .epThumbWrap {
+    width: 112px;
+    aspect-ratio: 16 / 9;
+    flex-shrink: 0;
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+    background: #000;
+  }
+
+  .epPlayOverlay {
+    font-size: 20px;
+    background: rgba(0, 0, 0, 0.4);
+  }
+
+  .epCardWatchedBadge {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    background: rgba(0, 224, 176, 0.95);
+    color: #05231f;
+    font-size: 8px;
+    font-weight: 800;
+    padding: 1px 5px;
+    border-radius: 3px;
+    letter-spacing: 0.5px;
+  }
+
+  .epDuration {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    background: rgba(0, 0, 0, 0.85);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: var(--mono);
+  }
+
+  .epMeta {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .epShowTitle {
+    display: none;
+  }
+
+  .epTitleRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+  }
+
+  .epTitle {
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .epWatchedToggle {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: var(--dim);
+    flex-shrink: 0;
+    padding: 0;
+  }
+  .epWatchedToggle:hover, .episodeCard.watched .epWatchedToggle {
+    background: rgba(0, 224, 176, 0.15);
+    border-color: #00e0b0;
+    color: #00e0b0;
+  }
+
+  .epDescription {
+    font-size: 11px;
+    color: var(--dim);
+    line-height: 1.35;
+    margin-top: 1px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  /* ---- Cinematic Player Controls (Mobile) ---- */
+  #vodPlayerOverlay {
+    z-index: 3000;
+  }
+
+  .vodControlsTop {
+    padding: 12px 16px;
+  }
+
+  #vodPlayerTitle {
+    font-size: 13px;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #vodPlayerClose {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .bigPlayBtn {
+    width: 64px;
+    height: 64px;
+    font-size: 24px;
+  }
+
+  .vodControlsBottom {
+    width: calc(100% - 24px);
+    margin-bottom: 16px;
+    padding: 12px;
+    gap: 10px;
+    border-radius: 14px;
+  }
+
+  .vodControlsRow {
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .vodControlsLeft, .vodControlsRight {
+    gap: 10px;
+  }
+
+  .controlBtn {
+    font-size: 16px;
+    padding: 2px 4px;
+  }
+
+  .vodTimeDisplay {
+    font-size: 11px;
+  }
+
+  .volumeSlider {
+    display: none;
+  }
+
+  #vodPlayerPrompts {
+    bottom: 90px;
+    right: 16px;
+  }
+
+  .promptBtn {
+    padding: 10px 16px;
+    font-size: 11px;
+  }
+
+  /* ---- Docked / PIP Mode on Mobile ---- */
+  #playerSuite.docked {
+    bottom: 74px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    height: 180px;
+  }
+
+  /* ---- Party Mode Overlay ---- */
+  #partyPlayerOverlay {
+    padding: 16px;
+  }
+
+  #partyLayout {
+    flex-direction: column;
+    gap: 16px;
+    height: auto;
+  }
+
+  #partyControls {
+    max-width: 100%;
+    width: 100%;
+    padding: 16px;
+  }
+
+  #partyVideoCol {
+    width: 100%;
+  }
+
+  #partyQueuePanel {
+    max-height: 200px;
+  }
+}
+
+@media (max-width: 480px) {
+  .posterCard {
+    width: 120px;
+  }
+
+  .continueCard {
+    width: 200px;
+  }
+
+  .showcaseCard {
+    width: 220px;
+  }
+
+  .vibeRow {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  #grid, .channelsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .vodHeroTitle {
+    font-size: 26px;
+  }
+
+  .vodHeroBlock {
+    height: 320px;
+  }
+}
+

@@ -1050,8 +1050,217 @@
       }
 
       @media (max-width: 768px) {
-        .features-grid { grid-template-columns: 1fr; }
-        .hero-wall { grid-template-columns: repeat(3, 1fr); }
+        nav {
+          padding: 12px 16px;
+        }
+
+        .logo {
+          font-size: 24px;
+        }
+
+        .nav-links {
+          display: none;
+        }
+
+        .nav-actions {
+          margin-left: auto;
+        }
+
+        .btn {
+          padding: 9px 18px;
+          font-size: 13px;
+        }
+
+        .hero {
+          padding: 110px 16px 50px;
+          min-height: auto;
+        }
+
+        .hero h1 {
+          font-size: 2.2rem;
+          letter-spacing: -1px;
+          margin-bottom: 16px;
+        }
+
+        .hero-subtitle {
+          font-size: 0.95rem;
+          margin-bottom: 24px;
+        }
+
+        .hero-form-container {
+          max-width: 100%;
+        }
+
+        .hero-form {
+          flex-direction: column;
+          padding: 8px;
+          gap: 8px;
+        }
+
+        .hero-form input {
+          padding: 12px 14px;
+          font-size: 14px;
+          text-align: center;
+        }
+
+        .hero-form button {
+          width: 100%;
+          padding: 12px 20px;
+          font-size: 14px;
+          justify-content: center;
+        }
+
+        .hero-pills {
+          gap: 12px 16px;
+          font-size: 12px;
+        }
+
+        .hero-spotlight {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 14px;
+          padding: 16px;
+          margin-top: 32px;
+        }
+
+        .spotlight-left {
+          width: 100%;
+        }
+
+        .hub-section {
+          padding: 48px 16px;
+        }
+
+        .hub-grid {
+          grid-template-columns: repeat(2, 1fr);
+          gap: 12px;
+        }
+
+        .hub-card {
+          height: 180px;
+          padding: 14px;
+        }
+
+        .hub-title {
+          font-size: 15px;
+        }
+
+        .top10-section {
+          padding: 48px 16px;
+        }
+
+        .top10-row {
+          grid-template-columns: repeat(2, 1fr);
+          gap: 16px 12px;
+        }
+
+        .top10-card {
+          height: 200px;
+        }
+
+        .top10-num {
+          font-size: 72px;
+          margin-right: -20px;
+        }
+
+        .genre-section {
+          padding: 48px 0;
+        }
+
+        .genre-card {
+          flex: 0 0 160px;
+          height: 240px;
+        }
+
+        .genre-title {
+          font-size: 16px;
+        }
+
+        .pricing-section {
+          padding: 48px 16px;
+        }
+
+        .pricing-card {
+          padding: 24px 20px;
+          border-radius: 16px;
+        }
+
+        .pricing-header {
+          flex-direction: column;
+          gap: 8px;
+          align-items: flex-start;
+        }
+
+        .pricing-cost {
+          font-size: 2.2rem;
+        }
+
+        .selfhost-banner {
+          padding: 48px 16px;
+        }
+
+        .selfhost-content {
+          flex-direction: column;
+          gap: 20px;
+          text-align: center;
+          justify-content: center;
+        }
+
+        .selfhost-text h3 {
+          font-size: 1.4rem;
+        }
+
+        .selfhost-text p {
+          font-size: 0.95rem;
+        }
+
+        .selfhost-content .btn {
+          width: 100%;
+          justify-content: center;
+        }
+
+        .faq-section {
+          padding: 48px 16px;
+        }
+
+        .faq-button {
+          padding: 16px;
+          font-size: 1rem;
+        }
+
+        .faq-item.active .faq-answer {
+          padding: 0 16px 16px;
+          font-size: 0.9rem;
+        }
+
+        .modal-box {
+          padding: 28px 20px;
+          border-radius: 16px;
+          margin: 16px;
+        }
+
+        .modal-box h2 {
+          font-size: 1.4rem;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .hero h1 {
+          font-size: 1.85rem;
+        }
+
+        .hub-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .top10-row {
+          grid-template-columns: repeat(2, 1fr);
+        }
+
+        .genre-card {
+          flex: 0 0 140px;
+          height: 210px;
+        }
       }
     </style>
   </head>

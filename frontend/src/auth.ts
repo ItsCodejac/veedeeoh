@@ -51,7 +51,11 @@ export function setSession(email: string, access_token?: string): void {
 export function signOut(): void {
   localStorage.removeItem(AUTH_KEY);
   getSupabase().auth.signOut();
-  window.location.href = '/landing.html';
+  if (isCloudMode()) {
+    window.location.href = '/landing.html';
+  } else {
+    window.location.href = '/';
+  }
 }
 
 export async function signIn(email: string, password: string): Promise<{ mustChangePassword: boolean }> {

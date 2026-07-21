@@ -69,6 +69,9 @@ function wireSidebar(): void {
       if (!$("moviesRails").querySelector(".rail")) {
         import("./vod").then(vod => vod.renderMovies($("moviesRails")));
       }
+    } else if (activeTabId === "tabFavs") {
+      $("homeView").removeAttribute("hidden");
+      renderHome();
     }
   }
 
@@ -85,18 +88,26 @@ function wireSidebar(): void {
   const sidebarUser = document.getElementById("sidebarUser");
   const sidebarEmail = document.getElementById("sidebarEmail");
   const sidebarAvatar = document.getElementById("sidebarAvatar");
+  const headerEmail = document.getElementById("headerEmail");
+  const headerAvatar = document.getElementById("headerAvatar");
+  const headerUserBadge = document.getElementById("headerUserBadge");
   const logoutBtn = document.getElementById("logoutBtn");
 
-  if (session && sidebarUser && sidebarEmail && sidebarAvatar && logoutBtn) {
-    const email = session.email;
-    sidebarEmail.textContent = email;
-    sidebarAvatar.textContent = email.charAt(0).toUpperCase();
+  if (session) {
+    const email = session.email || "";
+    if (sidebarEmail) sidebarEmail.textContent = email;
+    if (sidebarAvatar) sidebarAvatar.textContent = email.charAt(0).toUpperCase();
+    if (headerEmail) headerEmail.textContent = email;
+    if (headerAvatar) headerAvatar.textContent = email.charAt(0).toUpperCase();
 
-    logoutBtn.addEventListener("click", () => {
-      signOut();
-    });
+    if (logoutBtn) {
+      logoutBtn.addEventListener("click", () => {
+        signOut();
+      });
+    }
   } else if (!session) {
     if (sidebarUser) sidebarUser.style.display = "none";
+    if (headerUserBadge) headerUserBadge.style.display = "none";
     if (logoutBtn) logoutBtn.style.display = "none";
   }
 }
@@ -104,6 +115,31 @@ function wireSidebar(): void {
 function wireHeader(): void {
   let searchTimer: number | undefined;
   const searchInput = $("search") as HTMLInputElement;
+  const searchContainer = $("searchContainer");
+  const searchToggleBtn = $("searchToggleBtn");
+  const searchCloseBtn = $("searchCloseBtn");
+
+  if (searchToggleBtn && searchContainer) {
+    searchToggleBtn.addEventListener("click", () => {
+      const isOpen = searchContainer.classList.toggle("mobile-open");
+      if (isOpen && searchInput) {
+        searchInput.focus();
+      }
+    });
+  }
+
+  if (searchCloseBtn && searchContainer) {
+    searchCloseBtn.addEventListener("click", () => {
+      searchContainer.classList.remove("mobile-open");
+    });
+  }
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && searchContainer) {
+      searchContainer.classList.remove("mobile-open");
+    }
+  });
+
   if (searchInput) {
     searchInput.addEventListener("input", (e) => {
       clearTimeout(searchTimer);
