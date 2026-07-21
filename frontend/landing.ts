@@ -137,14 +137,14 @@ import CURATED_POSTERS from './src/landing_posters.json';
 const DEFAULT_ITEMS = CURATED_POSTERS;
 
 const GENRES = [
-  { name: "Action & Blockbusters", keyword: "action", fallback: "/posters/action_walking_tall.jpg" },
-  { name: "Comedy & Stand-up", keyword: "comedy", fallback: "/posters/comedy_rango.jpg" },
-  { name: "Sci-Fi & Fantasy", keyword: "scifi", fallback: "/posters/scifi_i_am_legend.jpg" },
-  { name: "Horror & Suspense", keyword: "horror", fallback: "/posters/horror_american_psycho.jpg" },
-  { name: "Drama & History", keyword: "drama", fallback: "/posters/drama_full_metal_jacket.jpg" },
-  { name: "Black Storytelling", keyword: "black", fallback: "/posters/black_the_wood.jpg" },
-  { name: "Anime & Animation", keyword: "anime", fallback: "/posters/anime_ghost_in_the_shell.jpg" },
-  { name: "Classics & Documentaries", keyword: "archive", fallback: "/posters/archive_fist_of_fury.jpg" }
+  { name: "Action & Blockbusters", categoryKey: "action_franchise", fallback: "/posters/action_franchise_terminator_2_judgment_day.jpg" },
+  { name: "Comedy & Stand-up", categoryKey: "comedy_standup", fallback: "/posters/comedy_standup_tropic_thunder.jpg" },
+  { name: "Sci-Fi & Fantasy", categoryKey: "a24_award", fallback: "/posters/a24_award_dungeons_dragons_honor_among_thieves.jpg" },
+  { name: "Horror & Suspense", categoryKey: "horror_thriller", fallback: "/posters/horror_thriller_the_cabin_in_the_woods.jpg" },
+  { name: "Drama & History", categoryKey: "a24_award", fallback: "/posters/a24_award_memento.jpg" },
+  { name: "Black Storytelling", categoryKey: "black_cinema", fallback: "/posters/black_cinema_drumline.jpg" },
+  { name: "Anime & Animation", categoryKey: "anime", fallback: "/posters/anime_ghost_in_the_shell.jpg" },
+  { name: "Classics & Documentaries", categoryKey: "classic_tv", fallback: "/posters/classic_tv_the_twilight_zone.jpg" }
 ];
 
 /** Hydrate Landing Page with REAL VOD Catalog Data + Instant Hero Marquee */
@@ -279,10 +279,7 @@ document.addEventListener('visibilitychange', () => {
     genreTrack.innerHTML = '';
     const filmStripList = [...GENRES, ...GENRES];
     filmStripList.forEach((g) => {
-      const match = activeItems.find(i => 
-        (i.genre && i.genre.toLowerCase().includes(g.keyword)) ||
-        (i.title && i.title.toLowerCase().includes(g.keyword))
-      );
+      const match = CURATED_POSTERS.find(i => i.category === g.categoryKey);
       const posterUrl = (match && match.poster) ? match.poster : g.fallback;
 
       const card = document.createElement('div');

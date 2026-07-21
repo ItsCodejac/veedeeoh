@@ -215,17 +215,18 @@
         100% { transform: translateY(-30px) scale(1.15); }
       }
 
-      /* Ultra-Vibrant Butter-Smooth 60FPS Hero Marquee */
+      /* Ultra-Vibrant Butter-Smooth 60FPS Hero Marquee (Netflix/Hulu Layered Poster Cloud) */
       .hero-marquee-container {
         position: absolute;
-        inset: -60px 0;
+        inset: -80px -40px;
         display: flex;
         flex-direction: column;
         justify-content: space-evenly;
-        gap: 16px;
-        opacity: 0.95;
-        mask-image: linear-gradient(180deg, transparent 0%, black 10%, black 90%, transparent 100%);
-        -webkit-mask-image: linear-gradient(180deg, transparent 0%, black 10%, black 90%, transparent 100%);
+        gap: 18px;
+        opacity: 0.38;
+        transform: perspective(1200px) rotateX(7deg) scale(1.05);
+        mask-image: linear-gradient(180deg, transparent 0%, black 15%, black 85%, transparent 100%);
+        -webkit-mask-image: linear-gradient(180deg, transparent 0%, black 15%, black 85%, transparent 100%);
         pointer-events: none;
         z-index: 0;
         overflow: hidden;
@@ -314,11 +315,15 @@
         z-index: 2;
       }
 
+      /* Netflix / Hulu Layered Atmospheric Dark Cloud Mask */
       .hero-overlay {
         position: absolute;
         inset: 0;
-        background: radial-gradient(circle at 50% 50%, rgba(6, 7, 10, 0.1) 0%, rgba(6, 7, 10, 0.5) 60%, rgba(6, 7, 10, 0.85) 100%);
+        background: 
+          radial-gradient(ellipse at 50% 50%, rgba(6, 7, 10, 0.9) 0%, rgba(6, 7, 10, 0.97) 60%, #06070a 100%),
+          linear-gradient(180deg, rgba(6, 7, 10, 0.75) 0%, rgba(6, 7, 10, 0.96) 80%, #06070a 100%);
         z-index: 1;
+        pointer-events: none;
       }
 
       .hero-content {
@@ -373,6 +378,7 @@
         letter-spacing: -2px;
         margin: 0 0 24px;
         color: #ffffff;
+        text-shadow: 0 4px 24px rgba(0, 0, 0, 0.95), 0 2px 10px rgba(0, 0, 0, 0.9);
       }
 
       .hero-gradient-text {
@@ -385,7 +391,8 @@
 
       .hero-subtitle {
         font-size: clamp(1.15rem, 2.2vw, 1.35rem);
-        color: var(--dim);
+        color: #d1d9e6;
+        text-shadow: 0 2px 14px rgba(0, 0, 0, 0.95);
         margin: 0 0 40px;
         line-height: 1.6;
         max-width: 740px;
