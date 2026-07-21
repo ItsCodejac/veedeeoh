@@ -2,8 +2,8 @@ import { XMLParser } from 'fast-xml-parser';
 
 const BOOT_URL = "https://boot.pluto.tv/v4/start";
 const VOD_URL = "https://service-vod.clusters.pluto.tv/v4/vod";
-const SESSION_TTL = 3 * 3600 * 1000;
-const CATALOG_TTL = 3600 * 1000;
+const SESSION_TTL = 5 * 60 * 1000;
+const CATALOG_TTL = 5 * 60 * 1000;
 
 const ANIME_RE = /anime|naruto|one piece|dragon ?ball|jojo|sailor moon|gundam|bleach|yu-gi-oh|shonen|ghibli|evangelion|cowboy bebop|akira|slayer/i;
 
@@ -47,8 +47,8 @@ async function boot(regionCode?: string): Promise<any> {
   };
 }
 
-async function getSession(regionCode?: string): Promise<any> {
-  if (!_session || Date.now() - _session.at > SESSION_TTL) {
+async function getSession(regionCode?: string, forceRefresh = false): Promise<any> {
+  if (forceRefresh || !_session || Date.now() - _session.at > SESSION_TTL) {
     _session = await boot(regionCode);
   }
   return _session;
@@ -130,7 +130,7 @@ export async function getCatalog(regionCode?: string): Promise<any[]> {
 }
 
 export async function getSeries(seriesId: string, regionCode?: string): Promise<any[]> {
-  const session = await getSession(regionCode);
+  const session = await getSession(regionCode, true);
   const params = new URLSearchParams({ offset: "0", page: "1" });
   
   const res = await fetch(`${VOD_URL}/series/${seriesId}/seasons?${params.toString()}`, {
