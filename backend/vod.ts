@@ -82,9 +82,7 @@ function normalize(session: any, item: any): any | null {
 }
 
 export async function getCatalog(regionCode?: string): Promise<any[]> {
-  if (_catalog && Date.now() - _catalog.at < CATALOG_TTL) {
-    return _catalog.rails;
-  }
+  _catalog = null; // Force fresh catalog generation
   const session = await getSession(regionCode);
   const params = new URLSearchParams({ offset: "0", page: "1", includeItems: "true" });
   

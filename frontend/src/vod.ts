@@ -954,7 +954,7 @@ export function renderShows(container: HTMLElement): void {
     loading.remove();
     let showRails = rails
       .map((rail) => {
-        const items = rail.items.filter((item) => item.series_id);
+        const items = rail.name.includes("Anime") ? rail.items : rail.items.filter((item) => item.series_id);
         return { name: rail.name, items };
       })
       .filter((rail) => rail.items.length > 0);
@@ -1078,7 +1078,7 @@ export function renderMovies(container: HTMLElement): void {
     loading.remove();
     let movieRails = rails
       .map((rail) => {
-        const items = rail.items.filter((item) => !item.series_id);
+        const items = rail.name.includes("Anime") ? rail.items : rail.items.filter((item) => !item.series_id);
         return { name: rail.name, items };
       })
       .filter((rail) => rail.items.length > 0);
