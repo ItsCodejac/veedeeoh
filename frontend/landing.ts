@@ -1,7 +1,7 @@
-import { getSession, signIn } from './src/auth';
+import { getSession, restoreSession, signIn } from './src/auth';
 
 async function checkAuth() {
-  const session = getSession();
+  const session = await restoreSession();
   if (session && window.location.pathname.endsWith('landing.html')) {
     window.location.href = '/index.html';
   }

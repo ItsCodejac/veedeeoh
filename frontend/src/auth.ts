@@ -1,15 +1,28 @@
 /// <reference types="vite/client" />
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Lazy Supabase client — only created when sign-in is attempted.
-// This prevents a module-level crash from killing the entire landing page.
 let _supabase: SupabaseClient | null = null;
 
 export function getSupabase(): SupabaseClient {
   if (!_supabase) {
     const url = import.meta.env.VITE_SUPABASE_URL as string;
     const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-    _supabase = createClient(url, key);
+    _supabase = createClient(url, key, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storageKey: 'veedeeoh_supabase_auth_session'
+      }
+    });
+
+    _supabase.auth.onAuthStateChange((event, session) => {
+      if (session && session.user && session.user.email) {
+        setSession(session.user.email, session.access_token);
+      } else if (event === 'SIGNED_OUT') {
+        localStorage.removeItem(AUTH_KEY);
+      }
+    });
   }
   return _supabase;
 }
@@ -39,6 +52,24 @@ export function getSession(): AuthSession | null {
   }
 }
 
+export async function restoreSession(): Promise<AuthSession | null> {
+  let session = getSession();
+  if (session) return session;
+
+  try {
+    const client = getSupabase();
+    const { data } = await client.auth.getSession();
+    if (data?.session?.user?.email) {
+      setSession(data.session.user.email, data.session.access_token);
+      return getSession();
+    }
+  } catch (err) {
+    console.warn('[Auth] Supabase session recovery warning:', err);
+  }
+
+  return null;
+}
+
 export function setSession(email: string, access_token?: string): void {
   const session: AuthSession = {
     email: email.toLowerCase(),
@@ -50,7 +81,9 @@ export function setSession(email: string, access_token?: string): void {
 
 export function signOut(): void {
   localStorage.removeItem(AUTH_KEY);
-  getSupabase().auth.signOut();
+  try {
+    getSupabase().auth.signOut();
+  } catch {}
   if (isCloudMode()) {
     window.location.href = '/landing.html';
   } else {
