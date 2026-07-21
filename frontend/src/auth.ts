@@ -5,8 +5,8 @@ let _supabase: SupabaseClient | null = null;
 
 export function getSupabase(): SupabaseClient {
   if (!_supabase) {
-    const url = import.meta.env.VITE_SUPABASE_URL as string;
-    const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+    const url = (import.meta.env.VITE_SUPABASE_URL as string) || "https://fwlbmksxmfzgkazrulgt.supabase.co";
+    const key = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3bGJta3N4bWZ6Z2thenJ1bGd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2NTk5MTQsImV4cCI6MjEwMDIzNTkxNH0.oql8BpFvpCc2tS-e4ETFLonnDZWMU5PlTosp9FMTyAI";
     _supabase = createClient(url, key, {
       auth: {
         persistSession: true,
