@@ -11,7 +11,8 @@ export default defineConfig({
         changePassword: 'change-password.html',
         privacy: 'privacy.html',
         terms: 'terms.html',
-        notFound: '404.html'
+        notFound: '404.html',
+        selfHosting: 'self-hosting.html'
       }
     }
   },

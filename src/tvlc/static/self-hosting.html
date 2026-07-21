@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Self-Hosting Guide - veedeeoh.</title>
+    <meta name="description" content="Deploy veedeeoh on your local home server, Unraid, Docker, or Raspberry Pi. 100% free and open-source." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;800&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg: #06070a;
+        --card-bg: #10141e;
+        --card-hover: #161c2b;
+        --border: rgba(255, 255, 255, 0.1);
+        --text: #ffffff;
+        --dim: #9aa5b5;
+        --accent: #c5f04e;
+        --accent-hover: #b4df40;
+        --display: "Space Grotesk", sans-serif;
+        --body: "Instrument Sans", sans-serif;
+        --brand: "Bricolage Grotesque", sans-serif;
+        --mono: "JetBrains Mono", monospace;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        padding: 0;
+        font-family: var(--body);
+        background-color: var(--bg);
+        color: var(--text);
+        line-height: 1.7;
+        -webkit-font-smoothing: antialiased;
+      }
+      nav {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 6%;
+        background: rgba(6, 7, 10, 0.85);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border-bottom: 1px solid var(--border);
+      }
+      .logo {
+        font-family: var(--brand);
+        font-size: 32px;
+        font-weight: 800;
+        letter-spacing: -1px;
+        color: var(--text);
+        text-decoration: none;
+      }
+      .logo span { color: var(--accent); }
+      .nav-actions { display: flex; gap: 14px; align-items: center; }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 10px 22px;
+        border-radius: 8px;
+        font-family: var(--display);
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        text-decoration: none;
+        transition: all 0.2s ease;
+      }
+      .btn-primary { background: var(--accent); color: #06070a; }
+      .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
+      .btn-ghost { background: rgba(255, 255, 255, 0.08); color: #fff; border: 1px solid var(--border); }
+      .btn-ghost:hover { background: rgba(255, 255, 255, 0.15); }
+      
+      .hero {
+        padding: 150px 24px 60px;
+        text-align: center;
+        max-width: 900px;
+        margin: 0 auto;
+      }
+      .badge {
+        display: inline-block;
+        padding: 6px 16px;
+        border-radius: 20px;
+        background: rgba(197, 240, 78, 0.1);
+        border: 1px solid rgba(197, 240, 78, 0.3);
+        color: var(--accent);
+        font-family: var(--display);
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.8px;
+        margin-bottom: 20px;
+      }
+      h1 {
+        font-family: var(--display);
+        font-size: clamp(2.5rem, 5vw, 4rem);
+        font-weight: 800;
+        line-height: 1.1;
+        letter-spacing: -1.5px;
+        margin: 0 0 20px;
+      }
+      .subtitle {
+        font-size: 19px;
+        color: var(--dim);
+        max-width: 680px;
+        margin: 0 auto 36px;
+      }
+      
+      .content-grid {
+        max-width: 1060px;
+        margin: 0 auto 100px;
+        padding: 0 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 40px;
+      }
+      
+      .card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 32px;
+      }
+      .card-header {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 20px;
+      }
+      .card-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        background: rgba(197, 240, 78, 0.12);
+        color: var(--accent);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+      }
+      h2 {
+        font-family: var(--display);
+        font-size: 24px;
+        font-weight: 700;
+        margin: 0;
+      }
+      p { color: #c4d0e0; font-size: 16px; margin: 0 0 16px; }
+      
+      .code-block {
+        background: #080a10;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 12px;
+        padding: 20px;
+        font-family: var(--mono);
+        font-size: 14px;
+        color: #a8ff78;
+        overflow-x: auto;
+        white-space: pre;
+        margin: 16px 0;
+        line-height: 1.6;
+      }
+      
+      .env-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 16px;
+      }
+      .env-table th, .env-table td {
+        padding: 12px 16px;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+        font-size: 14px;
+      }
+      .env-table th {
+        font-family: var(--display);
+        color: var(--dim);
+        font-weight: 600;
+      }
+      .env-table code {
+        font-family: var(--mono);
+        color: var(--accent);
+        background: rgba(197, 240, 78, 0.08);
+        padding: 3px 8px;
+        border-radius: 4px;
+      }
+      
+      footer {
+        border-top: 1px solid var(--border);
+        padding: 40px 6%;
+        text-align: center;
+        color: var(--dim);
+        font-size: 14px;
+      }
+      footer a { color: var(--dim); text-decoration: none; }
+      footer a:hover { color: #fff; }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a href="/landing.html" class="logo">veedeeoh<span>.</span></a>
+      <div class="nav-actions">
+        <a href="https://github.com/ItsCodejac/veedeeoh" target="_blank" class="btn btn-ghost">GitHub Repo</a>
+        <a href="/landing.html" class="btn btn-primary">Back to Home</a>
+      </div>
+    </nav>
+
+    <div class="hero">
+      <span class="badge">OPEN SOURCE & PRIVATE</span>
+      <h1>Self-Host veedeeoh On Your Home Server</h1>
+      <p class="subtitle">Deploy your own private media server instance using Docker, Unraid, Railway, or Python. 100% free with zero telemetry or central tracking.</p>
+    </div>
+
+    <div class="content-grid">
+      <!-- Method 1: Docker Compose -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon">🐳</div>
+          <div>
+            <h2>Option 1: Docker Compose (Recommended)</h2>
+            <div style="font-size: 14px; color: var(--dim);">Run on any Linux server, NAS, Unraid, or Raspberry Pi</div>
+          </div>
+        </div>
+        <p>Save the following configuration as <code>docker-compose.yml</code> and start the service with a single command:</p>
+        
+        <div class="code-block">version: '3.8'
+services:
+  veedeeoh:
+    image: ghcr.io/itscodejac/veedeeoh:latest
+    container_name: veedeeoh
+    ports:
+      - "8321:8321"
+    environment:
+      - PORT=8321
+      - REGION=US
+    restart: unless-stopped</div>
+
+        <p>Launch the container in the background:</p>
+        <div class="code-block">docker compose up -d</div>
+        <p>Your media server will be live immediately at <code>http://localhost:8321</code>.</p>
+      </div>
+
+      <!-- Method 2: Railway Cloud -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon">☁️</div>
+          <div>
+            <h2>Option 2: One-Click Railway Cloud Deploy</h2>
+            <div style="font-size: 14px; color: var(--dim);">Deploy to your personal free/cheap cloud hosting</div>
+          </div>
+        </div>
+        <p>If you prefer cloud deployment without managing local hardware, deploy directly using our Railway configuration:</p>
+        <div style="margin: 20px 0;">
+          <a href="https://railway.app/template" target="_blank" class="btn btn-primary" style="padding: 12px 24px; font-size: 15px;">Deploy on Railway &rarr;</a>
+        </div>
+      </div>
+
+      <!-- Method 3: Local Node/Python Dev -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon">💻</div>
+          <div>
+            <h2>Option 3: Local Node / Python Source Build</h2>
+            <div style="font-size: 14px; color: var(--dim);">For developers and local customization</div>
+          </div>
+        </div>
+        <p>Clone the repository and launch the backend dev server:</p>
+        <div class="code-block">git clone https://github.com/ItsCodejac/veedeeoh.git
+cd veedeeoh
+
+# Install dependencies and launch
+npm install
+npm run dev</div>
+      </div>
+
+      <!-- Environment Variables -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon">⚙️</div>
+          <div>
+            <h2>Configuration & Environment Variables</h2>
+            <div style="font-size: 14px; color: var(--dim);">Tailor your server settings</div>
+          </div>
+        </div>
+        <table class="env-table">
+          <thead>
+            <tr>
+              <th>Variable</th>
+              <th>Default</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>PORT</code></td>
+              <td><code>8321</code></td>
+              <td>The HTTP port your server listens on.</td>
+            </tr>
+            <tr>
+              <td><code>REGION</code></td>
+              <td><code>US</code></td>
+              <td>Default spoofed FAST catalog region (US, GB, CA, DE, ES, MX, FR).</td>
+            </tr>
+            <tr>
+              <td><code>DATABASE_URL</code></td>
+              <td><code>local.db</code></td>
+              <td>SQLite storage location for multi-room profiles and favorites.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <footer>
+      <p>&copy; 2026 veedeeoh. All rights reserved. &middot; <a href="/self-hosting.html">Self-Hosting Guide</a> &middot; <a href="/privacy.html">Privacy Policy</a> &middot; <a href="/terms.html">Terms of Service</a></p>
+    </footer>
+  </body>
+</html>
