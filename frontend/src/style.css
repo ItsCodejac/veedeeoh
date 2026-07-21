@@ -96,6 +96,53 @@ aside {
 .navBtn svg { width: 20px; height: 20px; flex-shrink: 0; }
 .navBtn span { white-space: nowrap; }
 
+.sidebar-spacer {
+  flex-grow: 1;
+}
+
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.05);
+  overflow: hidden;
+}
+
+.sidebar-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+.sidebar-email {
+  font-size: 12px;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.8;
+}
+
+.sidebar-logout {
+  color: #ff3b30 !important;
+}
+.sidebar-logout:hover {
+  background: rgba(255, 59, 48, 0.1) !important;
+}
+
 /* ---- Ambient blurred backing glow ---- */
 #ambientGlow {
   position: absolute;

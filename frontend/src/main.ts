@@ -3,7 +3,7 @@ import { fetchCatalog, fetchWatched } from "./api";
 import { state } from "./state";
 import { $ } from "./util";
 import { wireVodDetails, renderShows, renderMovies, wireSearchInputs, renderHome } from "./vod";
-import { getSession, isCloudMode } from "./auth";
+import { getSession, isCloudMode, signOut } from "./auth";
 
 async function boot(): Promise<void> {
   if (isCloudMode()) {
@@ -80,6 +80,25 @@ function wireSidebar(): void {
       });
     }
   });
+
+  const session = getSession();
+  const sidebarUser = document.getElementById("sidebarUser");
+  const sidebarEmail = document.getElementById("sidebarEmail");
+  const sidebarAvatar = document.getElementById("sidebarAvatar");
+  const logoutBtn = document.getElementById("logoutBtn");
+
+  if (session && sidebarUser && sidebarEmail && sidebarAvatar && logoutBtn) {
+    const email = session.email;
+    sidebarEmail.textContent = email;
+    sidebarAvatar.textContent = email.charAt(0).toUpperCase();
+
+    logoutBtn.addEventListener("click", () => {
+      signOut();
+    });
+  } else if (!session) {
+    if (sidebarUser) sidebarUser.style.display = "none";
+    if (logoutBtn) logoutBtn.style.display = "none";
+  }
 }
 
 function wireHeader(): void {
