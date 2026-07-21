@@ -22,7 +22,8 @@ export async function signIn(email: string) {
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
-      emailRedirectTo: window.location.origin,
+      emailRedirectTo: window.location.origin + '/index.html',
+      shouldCreateUser: false, // Restricts sign-in strictly to authorized emails created in Supabase
     },
   });
   if (error) throw error;
