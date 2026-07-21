@@ -320,6 +320,79 @@ export function openVodPlayer(ch: any, streamIdx: number, startTime: number = 0)
     }
   };
 
+  const showToast = (msg: string) => {
+    const existing = document.getElementById("vodToast");
+    if (existing) existing.remove();
+    const t = document.createElement("div");
+    t.id = "vodToast";
+    t.style.cssText = "position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(16,20,30,0.95);border:1px solid rgba(197,240,78,0.4);color:#c5f04e;padding:10px 22px;border-radius:20px;font-size:13px;font-weight:700;z-index:10001;box-shadow:0 10px 30px rgba(0,0,0,0.8);pointer-events:none;";
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 2500);
+  };
+
+  const toggleSubtitles = () => {
+    if (video.textTracks && video.textTracks.length > 0) {
+      let enabled = false;
+      for (let i = 0; i < video.textTracks.length; i++) {
+        const track = video.textTracks[i];
+        if (track) {
+          if (track.mode === "showing") {
+            track.mode = "disabled";
+          } else {
+            track.mode = "showing";
+            enabled = true;
+          }
+        }
+      }
+      showToast(enabled ? "Subtitles Enabled (CC)" : "Subtitles Disabled");
+    } else if (vodHls && vodHls.subtitleTracks.length > 0) {
+      if (vodHls.subtitleTrack === -1) {
+        vodHls.subtitleTrack = 0;
+        showToast("Subtitles Enabled (CC)");
+      } else {
+        vodHls.subtitleTrack = -1;
+        showToast("Subtitles Disabled");
+      }
+    } else {
+      showToast("No Closed Captions / Subtitles available for this stream");
+    }
+  };
+
+  const showHotkeysModal = () => {
+    const existing = document.getElementById("hotkeysModal");
+    if (existing) {
+      existing.remove();
+      return;
+    }
+    const modal = document.createElement("div");
+    modal.id = "hotkeysModal";
+    modal.style.cssText = "position:fixed;inset:0;background:rgba(6,7,10,0.85);backdrop-filter:blur(12px);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;";
+    modal.innerHTML = `
+      <div style="background:#10141e;border:1px solid rgba(255,255,255,0.15);border-radius:18px;max-width:440px;width:100%;padding:28px;color:#fff;font-family:sans-serif;box-shadow:0 20px 50px rgba(0,0,0,0.8);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+          <h3 style="margin:0;font-size:20px;font-weight:700;">⌨️ Keyboard Shortcuts</h3>
+          <button id="closeHotkeysBtn" style="background:none;border:none;color:#aaa;font-size:20px;cursor:pointer;">✕</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:14px;color:#c4d0e0;">
+          <div><code>Space</code> / <code>K</code></div><div>Play / Pause</div>
+          <div><code>F</code></div><div>Fullscreen Toggle</div>
+          <div><code>M</code></div><div>Mute / Unmute</div>
+          <div><code>C</code></div><div>Subtitles / CC Toggle</div>
+          <div><code>←</code> / <code>→</code></div><div>Skip 10s Back / Forward</div>
+          <div><code>?</code></div><div>Show / Hide Hotkeys</div>
+          <div><code>Esc</code></div><div>Close Player / Modal</div>
+        </div>
+      </div>
+    `;
+    modal.onclick = (e) => {
+      if (e.target === modal || (e.target as HTMLElement).id === "closeHotkeysBtn") {
+        modal.remove();
+      }
+    };
+    document.body.appendChild(modal);
+  };
+
   const handleKeyDown = (e: KeyboardEvent) => {
     if (overlay.hasAttribute("hidden")) return;
 
@@ -348,6 +421,10 @@ export function openVodPlayer(ch: any, streamIdx: number, startTime: number = 0)
     } else if (e.key === "ArrowLeft" || e.key === "j") {
       video.currentTime = Math.max(0, video.currentTime - 10);
       onMouseMove();
+    } else if (e.key === "c" || e.key === "C") {
+      toggleSubtitles();
+    } else if (e.key === "?" || e.key === "/") {
+      showHotkeysModal();
     }
   };
 
