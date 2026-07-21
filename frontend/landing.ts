@@ -170,13 +170,17 @@ function renderCatalogUI(items: any[], rails: any[]) {
     marqueeTrack3.innerHTML = '';
     marqueeTrack4.innerHTML = '';
 
-    const row1Items = activeItems.slice(0, 5);
-    const row2Items = activeItems.slice(5, 10);
-    const row3Items = activeItems.slice(0, 5).reverse();
-    const row4Items = activeItems.slice(5, 10).reverse();
+    // Shuffle active items for alternating variety
+    const shuffled = [...activeItems].sort(() => 0.5 - Math.random());
+    const chunkSize = Math.max(4, Math.floor(shuffled.length / 4));
+
+    const row1Items = shuffled.slice(0, chunkSize);
+    const row2Items = shuffled.slice(chunkSize, chunkSize * 2);
+    const row3Items = shuffled.slice(chunkSize * 2, chunkSize * 3);
+    const row4Items = shuffled.slice(chunkSize * 3);
 
     const renderTrack = (trackElement: HTMLElement, trackItems: any[]) => {
-      const loopItems = [...trackItems, ...trackItems, ...trackItems];
+      const loopItems = trackItems.length > 0 ? [...trackItems, ...trackItems, ...trackItems] : DEFAULT_ITEMS;
       loopItems.forEach((item, idx) => {
         const card = document.createElement('div');
         card.className = 'marquee-card';
@@ -185,6 +189,8 @@ function renderCatalogUI(items: any[], rails: any[]) {
         const img = document.createElement('img');
         img.src = item.poster || fallback;
         img.alt = item.title || 'Movie';
+        img.referrerPolicy = 'no-referrer';
+        img.loading = 'lazy';
         img.onerror = function() {
           (this as HTMLImageElement).onerror = null;
           (this as HTMLImageElement).src = fallback;
