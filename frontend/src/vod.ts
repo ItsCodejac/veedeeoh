@@ -453,14 +453,14 @@ export function openVodPlayer(ch: any, streamIdx: number, startTime: number = 0)
     video.ontimeupdate = handleProgress;
     
     const isDirectMp4 = /\.(mp4|m4v|webm|ogv)(\?|$)/i.test(url);
-    const targetUrl = isDirectMp4 ? url : proxiedUrl;
+    const targetUrl = url; // Client-side direct CDN streaming (0 Vercel bandwidth!)
 
     if (isDirectMp4) {
       video.src = targetUrl;
       void video.play().catch(() => {});
     } else if (Hls.isSupported()) {
       vodHls = new Hls({
-        maxBufferLength: 15,
+        maxBufferLength: 30,
         manifestLoadingTimeOut: 30000,
         levelLoadingTimeOut: 30000,
         fragLoadingTimeOut: 30000,
@@ -475,7 +475,11 @@ export function openVodPlayer(ch: any, streamIdx: number, startTime: number = 0)
         if (data.fatal) {
           console.warn("HLS fatal error:", data.type, data.details);
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-            vodHls?.startLoad();
+            if (vodHls) {
+              console.log("Direct CDN stream blocked, falling back to proxy stream...");
+              vodHls.loadSource(proxiedUrl);
+              vodHls.startLoad();
+            }
           } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
             vodHls?.recoverMediaError();
           }
@@ -486,6 +490,10 @@ export function openVodPlayer(ch: any, streamIdx: number, startTime: number = 0)
       video.addEventListener("loadedmetadata", () => {
         void video.play().catch(() => {});
       }, { once: true });
+      video.onerror = () => {
+        video.src = proxiedUrl;
+        void video.play().catch(() => {});
+      };
     } else {
       video.src = targetUrl;
       void video.play().catch(() => {});
