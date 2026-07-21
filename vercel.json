@@ -1,6 +1,9 @@
 {
   "routes": [
     { "src": "/", "dest": "/landing.html" },
+    { "src": "/privacy", "dest": "/privacy.html" },
+    { "src": "/terms", "dest": "/terms.html" },
+    { "src": "/404", "dest": "/404.html" },
     { "src": "/change-password", "dest": "/change-password.html" },
     { "src": "/api/(.*)", "dest": "/api/index.ts" },
     { "src": "/proxy", "dest": "/api/proxy.ts" },
