@@ -6,8 +6,8 @@ import { wireVodDetails, renderShows, renderMovies, wireSearchInputs, renderHome
 import { getSession, isCloudMode } from "./auth";
 
 async function boot(): Promise<void> {
-  if (isCloudMode) {
-    const session = await getSession();
+  if (isCloudMode()) {
+    const session = getSession();
     if (!session) {
       window.location.href = '/landing.html';
       return;

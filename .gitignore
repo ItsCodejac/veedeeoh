@@ -16,3 +16,4 @@ nohup.out
 *.env
 emails.txt
 *.spec~
+.vercel

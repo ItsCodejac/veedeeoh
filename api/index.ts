@@ -1,20 +1,46 @@
-import { Hono } from 'hono';
+import { Hono, Context } from 'hono';
 import { handle } from 'hono/vercel';
 import * as vod from '../backend/vod';
 import * as store from '../backend/store';
-import { createClient } from '@supabase/supabase-js';
 
 const app = new Hono().basePath('/api');
 
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co';
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'placeholder_key';
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
 const waitlistStore = new store.Waitlist();
 
-app.get('/health', (c) => c.json({ status: 'ok', environment: 'vercel' }));
+const ALLOWED_EMAILS = new Set([
+  'dannywsalama1@gmail.com',
+  'itscojac@gmail.com',
+  'fel250@live.com',
+  'anthonyg.video@gmail.com',
+  'davereed388@gmail.com'
+]);
 
-app.post('/waitlist', async (c) => {
+app.get('/health', (c: Context) => c.json({ status: 'ok', environment: 'vercel' }));
+
+app.post('/auth/authorize', async (c: Context) => {
+  try {
+    const body = await c.req.json();
+    const email = (body?.email || '').trim().toLowerCase();
+
+    if (ALLOWED_EMAILS.has(email)) {
+      return c.json({ authorized: true, email });
+    }
+
+    return c.json({ authorized: false, error: 'Access is reserved for invited waitlist members.' }, 403);
+  } catch (err) {
+    return c.json({ authorized: false, error: 'Invalid request.' }, 400);
+  }
+});
+
+app.get('/catalog', (c: Context) => {
+  return c.json({
+    region: { code: 'US', source: 'default' },
+    favorites: [],
+    health: {}
+  });
+});
+
+app.post('/waitlist', async (c: Context) => {
   try {
     const body = await c.req.json();
     const email = body?.email;
@@ -22,22 +48,17 @@ app.post('/waitlist', async (c) => {
       return c.json({ error: 'Please enter a valid email address.' }, 400);
     }
     const entry = waitlistStore.add(email);
-
-    if (supabaseUrl && !supabaseUrl.includes('placeholder')) {
-      supabase.from('waitlist').insert({ email: entry.email, created_at: entry.created_at }).then(() => {}).catch(() => {});
-    }
-
     return c.json({ ok: true, message: "You're on the waitlist! We'll email you as cloud spots open.", entry });
   } catch (err: any) {
     return c.json({ error: 'Failed to record waitlist submission.' }, 500);
   }
 });
 
-app.get('/waitlist', (c) => {
+app.get('/waitlist', (c: Context) => {
   return c.json({ count: waitlistStore.entries.length, waitlist: waitlistStore.entries });
 });
 
-app.get('/vod', async (c) => {
+app.get('/vod', async (c: Context) => {
   const rails: any[] = [];
   try {
     const plutoRails = await vod.getCatalog('US');
@@ -54,9 +75,10 @@ app.get('/vod', async (c) => {
   return c.json({ rails });
 });
 
-app.get('/vod/series/:id', async (c) => {
+app.get('/vod/series/:id', async (c: Context) => {
   try {
-    const episodes = await vod.getSeries(c.req.param('id'), 'US');
+    const seriesId = c.req.param('id') || '';
+    const episodes = await vod.getSeries(seriesId, 'US');
     return c.json({ episodes });
   } catch (e: any) {
     return c.json({ error: e.message }, 502);

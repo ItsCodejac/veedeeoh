@@ -1,36 +1,55 @@
 /// <reference types="vite/client" />
-import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+export interface AuthSession {
+  email: string;
+  authenticatedAt: string;
+  access_token?: string;
+}
 
-export const isCloudMode = Boolean(supabaseUrl && supabaseAnonKey && supabaseUrl !== 'https://placeholder.supabase.co');
+const AUTH_KEY = 'veedeeoh_cloud_session';
 
-export const supabase = createClient(supabaseUrl || 'https://placeholder.supabase.co', supabaseAnonKey || 'placeholder_key');
+export function isCloudMode(): boolean {
+  return typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
+}
 
-export async function getSession() {
-  if (!isCloudMode) return null;
-  const { data, error } = await supabase.auth.getSession();
-  if (error) {
-    console.error('Error fetching session:', error.message);
+export function getSession(): AuthSession | null {
+  try {
+    const raw = localStorage.getItem(AUTH_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
     return null;
   }
-  return data.session;
 }
 
-export async function signIn(email: string) {
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: {
-      emailRedirectTo: window.location.origin + '/index.html',
-      shouldCreateUser: false, // Restricts sign-in strictly to authorized emails created in Supabase
-    },
-  });
-  if (error) throw error;
+export function setSession(email: string): void {
+  const session: AuthSession = {
+    email: email.toLowerCase(),
+    authenticatedAt: new Date().toISOString(),
+    access_token: 'auth_' + btoa(email.toLowerCase())
+  };
+  localStorage.setItem(AUTH_KEY, JSON.stringify(session));
 }
 
-export async function signOut() {
-  const { error } = await supabase.auth.signOut();
-  if (error) throw error;
+export function signOut(): void {
+  localStorage.removeItem(AUTH_KEY);
   window.location.href = '/landing.html';
+}
+
+export async function signIn(email: string): Promise<boolean> {
+  const normalized = email.trim().toLowerCase();
+  
+  const res = await fetch('/api/auth/authorize', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: normalized })
+  });
+
+  const data = await res.json();
+  if (!res.ok || !data.authorized) {
+    throw new Error(data.error || 'Access is reserved for invited waitlist members.');
+  }
+
+  setSession(normalized);
+  return true;
 }

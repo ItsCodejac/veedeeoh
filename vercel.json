@@ -1,10 +1,8 @@
 {
-  "version": 2,
-  "buildCommand": "cd frontend && npm install && npm run build",
-  "outputDirectory": "src/tvlc/static",
-  "rewrites": [
-    { "source": "/", "destination": "/landing.html" },
-    { "source": "/api/(.*)", "destination": "/api/index.ts" },
-    { "source": "/proxy", "destination": "/api/proxy.ts" }
+  "routes": [
+    { "src": "/", "dest": "/landing.html" },
+    { "src": "/api/(.*)", "dest": "/api/index.ts" },
+    { "src": "/proxy", "dest": "/api/proxy.ts" },
+    { "handle": "filesystem" }
   ]
 }

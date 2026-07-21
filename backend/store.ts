@@ -2,6 +2,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 function getUserDataDir(appName: string): string {
+  if (process.env.VERCEL) {
+    return '/tmp';
+  }
   const home = process.env.HOME || process.env.USERPROFILE || '';
   if (process.platform === 'win32') {
     return path.join(process.env.APPDATA || path.join(home, 'AppData', 'Roaming'), appName);
@@ -33,13 +36,12 @@ export class JsonStore<T> {
   }
 
   save(data: T): void {
-    // In Node.js, writeFile is atomic if written to temp and renamed.
-    // For simplicity, writeFileSync is often atomic enough for small JSON, 
-    // but we will do tmp rename for safety.
-    fs.mkdirSync(path.dirname(this.path), { recursive: true });
-    const tmp = `${this.path}.tmp`;
-    fs.writeFileSync(tmp, JSON.stringify(data));
-    fs.renameSync(tmp, this.path);
+    try {
+      fs.mkdirSync(path.dirname(this.path), { recursive: true });
+      fs.writeFileSync(this.path, JSON.stringify(data));
+    } catch {
+      // Ignore write errors in serverless environments
+    }
   }
 }
 

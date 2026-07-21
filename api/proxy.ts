@@ -1,9 +1,9 @@
-import { Hono } from 'hono';
+import { Hono, Context } from 'hono';
 import { handle } from 'hono/vercel';
 
 const app = new Hono();
 
-app.get('/proxy', async (c) => {
+app.get('/proxy', async (c: Context) => {
   const rawUrl = c.req.query('url');
   const obf = c.req.query('obf');
   if (!rawUrl) return c.text('bad url', 400);
