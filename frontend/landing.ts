@@ -132,42 +132,19 @@ if (authForm) {
   });
 }
 
-const LOCAL_POSTERS = [
-  { title: "Ghost In The Shell", poster: "/posters/ghost_in_the_shell.jpg", genre: "Anime & Sci-Fi" },
-  { title: "Space Adventure Cobra", poster: "/posters/space_adventure_cobra.jpg", genre: "Anime & Action" },
-  { title: "Naruto", poster: "/posters/naruto.jpg", genre: "Anime & Adventure" },
-  { title: "Yu-Gi-Oh!", poster: "/posters/yugioh_espanol.jpg", genre: "Anime & Fantasy" },
-  { title: "Death Note", poster: "/posters/death_note.jpg", genre: "Anime & Mystery" },
-  { title: "Zom 100: Bucket List of the Dead", poster: "/posters/zom_100.jpg", genre: "Anime & Comedy" },
-  { title: "Hunter x Hunter", poster: "/posters/hunter_x_hunter.jpg", genre: "Anime & Action" },
-  { title: "JoJo's Bizarre Adventure", poster: "/posters/jojo_bizarre_adventure.jpg", genre: "Anime & Action" },
-  { title: "Inuyasha", poster: "/posters/inuyasha.jpg", genre: "Anime & Fantasy" },
-  { title: "Captain Tsubasa", poster: "/posters/captain_tsubasa.jpg", genre: "Anime & Sports" },
-  { title: "Pop Team Epic", poster: "/posters/pop_team_epic.jpg", genre: "Anime & Comedy" },
-  { title: "Saint Seiya", poster: "/posters/saint_seiya.jpg", genre: "Anime & Action" },
-  { title: "Digimon Adventure", poster: "/posters/digimon.jpg", genre: "Anime & Fantasy" },
-  { title: "Love Hina", poster: "/posters/love_hina.jpg", genre: "Anime & Romance" },
-  { title: "Interlude", poster: "/posters/interlude.jpg", genre: "Anime & Sci-Fi" },
-  { title: "Inuyasha: The Final Act", poster: "/posters/inuyasha_final_act.jpg", genre: "Anime & Fantasy" },
-  { title: "Yashahime", poster: "/posters/yashahime.jpg", genre: "Anime & Fantasy" },
-  { title: "Mr. Osomatsu", poster: "/posters/mr_osomatsu.jpg", genre: "Anime & Comedy" },
-  { title: "Gaiking", poster: "/posters/gaiking.jpg", genre: "Anime & Mecha" },
-  { title: "Tiger Mask W", poster: "/posters/tiger_mask.jpg", genre: "Anime & Sports" }
-];
+import CURATED_POSTERS from './src/landing_posters.json';
 
-const DEFAULT_ITEMS = LOCAL_POSTERS;
+const DEFAULT_ITEMS = CURATED_POSTERS;
 
 const GENRES = [
-  { name: "Action & Adventure", keyword: "action", fallback: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=800&auto=format&fit=crop&q=80" },
-  { name: "Comedy & Stand-up", keyword: "comedy", fallback: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop&q=80" },
-  { name: "Sci-Fi & Fantasy", keyword: "sci", fallback: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&auto=format&fit=crop&q=80" },
-  { name: "Horror & Suspense", keyword: "horror", fallback: "https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=800&auto=format&fit=crop&q=80" },
-  { name: "Crime & Thriller", keyword: "crime", fallback: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop&q=80" },
-  { name: "Drama & Romance", keyword: "drama", fallback: "https://images.unsplash.com/photo-1440404653325-ab127d49abc1?w=800&auto=format&fit=crop&q=80" },
-  { name: "Documentaries", keyword: "doc", fallback: "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=800&auto=format&fit=crop&q=80" },
-  { name: "Cult & Archive Cinema", keyword: "archive", fallback: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&auto=format&fit=crop&q=80" },
-  { name: "Anime & Animation", keyword: "anime", fallback: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800&auto=format&fit=crop&q=80" },
-  { name: "Family & Kids", keyword: "family", fallback: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=800&auto=format&fit=crop&q=80" },
+  { name: "Action & Blockbusters", keyword: "action", fallback: "/posters/action_walking_tall.jpg" },
+  { name: "Comedy & Stand-up", keyword: "comedy", fallback: "/posters/comedy_rango.jpg" },
+  { name: "Sci-Fi & Fantasy", keyword: "scifi", fallback: "/posters/scifi_i_am_legend.jpg" },
+  { name: "Horror & Suspense", keyword: "horror", fallback: "/posters/horror_american_psycho.jpg" },
+  { name: "Drama & History", keyword: "drama", fallback: "/posters/drama_full_metal_jacket.jpg" },
+  { name: "Black Storytelling", keyword: "black", fallback: "/posters/black_the_wood.jpg" },
+  { name: "Anime & Animation", keyword: "anime", fallback: "/posters/anime_ghost_in_the_shell.jpg" },
+  { name: "Classics & Documentaries", keyword: "archive", fallback: "/posters/archive_fist_of_fury.jpg" }
 ];
 
 /** Hydrate Landing Page with REAL VOD Catalog Data + Instant Hero Marquee */
@@ -181,21 +158,17 @@ function renderCatalogUI(items: any[], rails: any[]) {
   const marqueeTrack3 = document.getElementById('marqueeTrack3');
   const marqueeTrack4 = document.getElementById('marqueeTrack4');
 
-  // 1. Populate Top Hero Marquee Tracks (Smooth 60FPS Vivid Wall)
+  // 1. Populate Top Hero Marquee Tracks (Distinct Genre Rows)
   if (marqueeTrack1 && marqueeTrack2 && marqueeTrack3 && marqueeTrack4) {
     marqueeTrack1.innerHTML = '';
     marqueeTrack2.innerHTML = '';
     marqueeTrack3.innerHTML = '';
     marqueeTrack4.innerHTML = '';
 
-    // Shuffle active items for alternating variety
-    const shuffled = [...activeItems].sort(() => 0.5 - Math.random());
-    const chunkSize = Math.max(4, Math.floor(shuffled.length / 4));
-
-    const row1Items = shuffled.slice(0, chunkSize);
-    const row2Items = shuffled.slice(chunkSize, chunkSize * 2);
-    const row3Items = shuffled.slice(chunkSize * 2, chunkSize * 3);
-    const row4Items = shuffled.slice(chunkSize * 3);
+    const actionItems = CURATED_POSTERS.filter(i => i.category === 'action' || i.category === 'scifi');
+    const animeItems = CURATED_POSTERS.filter(i => i.category === 'anime');
+    const comedyItems = CURATED_POSTERS.filter(i => i.category === 'comedy' || i.category === 'black');
+    const horrorItems = CURATED_POSTERS.filter(i => i.category === 'horror' || i.category === 'drama' || i.category === 'archive');
 
     const renderTrack = (trackElement: HTMLElement, trackItems: any[]) => {
       const loopItems = trackItems.length > 0 ? [...trackItems, ...trackItems, ...trackItems] : DEFAULT_ITEMS;
@@ -228,10 +201,10 @@ function renderCatalogUI(items: any[], rails: any[]) {
       });
     };
 
-    renderTrack(marqueeTrack1, row1Items);
-    renderTrack(marqueeTrack2, row2Items);
-    renderTrack(marqueeTrack3, row3Items);
-    renderTrack(marqueeTrack4, row4Items);
+    renderTrack(marqueeTrack1, actionItems);
+    renderTrack(marqueeTrack2, animeItems);
+    renderTrack(marqueeTrack3, comedyItems);
+    renderTrack(marqueeTrack4, horrorItems);
   }
 
   // 2. Populate Category Hub Grid
