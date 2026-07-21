@@ -132,19 +132,25 @@ if (authForm) {
   });
 }
 
-// 100% Guaranteed High-Resolution Movie & TV Artwork URLs (Zero ORB / CORS Blocking)
-const DEFAULT_ITEMS = [
-  { title: "Dune: Part Two", poster: "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=800&auto=format&fit=crop&q=80", genre: "Sci-Fi & Fantasy" },
-  { title: "Oppenheimer", poster: "https://images.unsplash.com/photo-1440404653325-ab127d49abc1?w=800&auto=format&fit=crop&q=80", genre: "Drama & History" },
-  { title: "The Dark Knight", poster: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=800&auto=format&fit=crop&q=80", genre: "Action & Adventure" },
-  { title: "Interstellar", poster: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&auto=format&fit=crop&q=80", genre: "Sci-Fi & Fantasy" },
-  { title: "Pulp Fiction", poster: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop&q=80", genre: "Crime & Thriller" },
-  { title: "Inception", poster: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=800&auto=format&fit=crop&q=80", genre: "Sci-Fi & Fantasy" },
-  { title: "The Matrix", poster: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&auto=format&fit=crop&q=80", genre: "Sci-Fi & Fantasy" },
-  { title: "Fight Club", poster: "https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=800&auto=format&fit=crop&q=80", genre: "Cult & Archive Cinema" },
-  { title: "Avengers: Endgame", poster: "https://images.unsplash.com/photo-1635805737707-575885ab0820?w=800&auto=format&fit=crop&q=80", genre: "Action & Adventure" },
-  { title: "Blade Runner 2049", poster: "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=800&auto=format&fit=crop&q=80", genre: "Sci-Fi & Fantasy" }
+const LOCAL_POSTERS = [
+  { title: "Ghost In The Shell", poster: "/posters/poster_0.jpg", genre: "Anime & Sci-Fi" },
+  { title: "Space Adventure Cobra", poster: "/posters/poster_1.jpg", genre: "Anime & Action" },
+  { title: "Naruto", poster: "/posters/poster_2.jpg", genre: "Anime & Adventure" },
+  { title: "Yu-Gi-Oh!", poster: "/posters/poster_3.jpg", genre: "Anime & Fantasy" },
+  { title: "Death Note", poster: "/posters/poster_4.jpg", genre: "Anime & Mystery" },
+  { title: "Zom 100", poster: "/posters/poster_5.jpg", genre: "Anime & Comedy" },
+  { title: "Hunter x Hunter", poster: "/posters/poster_6.jpg", genre: "Anime & Action" },
+  { title: "JoJo's Bizarre Adventure", poster: "/posters/poster_7.jpg", genre: "Anime & Action" },
+  { title: "Inuyasha", poster: "/posters/poster_9.jpg", genre: "Anime & Fantasy" },
+  { title: "Captain Tsubasa", poster: "/posters/poster_12.jpg", genre: "Anime & Sports" },
+  { title: "Pop Team Epic", poster: "/posters/poster_14.jpg", genre: "Anime & Comedy" },
+  { title: "Saint Seiya", poster: "/posters/poster_16.jpg", genre: "Anime & Action" },
+  { title: "Digimon Adventure", poster: "/posters/poster_19.jpg", genre: "Anime & Fantasy" },
+  { title: "Love Hina", poster: "/posters/poster_22.jpg", genre: "Anime & Romance" },
+  { title: "Interlude", poster: "/posters/poster_23.jpg", genre: "Anime & Sci-Fi" }
 ];
+
+const DEFAULT_ITEMS = LOCAL_POSTERS;
 
 const GENRES = [
   { name: "Action & Adventure", keyword: "action", fallback: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=800&auto=format&fit=crop&q=80" },
