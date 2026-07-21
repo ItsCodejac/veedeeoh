@@ -153,7 +153,10 @@ function wireHeader(): void {
   }
 }
 
+import { initPWA } from "./pwa";
+
 wireSidebar();
 wireHeader();
 wireVodDetails();
+initPWA();
 void boot();
