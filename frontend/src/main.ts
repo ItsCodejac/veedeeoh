@@ -1,7 +1,7 @@
 import "./style.css";
 import { fetchCatalog, fetchWatched } from "./api";
 import { state } from "./state";
-import { $ } from "./util";
+import { $, escapeHtml } from "./util";
 import { wireVodDetails, renderShows, renderMovies, wireSearchInputs, renderHome } from "./vod";
 import { getSession, isCloudMode, restoreSession, signOut } from "./auth";
 
@@ -30,8 +30,8 @@ async function boot(): Promise<void> {
 }
 
 function wireSidebar(): void {
-  const tabs = ["tabHome", "tabShows", "tabMovies", "tabFavs", "tabZzz"];
-  const views = ["homeView", "showsView", "moviesView", "zzzView"];
+  const tabs = ["tabHome", "tabShows", "tabMovies", "tabFavs", "tabZzz", "tabOcean"];
+  const views = ["homeView", "showsView", "moviesView", "zzzView", "oceanView"];
 
   function switchView(activeTabId: string) {
 
@@ -97,6 +97,9 @@ function wireSidebar(): void {
     } else if (activeTabId === "tabZzz") {
       $("zzzView").removeAttribute("hidden");
       import("./zzz").then(zzz => zzz.renderZzzSanctuary($("zzzRails")));
+    } else if (activeTabId === "tabOcean") {
+      $("oceanView").removeAttribute("hidden");
+      renderOceanView($("oceanRails"));
     }
   }
 
@@ -277,6 +280,71 @@ function wireHeader(): void {
         });
       }, 150);
     });
+  }
+}
+
+async function renderOceanView(container: HTMLElement | null): Promise<void> {
+  if (!container) return;
+  container.innerHTML = '<div style="padding: 24px; color: #38bdf8; font-weight: 700;">Loading 24/7 Ocean & Nature Streams...</div>';
+
+  try {
+    const res = await fetch('/api/catalog');
+    const data = await res.json();
+
+    const regex = /ocean|nature|reef|sea|marine|waterfall|planet|earth|animal|stingray|zenlife/i;
+    const oceanChannels = (data.channels || []).filter((ch: any) =>
+      regex.test(`${ch.name} ${ch.categories?.join(' ') || ''}`)
+    );
+
+    if (oceanChannels.length === 0) {
+      container.innerHTML = '<div style="padding: 24px; color: #9aa5b5;">No live ocean streams found in current region.</div>';
+      return;
+    }
+
+    container.replaceChildren();
+
+    const section = document.createElement('div');
+    section.className = 'showcaseRail';
+
+    const grid = document.createElement('div');
+    grid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 20px;';
+
+    oceanChannels.forEach((ch: any) => {
+      const card = document.createElement('div');
+      card.style.cssText = 'background: #10141e; border: 1px solid rgba(56,189,248,0.25); border-radius: 16px; overflow: hidden; cursor: pointer; transition: transform 0.2s ease, border-color 0.2s ease; position: relative;';
+      card.onmouseover = () => { card.style.transform = 'translateY(-4px)'; card.style.borderColor = '#38bdf8'; };
+      card.onmouseout = () => { card.style.transform = 'none'; card.style.borderColor = 'rgba(56,189,248,0.25)'; };
+
+      card.innerHTML = `
+        <div style="height: 140px; position: relative; overflow: hidden; background: #080c14; display: flex; align-items: center; justify-content: center;">
+          <img src="${ch.logo || ''}" alt="${escapeHtml(ch.name)}" style="max-width: 80%; max-height: 80%; object-fit: contain;" />
+          <div style="position: absolute; bottom: 10px; right: 10px; width: 32px; height: 32px; border-radius: 50%; background: #38bdf8; color: #06070a; display: flex; align-items: center; justify-content: center; font-weight: bold;">▶</div>
+        </div>
+        <div style="padding: 14px;">
+          <h4 style="margin: 0 0 4px; font-size: 15px; font-weight: 700; color: #fff;">${escapeHtml(ch.name)}</h4>
+          <span style="display: inline-block; background: rgba(56,189,248,0.2); color: #38bdf8; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px;">24/7 LIVE STREAM</span>
+        </div>
+      `;
+
+      card.onclick = () => {
+        import('./vod').then(vod => vod.openVodDetails({
+          id: ch.id,
+          title: ch.name,
+          type: 'live',
+          poster: ch.logo || null,
+          banner: ch.logo || null,
+          summary: '24/7 Live Stream',
+          genre: 'Ocean & Nature',
+        }));
+      };
+
+      grid.appendChild(card);
+    });
+
+    section.appendChild(grid);
+    container.appendChild(section);
+  } catch {
+    container.innerHTML = '<div style="padding: 24px; color: #ff5e7e;">Failed to load ocean streams.</div>';
   }
 }
 
