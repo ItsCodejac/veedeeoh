@@ -135,7 +135,9 @@ export function openSleepTimerModal(): void {
 
   modal.innerHTML = `
     <div style="background: #10141e; border: 1px solid rgba(255,255,255,0.15); border-radius: 24px; max-width: 400px; width: 100%; padding: 32px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.9);">
-      <div style="font-size: 40px; margin-bottom: 8px;">🌙</div>
+      <div style="margin-bottom: 8px; display: flex; justify-content: center;">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+      </div>
       <h2 style="margin: 0 0 6px; font-size: 24px; font-weight: 800;">veedeeoh.zzz</h2>
       <p style="margin: 0 0 24px; color: #9aa5b5; font-size: 14px;">Select a sleep timer duration with smooth audio fade</p>
       

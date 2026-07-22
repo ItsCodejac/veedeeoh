@@ -55,7 +55,9 @@ export function promptPinVerification(correctPin: string, onSuccess: () => void)
 
   modal.innerHTML = `
     <div style="background: #10141e; border: 1px solid rgba(255,255,255,0.15); border-radius: 20px; max-width: 360px; width: 100%; padding: 32px; text-align: center; color: #fff; font-family: 'Space Grotesk', sans-serif; box-shadow: 0 20px 50px rgba(0,0,0,0.9);">
-      <div style="font-size: 36px; margin-bottom: 12px;">🔒</div>
+      <div style="margin-bottom: 12px; display: flex; justify-content: center;">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#c5f04e" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+      </div>
       <h3 style="margin: 0 0 8px; font-size: 20px;">Parent PIN Required</h3>
       <p style="margin: 0 0 20px; color: #9aa5b5; font-size: 14px;">Enter 4-digit Master PIN to proceed</p>
       <input type="password" id="pinInput" maxlength="4" placeholder="••••" style="width: 140px; font-size: 28px; letter-spacing: 8px; text-align: center; background: #080a10; border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; color: #c5f04e; padding: 10px; margin-bottom: 20px; outline: none;" autofocus />
@@ -122,8 +124,8 @@ export function openProfileSwitcher(onSelectProfile?: (p: HouseholdProfile) => v
             <div style="
               width: 100px; height: 100px; border-radius: 20px; background: ${p.avatar_color}; display: flex; align-items: center; justify-content: center; font-size: 40px; font-weight: 800; color: #06070a; box-shadow: ${p.id === active.id ? '0 0 0 4px #c5f04e, 0 12px 30px rgba(197,240,78,0.4)' : '0 8px 24px rgba(0,0,0,0.5)'}; position: relative;
             ">
-              ${p.is_kids ? '🎈' : p.name.charAt(0).toUpperCase()}
-              ${p.pin ? `<span style="position: absolute; bottom: 6px; right: 6px; font-size: 14px;">🔒</span>` : ''}
+              ${p.is_kids ? '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#06070a" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>' : p.name.charAt(0).toUpperCase()}
+              ${p.pin ? `<span style="position: absolute; bottom: 6px; right: 6px; display: flex;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#06070a" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></span>` : ''}
             </div>
             <span style="font-size: 16px; font-weight: 700; color: #fff;">${escapeHtml(p.name)}</span>
           </button>
