@@ -1,0 +1,96 @@
+import { VodItem } from './types';
+import { openVodDetails } from './vod';
+
+export const OCEAN_STREAMS: VodItem[] = [
+  {
+    id: 'ocean_animals_tv',
+    title: 'Ocean Animals TV (Pluto FAST)',
+    type: 'live',
+    poster: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=800&q=80',
+    summary: '24/7 HD live stream of tropical reefs, sharks, sea turtles, and ocean wildlife.',
+    genre: 'Marine / Nature',
+    provider: 'Pluto TV',
+    url: 'https://pluto.tv/'
+  },
+  {
+    id: 'monterey_bay_kelp',
+    title: 'Monterey Bay Kelp Forest Cam',
+    type: 'live',
+    poster: 'https://images.unsplash.com/photo-1582967788606-a171c1080cb0?auto=format&fit=crop&w=800&q=80',
+    summary: 'Live undersea view of giant kelp forest habitat featuring leopard sharks and sea otters.',
+    genre: 'Live Cam',
+    provider: 'Monterey Bay Aquarium',
+    url: 'https://www.youtube.com/watch?v=live'
+  },
+  {
+    id: 'coral_reef_cam',
+    title: 'Coral Reef World Wildlife',
+    type: 'live',
+    poster: 'https://images.unsplash.com/photo-1546026423-cc4642628d2b?auto=format&fit=crop&w=800&q=80',
+    summary: 'Vibrant Pacific coral reef marine life, clownfish, and stingrays.',
+    genre: 'Live Cam',
+    provider: 'Reef Life HD',
+    url: 'https://pluto.tv/'
+  },
+  {
+    id: 'deep_sea_abyss',
+    title: 'Deep Sea Abyss Exploration',
+    type: 'live',
+    poster: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80',
+    summary: 'High-definition deep ocean footage and bioluminescent underwater creatures.',
+    genre: 'Documentary',
+    provider: 'OceanX',
+    url: 'https://pluto.tv/'
+  }
+];
+
+export function renderOceanTv(container: HTMLElement): void {
+  container.innerHTML = '';
+
+  const section = document.createElement('div');
+  section.className = 'showcaseRail';
+  section.style.marginBottom = '32px';
+
+  const header = document.createElement('h3');
+  header.style.cssText = 'font-size: 20px; font-weight: 800; color: #38bdf8; margin: 0 0 16px; display: flex; align-items: center; gap: 8px;';
+  header.innerHTML = `
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12c5.523 0 10-4.477 10-10 0 5.523 4.477 10 10 10-5.523 0-10 4.477-10 10 0-5.523-4.477-10-10-10z"></path></svg>
+    <span>🌊 Live Marine & Coral Reef Cams</span>
+  `;
+  section.appendChild(header);
+
+  const row = document.createElement('div');
+  row.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px;';
+
+  OCEAN_STREAMS.forEach(item => {
+    const card = document.createElement('div');
+    card.style.cssText = 'background: #0f172a; border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 16px; overflow: hidden; cursor: pointer; transition: transform 0.2s ease, border-color 0.2s ease; position: relative;';
+    card.onmouseover = () => { card.style.transform = 'translateY(-4px)'; card.style.borderColor = '#38bdf8'; };
+    card.onmouseout = () => { card.style.transform = 'none'; card.style.borderColor = 'rgba(56, 189, 248, 0.3)'; };
+
+    card.innerHTML = `
+      <div style="height: 150px; position: relative; overflow: hidden;">
+        <img src="${item.poster}" alt="${item.title}" style="width: 100%; height: 100%; object-fit: cover;" />
+        <div style="position: absolute; inset: 0; background: linear-gradient(180deg, transparent 40%, rgba(15, 23, 42, 0.9) 100%);"></div>
+        <div style="position: absolute; bottom: 12px; left: 12px; right: 12px; display: flex; align-items: center; justify-content: space-between;">
+          <span style="background: rgba(56, 189, 248, 0.3); backdrop-filter: blur(8px); border: 1px solid rgba(56, 189, 248, 0.5); color: #fff; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700;">${item.provider || 'LIVE STREAM'}</span>
+          <div style="width: 32px; height: 32px; border-radius: 50%; background: #38bdf8; color: #0f172a; display: flex; align-items: center; justify-content: center; font-weight: bold;">▶</div>
+        </div>
+      </div>
+      <div style="padding: 16px;">
+        <h4 style="margin: 0 0 6px; font-size: 15px; font-weight: 700; color: #fff;">${item.title}</h4>
+        <p style="margin: 0; font-size: 12px; color: #94a3b8; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${item.summary}</p>
+      </div>
+    `;
+
+    card.onclick = () => {
+      // Play with the standard platform player!
+      openVodDetails(item);
+    };
+
+    row.appendChild(card);
+  });
+
+  section.appendChild(row);
+  container.appendChild(section);
+}
