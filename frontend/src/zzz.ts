@@ -1,51 +1,143 @@
 import { SleepTimerConfig, VodItem } from './types';
 
-export const AMBIENT_SLEEP_ITEMS: VodItem[] = [
+export interface ZzzCategory {
+  title: string;
+  badge: string;
+  iconSvg: string;
+  items: VodItem[];
+}
+
+export const ZZZ_GROUNDING_CATEGORIES: ZzzCategory[] = [
   {
-    id: 'zzz_fireplace',
-    title: '4K Cozy Fireplace & Crackling Log',
-    type: 'movie',
-    poster: 'https://images.unsplash.com/photo-1542296332-2e4473faf563?w=600&auto=format&fit=crop&q=80',
-    banner: 'https://images.unsplash.com/photo-1542296332-2e4473faf563?w=1200&auto=format&fit=crop&q=80',
-    summary: 'Warm crackling fireplace ambiance in crisp 4K Ultra HD. Deep relaxing embers and gentle fire sounds.',
-    genre: 'Sleep & Ambient',
-    rating: 'G',
-    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4'
+    title: '🌙 Sleep (Bedtime & Nightstand)',
+    badge: 'SLEEP',
+    iconSvg: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`,
+    items: [
+      {
+        id: 'zzz_fireplace',
+        title: '4K Cozy Fireplace & Crackling Log',
+        type: 'movie',
+        poster: 'https://images.unsplash.com/photo-1542296332-2e4473faf563?w=600&auto=format&fit=crop&q=80',
+        banner: 'https://images.unsplash.com/photo-1542296332-2e4473faf563?w=1200&auto=format&fit=crop&q=80',
+        summary: 'Warm crackling fireplace ambiance in crisp 4K. Deep relaxing embers with zero commercial interruptions.',
+        genre: 'Sleep',
+        rating: 'G',
+        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4'
+      },
+      {
+        id: 'zzz_rain',
+        title: 'Heavy Night Rain & Thunder on Glass',
+        type: 'movie',
+        poster: 'https://images.unsplash.com/photo-1515694346937-94d85e41e6f0?w=600&auto=format&fit=crop&q=80',
+        banner: 'https://images.unsplash.com/photo-1515694346937-94d85e41e6f0?w=1200&auto=format&fit=crop&q=80',
+        summary: 'Gentle night rain falling against glass with distant rolling thunder for deep sleep and insomnia relief.',
+        genre: 'Sleep',
+        rating: 'G',
+        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
+      },
+      {
+        id: 'zzz_lullaby',
+        title: 'Nursery Lullabies & Galaxy Night Light',
+        type: 'movie',
+        poster: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=600&auto=format&fit=crop&q=80',
+        banner: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=1200&auto=format&fit=crop&q=80',
+        summary: 'Soothing soft music box lullabies paired with gentle galaxy projector animation for babies and toddlers.',
+        genre: 'Sleep',
+        rating: 'G',
+        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4'
+      }
+    ]
   },
   {
-    id: 'zzz_rain',
-    title: 'Night Rain & Thunder on Window Glass',
-    type: 'movie',
-    poster: 'https://images.unsplash.com/photo-1515694346937-94d85e41e6f0?w=600&auto=format&fit=crop&q=80',
-    banner: 'https://images.unsplash.com/photo-1515694346937-94d85e41e6f0?w=1200&auto=format&fit=crop&q=80',
-    summary: 'Gentle night rain falling against glass with distant rolling thunder for deep sleep and insomnia relief.',
-    genre: 'Sleep & Ambient',
-    rating: 'G',
-    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
+    title: '☀️ Wake (Sunrise & Morning Alarm)',
+    badge: 'WAKE',
+    iconSvg: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>`,
+    items: [
+      {
+        id: 'zzz_sunrise',
+        title: 'Golden Horizon Sunrise & Morning Birdsong',
+        type: 'movie',
+        poster: 'https://images.unsplash.com/photo-1470240731273-7821a6eeb6bd?w=600&auto=format&fit=crop&q=80',
+        banner: 'https://images.unsplash.com/photo-1470240731273-7821a6eeb6bd?w=1200&auto=format&fit=crop&q=80',
+        summary: 'Gradual golden hour morning glow with natural forest birdsong for gentle non-jarring wakeup.',
+        genre: 'Wake',
+        rating: 'G',
+        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4'
+      },
+      {
+        id: 'zzz_coastal_tide',
+        title: 'Pacific Morning Shore & Gentle Tides',
+        type: 'movie',
+        poster: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&auto=format&fit=crop&q=80',
+        banner: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&auto=format&fit=crop&q=80',
+        summary: 'Crisp morning ocean tides washing over sunlit sandy beaches. Refreshing morning audio ambiance.',
+        genre: 'Wake',
+        rating: 'G',
+        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyplays.mp4'
+      }
+    ]
   },
   {
-    id: 'zzz_nebula',
-    title: 'Deep Space Nebula & Delta Waves',
-    type: 'movie',
-    poster: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&auto=format&fit=crop&q=80',
-    banner: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1200&auto=format&fit=crop&q=80',
-    summary: 'Slow motion cosmic starfield drifting with 432Hz delta binaural beats for deep REM sleep.',
-    genre: 'Sleep & Ambient',
-    rating: 'G',
-    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4'
+    title: '✨ Vibe (Chill & Ambient Drift)',
+    badge: 'VIBE',
+    iconSvg: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>`,
+    items: [
+      {
+        id: 'zzz_lofi',
+        title: 'Lo-Fi Chill & Nightland Radio Beats',
+        type: 'movie',
+        poster: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=600&auto=format&fit=crop&q=80',
+        banner: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=1200&auto=format&fit=crop&q=80',
+        summary: 'Relaxing lo-fi study and sleep beats with continuous animated nightland window visuals.',
+        genre: 'Vibe',
+        rating: 'G',
+        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4'
+      },
+      {
+        id: 'zzz_synth_drive',
+        title: 'Neon Synthwave Night Drive & Rain',
+        type: 'movie',
+        poster: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=600&auto=format&fit=crop&q=80',
+        banner: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=1200&auto=format&fit=crop&q=80',
+        summary: 'Smooth retro synthwave audio paired with endless rainy highway visuals. Perfect evening background vibe.',
+        genre: 'Vibe',
+        rating: 'G',
+        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackSpecial.mp4'
+      }
+    ]
   },
   {
-    id: 'zzz_lullaby',
-    title: 'Baby Lullabies & Starry Night Light',
-    type: 'movie',
-    poster: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=600&auto=format&fit=crop&q=80',
-    banner: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=1200&auto=format&fit=crop&q=80',
-    summary: 'Soothing soft music box lullabies paired with gentle galaxy projector animation for babies and toddlers.',
-    genre: 'Sleep & Ambient',
-    rating: 'G',
-    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4'
+    title: '🧘 Meditate (Deep Mind & Zen)',
+    badge: 'MEDITATE',
+    iconSvg: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>`,
+    items: [
+      {
+        id: 'zzz_binaural',
+        title: '432Hz Deep Space Delta Binaural Beats',
+        type: 'movie',
+        poster: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&auto=format&fit=crop&q=80',
+        banner: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1200&auto=format&fit=crop&q=80',
+        summary: 'Pure 432Hz tuning and binaural delta wave frequencies for deep meditation, stress relief, and REM sleep.',
+        genre: 'Meditate',
+        rating: 'G',
+        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4'
+      },
+      {
+        id: 'zzz_zen_bamboo',
+        title: 'Kyoto Zen Garden & Bamboo Water Fountain',
+        type: 'movie',
+        poster: 'https://images.unsplash.com/photo-1503899036084-c55cdd92da26?w=600&auto=format&fit=crop&q=80',
+        banner: 'https://images.unsplash.com/photo-1503899036084-c55cdd92da26?w=1200&auto=format&fit=crop&q=80',
+        summary: 'Tranquil Japanese bamboo water spout (Shishi-odoshi) with Tibetan singing bowls for mindful breathing.',
+        genre: 'Meditate',
+        rating: 'G',
+        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WhatCarCanYouGetForAGrand.mp4'
+      }
+    ]
   }
 ];
+
+export const AMBIENT_SLEEP_ITEMS: VodItem[] = ZZZ_GROUNDING_CATEGORIES.flatMap(c => c.items);
 
 let timerInterval: number | null = null;
 let timerState: SleepTimerConfig = {
@@ -206,52 +298,54 @@ export function renderZzzSanctuary(container: HTMLElement | null): void {
     container.appendChild(favSection);
   }
 
-  // 2. Curated Sleep & Ambient Soundscapes Rail
-  const section = document.createElement('div');
-  section.className = 'showcaseRail';
-  section.style.marginBottom = '32px';
+  // 2. Curated Grounding Pillars (Sleep, Wake, Vibe, Meditate)
+  ZZZ_GROUNDING_CATEGORIES.forEach(cat => {
+    const section = document.createElement('div');
+    section.className = 'showcaseRail';
+    section.style.marginBottom = '32px';
 
-  const header = document.createElement('h3');
-  header.style.cssText = 'font-size: 20px; font-weight: 800; color: #a78bfa; margin: 0 0 16px; display: flex; align-items: center; gap: 8px;';
-  header.innerHTML = `
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-    <span>Sleep & Ambient Soundscapes</span>
-  `;
-  section.appendChild(header);
-
-  const row = document.createElement('div');
-  row.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px;';
-
-  AMBIENT_SLEEP_ITEMS.forEach(item => {
-    const card = document.createElement('div');
-    card.style.cssText = 'background: #10141e; border: 1px solid rgba(167,139,250,0.2); border-radius: 16px; overflow: hidden; cursor: pointer; transition: transform 0.2s ease, border-color 0.2s ease; position: relative;';
-    card.onmouseover = () => { card.style.transform = 'translateY(-4px)'; card.style.borderColor = '#a78bfa'; };
-    card.onmouseout = () => { card.style.transform = 'none'; card.style.borderColor = 'rgba(167,139,250,0.2)'; };
-
-    card.innerHTML = `
-      <div style="height: 150px; position: relative; overflow: hidden;">
-        <img src="${item.poster}" alt="${escapeHtml(item.title)}" style="width: 100%; height: 100%; object-fit: cover;" />
-        <div style="position: absolute; inset: 0; background: linear-gradient(180deg, transparent 40%, rgba(6,7,10,0.9) 100%);"></div>
-        <div style="position: absolute; bottom: 12px; left: 12px; right: 12px; display: flex; align-items: center; justify-content: space-between;">
-          <span style="background: rgba(167,139,250,0.3); backdrop-filter: blur(8px); border: 1px solid rgba(167,139,250,0.5); color: #fff; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700;">AMBIENT</span>
-          <div style="width: 32px; height: 32px; border-radius: 50%; background: #a78bfa; color: #06070a; display: flex; align-items: center; justify-content: center; font-weight: bold;">▶</div>
-        </div>
-      </div>
-      <div style="padding: 16px;">
-        <h4 style="margin: 0 0 6px; font-size: 15px; font-weight: 700; color: #fff;">${escapeHtml(item.title)}</h4>
-        <p style="margin: 0; font-size: 12px; color: #9aa5b5; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${escapeHtml(item.summary)}</p>
-      </div>
+    const header = document.createElement('h3');
+    header.style.cssText = 'font-size: 20px; font-weight: 800; color: #a78bfa; margin: 0 0 16px; display: flex; align-items: center; gap: 8px;';
+    header.innerHTML = `
+      ${cat.iconSvg}
+      <span>${escapeHtml(cat.title)}</span>
     `;
+    section.appendChild(header);
 
-    card.onclick = () => {
-      import('./vod').then(vod => vod.openVodDetails(item));
-    };
+    const row = document.createElement('div');
+    row.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px;';
 
-    row.appendChild(card);
+    cat.items.forEach(item => {
+      const card = document.createElement('div');
+      card.style.cssText = 'background: #10141e; border: 1px solid rgba(167,139,250,0.2); border-radius: 16px; overflow: hidden; cursor: pointer; transition: transform 0.2s ease, border-color 0.2s ease; position: relative;';
+      card.onmouseover = () => { card.style.transform = 'translateY(-4px)'; card.style.borderColor = '#a78bfa'; };
+      card.onmouseout = () => { card.style.transform = 'none'; card.style.borderColor = 'rgba(167,139,250,0.2)'; };
+
+      card.innerHTML = `
+        <div style="height: 150px; position: relative; overflow: hidden;">
+          <img src="${item.poster}" alt="${escapeHtml(item.title)}" style="width: 100%; height: 100%; object-fit: cover;" />
+          <div style="position: absolute; inset: 0; background: linear-gradient(180deg, transparent 40%, rgba(6,7,10,0.9) 100%);"></div>
+          <div style="position: absolute; bottom: 12px; left: 12px; right: 12px; display: flex; align-items: center; justify-content: space-between;">
+            <span style="background: rgba(167,139,250,0.3); backdrop-filter: blur(8px); border: 1px solid rgba(167,139,250,0.5); color: #fff; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700;">${cat.badge}</span>
+            <div style="width: 32px; height: 32px; border-radius: 50%; background: #a78bfa; color: #06070a; display: flex; align-items: center; justify-content: center; font-weight: bold;">▶</div>
+          </div>
+        </div>
+        <div style="padding: 16px;">
+          <h4 style="margin: 0 0 6px; font-size: 15px; font-weight: 700; color: #fff;">${escapeHtml(item.title)}</h4>
+          <p style="margin: 0; font-size: 12px; color: #9aa5b5; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${escapeHtml(item.summary)}</p>
+        </div>
+      `;
+
+      card.onclick = () => {
+        import('./vod').then(vod => vod.openVodDetails(item));
+      };
+
+      row.appendChild(card);
+    });
+
+    section.appendChild(row);
+    container.appendChild(section);
   });
-
-  section.appendChild(row);
-  container.appendChild(section);
 
   // Wire Top Floating Controls Bar
   wireZzzControlBar();
