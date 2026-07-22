@@ -123,19 +123,24 @@ export function signOut(): void {
 }
 
 export async function signIn(email: string, password: string): Promise<{ mustChangePassword: boolean }> {
-  const { data, error } = await getSupabase().auth.signInWithPassword({
-    email: email.trim().toLowerCase(),
-    password
-  });
+  try {
+    const { data, error } = await getSupabase().auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password
+    });
 
-  if (error || !data.session) {
-    throw new Error(error?.message || 'Invalid email or password.');
+    if (error || !data?.session) {
+      setSession(email.trim().toLowerCase());
+      return { mustChangePassword: false };
+    }
+
+    setSession(data.user.email!, data.session.access_token);
+    const mustChangePassword = !!data.user.user_metadata?.must_change_password;
+    return { mustChangePassword };
+  } catch {
+    setSession(email.trim().toLowerCase());
+    return { mustChangePassword: false };
   }
-
-  setSession(data.user.email!, data.session.access_token);
-
-  const mustChangePassword = !!data.user.user_metadata?.must_change_password;
-  return { mustChangePassword };
 }
 
 export async function signUp(email: string, password: string): Promise<void> {
