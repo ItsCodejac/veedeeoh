@@ -22,7 +22,7 @@ export const ZZZ_GROUNDING_CATEGORIES: ZzzCategory[] = [
         summary: 'Warm crackling fireplace ambiance in crisp 4K. Deep relaxing embers with zero commercial interruptions.',
         genre: 'Sleep',
         rating: 'G',
-        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4'
+        url: 'https://vjs.zencdn.net/v/oceans.mp4'
       },
       {
         id: 'zzz_rain',
@@ -33,7 +33,7 @@ export const ZZZ_GROUNDING_CATEGORIES: ZzzCategory[] = [
         summary: 'Gentle night rain falling against glass with distant rolling thunder for deep sleep and insomnia relief.',
         genre: 'Sleep',
         rating: 'G',
-        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
+        url: 'https://media.w3.org/2010/05/sintel/trailer.mp4'
       },
       {
         id: 'zzz_lullaby',
@@ -44,7 +44,7 @@ export const ZZZ_GROUNDING_CATEGORIES: ZzzCategory[] = [
         summary: 'Soothing soft music box lullabies paired with gentle galaxy projector animation for babies and toddlers.',
         genre: 'Sleep',
         rating: 'G',
-        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4'
+        url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'
       }
     ]
   },
@@ -62,7 +62,7 @@ export const ZZZ_GROUNDING_CATEGORIES: ZzzCategory[] = [
         summary: 'Gradual golden hour morning glow with natural forest birdsong for gentle non-jarring wakeup.',
         genre: 'Wake',
         rating: 'G',
-        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4'
+        url: 'https://vjs.zencdn.net/v/oceans.mp4'
       },
       {
         id: 'zzz_coastal_tide',
@@ -73,7 +73,7 @@ export const ZZZ_GROUNDING_CATEGORIES: ZzzCategory[] = [
         summary: 'Crisp morning ocean tides washing over sunlit sandy beaches. Refreshing morning audio ambiance.',
         genre: 'Wake',
         rating: 'G',
-        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyplays.mp4'
+        url: 'https://media.w3.org/2010/05/sintel/trailer.mp4'
       }
     ]
   },
@@ -91,7 +91,7 @@ export const ZZZ_GROUNDING_CATEGORIES: ZzzCategory[] = [
         summary: 'Relaxing lo-fi study and sleep beats with continuous animated nightland window visuals.',
         genre: 'Vibe',
         rating: 'G',
-        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4'
+        url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'
       },
       {
         id: 'zzz_synth_drive',
@@ -102,7 +102,7 @@ export const ZZZ_GROUNDING_CATEGORIES: ZzzCategory[] = [
         summary: 'Smooth retro synthwave audio paired with endless rainy highway visuals. Perfect evening background vibe.',
         genre: 'Vibe',
         rating: 'G',
-        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackSpecial.mp4'
+        url: 'https://vjs.zencdn.net/v/oceans.mp4'
       }
     ]
   },
@@ -120,7 +120,7 @@ export const ZZZ_GROUNDING_CATEGORIES: ZzzCategory[] = [
         summary: 'Pure 432Hz tuning and binaural delta wave frequencies for deep meditation, stress relief, and REM sleep.',
         genre: 'Meditate',
         rating: 'G',
-        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4'
+        url: 'https://media.w3.org/2010/05/sintel/trailer.mp4'
       },
       {
         id: 'zzz_zen_bamboo',
@@ -131,7 +131,7 @@ export const ZZZ_GROUNDING_CATEGORIES: ZzzCategory[] = [
         summary: 'Tranquil Japanese bamboo water spout (Shishi-odoshi) with Tibetan singing bowls for mindful breathing.',
         genre: 'Meditate',
         rating: 'G',
-        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WhatCarCanYouGetForAGrand.mp4'
+        url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'
       }
     ]
   }
