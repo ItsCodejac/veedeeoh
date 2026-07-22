@@ -75,7 +75,11 @@ function wireSidebar(): void {
     } else if (activeTabId === "tabOcean") {
       if (brand) brand.innerHTML = `veedeeoh<span style="color:#38bdf8;">.ocean</span>`;
       if (mobileBrand) mobileBrand.innerHTML = `v<span style="color:#38bdf8;">.ocean</span>`;
-      document.body.classList.remove("zzz-mode-active");
+      document.body.classList.add("zzz-mode-active");
+
+      if ("wakeLock" in navigator) {
+        navigator.wakeLock.request("screen").catch(() => {});
+      }
     } else {
       if (brand) brand.innerHTML = `veedeeoh<span>.</span>`;
       if (mobileBrand) mobileBrand.innerHTML = `v<span>.</span>`;
@@ -103,7 +107,7 @@ function wireSidebar(): void {
       import("./zzz").then(zzz => zzz.renderZzzSanctuary($("zzzRails")));
     } else if (activeTabId === "tabOcean") {
       $("oceanView").removeAttribute("hidden");
-      import("./ocean").then(ocean => ocean.renderOceanSanctuary());
+      import("./ocean").then(ocean => ocean.renderOceanSanctuary($("oceanRails")));
     }
   }
 
