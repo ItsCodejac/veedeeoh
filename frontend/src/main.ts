@@ -241,6 +241,13 @@ function wireHeader(): void {
     });
   }
 
+  const sidebarUser = $("sidebarUser");
+  if (sidebarUser && headerUserBadge) {
+    sidebarUser.addEventListener("click", () => {
+      headerUserBadge.click();
+    });
+  }
+
   if (searchInput) {
     searchInput.addEventListener("input", (e) => {
       clearTimeout(searchTimer);
