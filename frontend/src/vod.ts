@@ -697,6 +697,25 @@ export async function openVodDetails(item: VodItem): Promise<void> {
   const select = $<HTMLSelectElement>("vdSeasonSelect");
   const grid = $("vdEpisodeGrid");
   const playBtn = $<HTMLButtonElement>("vdPlayBtn");
+  const addZzzBtn = $<HTMLButtonElement>("vdAddZzzBtn");
+
+  if (addZzzBtn) {
+    import("./zzz").then(zzz => {
+      const isPinned = zzz.isZzzFavorite(item.id);
+      addZzzBtn.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="${isPinned ? '#a78bfa' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+        <span>${isPinned ? 'Added to zzz' : 'Add to zzz'}</span>
+      `;
+      addZzzBtn.onclick = () => {
+        zzz.toggleZzzFavorite(item);
+        const nowPinned = zzz.isZzzFavorite(item.id);
+        addZzzBtn.innerHTML = `
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="${nowPinned ? '#a78bfa' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+          <span>${nowPinned ? 'Added to zzz' : 'Add to zzz'}</span>
+        `;
+      };
+    });
+  }
 
   selectContainer.hidden = true;
   select.replaceChildren();
