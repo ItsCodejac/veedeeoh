@@ -6,7 +6,8 @@ const SESSION_TTL = 5 * 60 * 1000;
 const CATALOG_TTL = 5 * 60 * 1000;
 
 const ANIME_RE = /anime|naruto|one piece|dragon ?ball|jojo|sailor moon|gundam|bleach|yu-gi-oh|shonen|ghibli|evangelion|cowboy bebop|akira|slayer/i;
-const AMBIENT_SLEEP_RE = /ambient|sleep|relaxation|naturescape|zenlife|white noise|rain sounds|binaural|meditation|lullaby|fireplace|soundscape|ocean waves|stingray/i;
+const AMBIENT_SLEEP_RE = /ambient|sleep|relaxation|naturescape|zenlife|white noise|rain sounds|binaural|meditation|lullaby|fireplace|soundscape|stingray/i;
+const OCEAN_RE = /ocean|shark|marine|underwater|sea life|tide pool|pink dolphin|whales|oyster farmers/i;
 
 let _sessions: Record<string, any> = {};
 let _catalogs: Record<string, any> = {};
@@ -128,6 +129,7 @@ export async function getCatalog(regionCode?: string): Promise<{ rails: any[]; s
   const rawRails: any[] = [];
   const seenAnime: Record<string, any> = {};
   const seenSleep: Record<string, any> = {};
+  const seenOcean: Record<string, any> = {};
 
   if (plutoData && plutoSession) {
     for (const cat of plutoData.categories || []) {
@@ -149,6 +151,9 @@ export async function getCatalog(regionCode?: string): Promise<{ rails: any[]; s
         if (AMBIENT_SLEEP_RE.test(`${n.title} ${n.genre || ""} ${cat.name || ""}`)) {
           seenSleep[n.id] = n;
         }
+        if (OCEAN_RE.test(`${n.title} ${n.genre || ""} ${cat.name || ""}`)) {
+          seenOcean[n.id] = n;
+        }
       }
     }
   }
@@ -162,6 +167,9 @@ export async function getCatalog(regionCode?: string): Promise<{ rails: any[]; s
       }
       if (AMBIENT_SLEEP_RE.test(`${item.title} ${item.genre || ""} ${tr.name || ""}`)) {
         seenSleep[item.id] = item;
+      }
+      if (OCEAN_RE.test(`${item.title} ${item.genre || ""} ${tr.name || ""}`)) {
+        seenOcean[item.id] = item;
       }
     }
   }
@@ -180,6 +188,11 @@ export async function getCatalog(regionCode?: string): Promise<{ rails: any[]; s
   const allSleep = Object.values(seenSleep);
   if (allSleep.length > 0) {
     rawRails.unshift({ name: "🌙 Sleep & Ambient Soundscapes", items: allSleep });
+  }
+
+  const allOcean = Object.values(seenOcean);
+  if (allOcean.length > 0) {
+    rawRails.unshift({ name: "🌊 Ocean Animals TV", items: allOcean });
   }
 
   // Merge & Deduplicate rails by category name & title

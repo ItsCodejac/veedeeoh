@@ -998,6 +998,80 @@ export function wireSearchInputs(): void {
   }
 }
 
+export async function renderOceanTvView(container: HTMLElement): Promise<void> {
+  container.replaceChildren();
+
+  const loading = document.createElement("div");
+  loading.style.cssText = "padding: 40px; text-align: center; color: #38bdf8; font-weight: 700;";
+  loading.textContent = "Loading Ocean Wildlife & Deep Sea Streams...";
+  container.appendChild(loading);
+
+  try {
+    const rails = await getVodRails();
+    container.replaceChildren();
+
+    const oceanRails = rails.filter(r => /ocean|shark|planet hd|whale|marine|sea|tide pool|oyster/i.test(r.name));
+
+    if (oceanRails.length === 0) {
+      const empty = document.createElement("div");
+      empty.style.cssText = "padding: 40px; text-align: center; color: #9aa5b5;";
+      empty.textContent = "No Ocean TV streams currently available.";
+      container.appendChild(empty);
+      return;
+    }
+
+    oceanRails.forEach(rail => {
+      const section = document.createElement('div');
+      section.className = 'showcaseRail';
+      section.style.marginBottom = '32px';
+
+      const header = document.createElement('h3');
+      header.style.cssText = 'font-size: 20px; font-weight: 800; color: #38bdf8; margin: 0 0 16px; display: flex; align-items: center; gap: 8px;';
+      header.innerHTML = `
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12c.6 0 1.2-.2 1.7-.7l.3-.3c1-1 2.6-1 3.6 0l.3.3c.9.9 2.5.9 3.4 0l.3-.3c1-1 2.6-1 3.6 0l.3.3c.9.9 2.5.9 3.4 0l.3-.3c.5-.5 1.1-.7 1.7-.7M2 17c.6 0 1.2-.2 1.7-.7l.3-.3c1-1 2.6-1 3.6 0l.3.3c.9.9 2.5.9 3.4 0l.3-.3c1-1 2.6-1 3.6 0l.3.3c.9.9 2.5.9 3.4 0l.3-.3c.5-.5 1.1-.7 1.7-.7"></path></svg>
+        <span>${escapeHtml(rail.name)}</span>
+      `;
+      section.appendChild(header);
+
+      const row = document.createElement('div');
+      row.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px;';
+
+      rail.items.forEach((item: VodItem) => {
+        const card = document.createElement('div');
+        card.style.cssText = 'background: #10141e; border: 1px solid rgba(56,189,248,0.2); border-radius: 16px; overflow: hidden; cursor: pointer; transition: transform 0.2s ease, border-color 0.2s ease; position: relative;';
+        card.onmouseover = () => { card.style.transform = 'translateY(-4px)'; card.style.borderColor = '#38bdf8'; };
+        card.onmouseout = () => { card.style.transform = 'none'; card.style.borderColor = 'rgba(56,189,248,0.2)'; };
+
+        card.innerHTML = `
+          <div style="height: 150px; position: relative; overflow: hidden;">
+            <img src="${item.poster || item.banner || ''}" alt="${escapeHtml(item.title)}" style="width: 100%; height: 100%; object-fit: cover;" />
+            <div style="position: absolute; inset: 0; background: linear-gradient(180deg, transparent 40%, rgba(6,7,10,0.9) 100%);"></div>
+            <div style="position: absolute; bottom: 12px; left: 12px; right: 12px; display: flex; align-items: center; justify-content: space-between;">
+              <span style="background: rgba(56,189,248,0.3); backdrop-filter: blur(8px); border: 1px solid rgba(56,189,248,0.5); color: #fff; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700;">${escapeHtml(item.provider || 'LIVE STREAM')}</span>
+              <div style="width: 32px; height: 32px; border-radius: 50%; background: #38bdf8; color: #06070a; display: flex; align-items: center; justify-content: center; font-weight: bold;">▶</div>
+            </div>
+          </div>
+          <div style="padding: 16px;">
+            <h4 style="margin: 0 0 6px; font-size: 15px; font-weight: 700; color: #fff;">${escapeHtml(item.title)}</h4>
+            <p style="margin: 0; font-size: 12px; color: #9aa5b5; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${escapeHtml(item.summary || item.genre || '')}</p>
+          </div>
+        `;
+
+        card.onclick = () => {
+          openVodDetails(item);
+        };
+
+        row.appendChild(card);
+      });
+
+      section.appendChild(row);
+      container.appendChild(section);
+    });
+  } catch (err) {
+    console.error("Failed to load Ocean TV view:", err);
+  }
+}
+
 let previousActivePanelId = "homeView";
 let previousScrollPos = 0;
 
