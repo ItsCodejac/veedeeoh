@@ -1026,6 +1026,24 @@ export function openCategoryView(titleName: string, items: VodItem[]): void {
   }
 }
 
+function getRailPriorityScore(name: string): number {
+  const n = name.toLowerCase();
+  if (n.includes("trending") || n.includes("popular") || n.includes("hit") || n.includes("top") || n.includes("binge")) return 1;
+  if (n.includes("blockbuster") || n.includes("hollywood") || n.includes("feature")) return 2;
+  if (n.includes("action") || n.includes("adventure")) return 3;
+  if (n.includes("drama")) return 4;
+  if (n.includes("comedy") || n.includes("standup")) return 5;
+  if (n.includes("crime") || n.includes("thriller")) return 6;
+  if (n.includes("sci-fi") || n.includes("cyberpunk") || n.includes("fantasy")) return 7;
+  if (n.includes("horror") || n.includes("monster")) return 8;
+  if (n.includes("docu") || n.includes("reality")) return 9;
+  
+  // Ambient, sleep soundscapes, and fireplaces push to the bottom
+  if (n.includes("sleep") || n.includes("ambient") || n.includes("soundscape") || n.includes("fireplace") || n.includes("relax")) return 999;
+  
+  return 50;
+}
+
 /** Render Shows (Series) only */
 export function renderShows(container: HTMLElement): void {
   container.replaceChildren();
@@ -1045,7 +1063,8 @@ export function renderShows(container: HTMLElement): void {
         const items = rail.items.filter((item) => item.series_id);
         return { name: rail.name, items };
       })
-      .filter((rail) => rail.items.length > 0);
+      .filter((rail) => rail.items.length > 0)
+      .sort((a, b) => getRailPriorityScore(a.name) - getRailPriorityScore(b.name));
 
     // Extract all unique genres for filter chips!
     const genresSet = new Set<string>();
@@ -1169,7 +1188,8 @@ export function renderMovies(container: HTMLElement): void {
         const items = rail.items.filter((item) => !item.series_id);
         return { name: rail.name, items };
       })
-      .filter((rail) => rail.items.length > 0);
+      .filter((rail) => rail.items.length > 0)
+      .sort((a, b) => getRailPriorityScore(a.name) - getRailPriorityScore(b.name));
 
     // Extract all unique genres for filter chips!
     const genresSet = new Set<string>();
@@ -1490,18 +1510,22 @@ export async function renderHome(): Promise<void> {
 
 
 
-    // Render Genre Rails (Posters)
-    Object.entries(movieGenres).forEach(([genre, items]) => {
-      if (items.length >= 3 && genre !== "Hit Films") {
-        renderGenreRail(`${genre} Movies`, items, false);
-      }
-    });
+    // Render Genre Rails (Posters) - Sorted by priority so Ambient & Fireplaces drop to bottom
+    Object.entries(movieGenres)
+      .sort(([a], [b]) => getRailPriorityScore(a) - getRailPriorityScore(b))
+      .forEach(([genre, items]) => {
+        if (items.length >= 3 && genre !== "Hit Films") {
+          renderGenreRail(`${genre} Movies`, items, false);
+        }
+      });
     
-    Object.entries(tvGenres).forEach(([genre, items]) => {
-      if (items.length >= 3 && genre !== "Binge-Worthy Series") {
-        renderGenreRail(`${genre} TV`, items, false);
-      }
-    });
+    Object.entries(tvGenres)
+      .sort(([a], [b]) => getRailPriorityScore(a) - getRailPriorityScore(b))
+      .forEach(([genre, items]) => {
+        if (items.length >= 3 && genre !== "Binge-Worthy Series") {
+          renderGenreRail(`${genre} TV`, items, false);
+        }
+      });
   } catch (err) {
     loading.textContent = `Failed to load Home dashboard: ${err}`;
   }
