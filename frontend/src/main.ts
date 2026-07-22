@@ -283,69 +283,106 @@ function wireHeader(): void {
   }
 }
 
-async function renderOceanView(container: HTMLElement | null): Promise<void> {
-  if (!container) return;
-  container.innerHTML = '<div style="padding: 24px; color: #38bdf8; font-weight: 700;">Loading 24/7 Ocean & Nature Streams...</div>';
-
-  try {
-    const res = await fetch('/api/catalog');
-    const data = await res.json();
-
-    const regex = /ocean|nature|reef|sea|marine|waterfall|planet|earth|animal|stingray|zenlife/i;
-    const oceanChannels = (data.channels || []).filter((ch: any) =>
-      regex.test(`${ch.name} ${ch.categories?.join(' ') || ''}`)
-    );
-
-    if (oceanChannels.length === 0) {
-      container.innerHTML = '<div style="padding: 24px; color: #9aa5b5;">No live ocean streams found in current region.</div>';
-      return;
-    }
-
-    container.replaceChildren();
-
-    const section = document.createElement('div');
-    section.className = 'showcaseRail';
-
-    const grid = document.createElement('div');
-    grid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 20px;';
-
-    oceanChannels.forEach((ch: any) => {
-      const card = document.createElement('div');
-      card.style.cssText = 'background: #10141e; border: 1px solid rgba(56,189,248,0.25); border-radius: 16px; overflow: hidden; cursor: pointer; transition: transform 0.2s ease, border-color 0.2s ease; position: relative;';
-      card.onmouseover = () => { card.style.transform = 'translateY(-4px)'; card.style.borderColor = '#38bdf8'; };
-      card.onmouseout = () => { card.style.transform = 'none'; card.style.borderColor = 'rgba(56,189,248,0.25)'; };
-
-      card.innerHTML = `
-        <div style="height: 140px; position: relative; overflow: hidden; background: #080c14; display: flex; align-items: center; justify-content: center;">
-          <img src="${ch.logo || ''}" alt="${escapeHtml(ch.name)}" style="max-width: 80%; max-height: 80%; object-fit: contain;" />
-          <div style="position: absolute; bottom: 10px; right: 10px; width: 32px; height: 32px; border-radius: 50%; background: #38bdf8; color: #06070a; display: flex; align-items: center; justify-content: center; font-weight: bold;">▶</div>
-        </div>
-        <div style="padding: 14px;">
-          <h4 style="margin: 0 0 4px; font-size: 15px; font-weight: 700; color: #fff;">${escapeHtml(ch.name)}</h4>
-          <span style="display: inline-block; background: rgba(56,189,248,0.2); color: #38bdf8; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px;">24/7 LIVE STREAM</span>
-        </div>
-      `;
-
-      card.onclick = () => {
-        import('./vod').then(vod => vod.openVodDetails({
-          id: ch.id,
-          title: ch.name,
-          type: 'live',
-          poster: ch.logo || null,
-          banner: ch.logo || null,
-          summary: '24/7 Live Stream',
-          genre: 'Ocean & Nature',
-        }));
-      };
-
-      grid.appendChild(card);
-    });
-
-    section.appendChild(grid);
-    container.appendChild(section);
-  } catch {
-    container.innerHTML = '<div style="padding: 24px; color: #ff5e7e;">Failed to load ocean streams.</div>';
+const OCEANIC_STREAMS = [
+  {
+    id: "ocean-coral-reef",
+    title: "Coral Reef Haven 4K",
+    summary: "Vibrant tropical reef soundscape with clownfish, sea turtles & gentle wave rhythms.",
+    badge: "CORAL REEF",
+    poster: "https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=800&q=80",
+    url: "https://vjs.zencdn.net/v/oceans.mp4"
+  },
+  {
+    id: "ocean-pacific-coast",
+    title: "Pacific Coast Wave Drift",
+    summary: "Crashing Pacific ocean swells against rugged coastal cliffs with 3D spatial wave audio.",
+    badge: "COASTAL SWELLS",
+    poster: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80",
+    url: "https://vjs.zencdn.net/v/oceans.mp4"
+  },
+  {
+    id: "ocean-deep-jellyfish",
+    title: "Deep Sea Jellyfish Sanctuary",
+    summary: "Bioluminescent moon jellyfish gliding through pitch-black abyssal ocean waters.",
+    badge: "DEEP SEA",
+    poster: "https://images.unsplash.com/photo-1544551763-77ef2d0cfc6c?auto=format&fit=crop&w=800&q=80",
+    url: "https://vjs.zencdn.net/v/oceans.mp4"
+  },
+  {
+    id: "ocean-kelp-forest",
+    title: "Monterey Kelp Forest",
+    summary: "Sunbeams streaming through giant kelp forests with sea otters & leopard sharks.",
+    badge: "KELP FOREST",
+    poster: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80",
+    url: "https://vjs.zencdn.net/v/oceans.mp4"
+  },
+  {
+    id: "ocean-hawaiian-sunset",
+    title: "Hawaiian Sunset Shore",
+    summary: "Golden hour sunset waves gently lapping white sand beaches at dusk.",
+    badge: "SUNSET SHORE",
+    poster: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80",
+    url: "https://vjs.zencdn.net/v/oceans.mp4"
+  },
+  {
+    id: "ocean-dolphin-lagoon",
+    title: "Maldives Azure Lagoon",
+    summary: "Crystal clear turquoise lagoon waters gently rippling under tropical palm trees.",
+    badge: "TROPICAL LAGOON",
+    poster: "https://images.unsplash.com/photo-1512100356356-de1b84283e18?auto=format&fit=crop&w=800&q=80",
+    url: "https://vjs.zencdn.net/v/oceans.mp4"
   }
+];
+
+function renderOceanView(container: HTMLElement | null): void {
+  if (!container) return;
+  container.replaceChildren();
+
+  const section = document.createElement('div');
+  section.className = 'showcaseRail';
+
+  const grid = document.createElement('div');
+  grid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 24px;';
+
+  OCEANIC_STREAMS.forEach((item) => {
+    const card = document.createElement('div');
+    card.style.cssText = 'background: #10141e; border: 1px solid rgba(56,189,248,0.25); border-radius: 16px; overflow: hidden; cursor: pointer; transition: transform 0.2s ease, border-color 0.2s ease; position: relative;';
+    card.onmouseover = () => { card.style.transform = 'translateY(-4px)'; card.style.borderColor = '#38bdf8'; };
+    card.onmouseout = () => { card.style.transform = 'none'; card.style.borderColor = 'rgba(56,189,248,0.25)'; };
+
+    card.innerHTML = `
+      <div style="height: 160px; position: relative; overflow: hidden;">
+        <img src="${item.poster}" alt="${escapeHtml(item.title)}" style="width: 100%; height: 100%; object-fit: cover;" />
+        <div style="position: absolute; inset: 0; background: linear-gradient(180deg, transparent 40%, rgba(6,7,10,0.9) 100%);"></div>
+        <div style="position: absolute; bottom: 12px; left: 12px; right: 12px; display: flex; align-items: center; justify-content: space-between;">
+          <span style="background: rgba(56,189,248,0.3); backdrop-filter: blur(8px); border: 1px solid rgba(56,189,248,0.5); color: #fff; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700;">${item.badge}</span>
+          <div style="width: 32px; height: 32px; border-radius: 50%; background: #38bdf8; color: #06070a; display: flex; align-items: center; justify-content: center; font-weight: bold;">▶</div>
+        </div>
+      </div>
+      <div style="padding: 16px;">
+        <h4 style="margin: 0 0 6px; font-size: 16px; font-weight: 700; color: #fff;">${escapeHtml(item.title)}</h4>
+        <p style="margin: 0; font-size: 12px; color: #9aa5b5; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${escapeHtml(item.summary)}</p>
+      </div>
+    `;
+
+    card.onclick = () => {
+      import('./zzz').then(zzz => zzz.playZzzAmbientItem({
+        id: item.id,
+        title: item.title,
+        type: 'ocean',
+        poster: item.poster,
+        banner: item.poster,
+        summary: item.summary,
+        genre: 'Oceanic Soundscapes',
+        url: item.url,
+      }));
+    };
+
+    grid.appendChild(card);
+  });
+
+  section.appendChild(grid);
+  container.appendChild(section);
 }
 
 import { initPWA } from "./pwa";
