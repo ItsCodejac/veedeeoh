@@ -137,3 +137,22 @@ export async function signIn(email: string, password: string): Promise<{ mustCha
   const mustChangePassword = !!data.user.user_metadata?.must_change_password;
   return { mustChangePassword };
 }
+
+export async function signUp(email: string, password: string): Promise<void> {
+  const cleanEmail = email.trim().toLowerCase();
+  const supabase = getSupabase();
+  const { data, error } = await supabase.auth.signUp({
+    email: cleanEmail,
+    password
+  });
+
+  if (error) {
+    throw new Error(error.message || 'Account registration failed.');
+  }
+
+  if (data.session) {
+    setSession(cleanEmail, data.session.access_token);
+  } else {
+    setSession(cleanEmail);
+  }
+}

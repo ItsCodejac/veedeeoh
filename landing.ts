@@ -1,4 +1,4 @@
-import { getSession, restoreSession, signIn, signUp } from './src/auth';
+import { getSession, restoreSession, signIn, signUp } from './frontend/src/auth';
 
 async function checkAuth() {
   const session = await restoreSession();
@@ -240,7 +240,7 @@ if (authForm) {
   });
 }
 
-import CURATED_POSTERS from './src/landing_posters.json';
+import CURATED_POSTERS from './frontend/src/landing_posters.json';
 
 const DEFAULT_ITEMS = CURATED_POSTERS;
 

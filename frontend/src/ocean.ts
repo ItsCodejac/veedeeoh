@@ -7,6 +7,45 @@ export interface ZzzCategory {
   items: VodItem[];
 }
 
+export interface OceanCategory {
+  title: string;
+  badge: string;
+  iconSvg: string;
+  items: VodItem[];
+}
+
+export const OCEAN_GROUNDING_CATEGORIES: OceanCategory[] = [
+  {
+    title: '🌊 Ocean Wildlife & Deep Reefs',
+    badge: 'OCEAN',
+    iconSvg: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path></svg>`,
+    items: [
+      {
+        id: 'ocean_tides',
+        title: 'veedeeocean: Pacific Morning Shore & Tides',
+        type: 'movie',
+        poster: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&auto=format&fit=crop&q=80',
+        banner: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&auto=format&fit=crop&q=80',
+        summary: 'veedeeocean Sanctuary — Crisp morning ocean tides washing over sunlit sandy beaches.',
+        genre: 'Ocean',
+        rating: 'G',
+        url: 'https://vjs.zencdn.net/v/oceans.mp4'
+      },
+      {
+        id: 'ocean_deep_blue',
+        title: 'veedeeocean: Deep Water Savages & Reef Life',
+        type: 'movie',
+        poster: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=600&auto=format&fit=crop&q=80',
+        banner: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=1200&auto=format&fit=crop&q=80',
+        summary: 'veedeeocean Sanctuary — Exploring vibrant marine life, coral reefs, and pelagic species.',
+        genre: 'Ocean',
+        rating: 'G',
+        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4'
+      }
+    ]
+  }
+];
+
 export const ZZZ_GROUNDING_CATEGORIES: ZzzCategory[] = [
   {
     title: '🌙 Sleep (Bedtime & Nightstand)',
@@ -202,8 +241,8 @@ function showSleepToast(msg: string): void {
   t.id = 'zzzToast';
   t.style.cssText = `
     position: fixed; top: 80px; left: 50%; transform: translateX(-50%);
-    background: rgba(16,20,30,0.95); border: 1px solid rgba(167,139,250,0.5);
-    color: #a78bfa; padding: 12px 24px; border-radius: 24px; font-size: 14px;
+    background: rgba(16,20,30,0.95); border: 1px solid rgba(56,189,248,0.5);
+    color: #38bdf8; padding: 12px 24px; border-radius: 24px; font-size: 14px;
     font-weight: 700; z-index: 10002; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
     font-family: 'Space Grotesk', sans-serif; pointer-events: none;
   `;
@@ -256,9 +295,9 @@ export function renderZzzSanctuary(container: HTMLElement | null): void {
     favSection.style.marginBottom = '32px';
 
     const favHeader = document.createElement('h3');
-    favHeader.style.cssText = 'font-size: 20px; font-weight: 800; color: #a78bfa; margin: 0 0 16px; display: flex; align-items: center; gap: 8px;';
+    favHeader.style.cssText = 'font-size: 20px; font-weight: 800; color: #38bdf8; margin: 0 0 16px; display: flex; align-items: center; gap: 8px;';
     favHeader.innerHTML = `
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="#a78bfa" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="#38bdf8" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
       <span>🌙 My Bedtime Favorites</span>
     `;
     favSection.appendChild(favHeader);
@@ -268,17 +307,16 @@ export function renderZzzSanctuary(container: HTMLElement | null): void {
 
     favs.forEach(item => {
       const card = document.createElement('div');
-      card.style.cssText = 'background: #10141e; border: 1px solid rgba(167,139,250,0.3); border-radius: 16px; overflow: hidden; cursor: pointer; transition: transform 0.2s ease, border-color 0.2s ease; position: relative;';
-      card.onmouseover = () => { card.style.transform = 'translateY(-4px)'; card.style.borderColor = '#a78bfa'; };
-      card.onmouseout = () => { card.style.transform = 'none'; card.style.borderColor = 'rgba(167,139,250,0.3)'; };
+      card.style.cssText = 'background: #10141e; border: 1px solid rgba(56,189,248,0.3); border-radius: 16px; overflow: hidden; cursor: pointer; transition: transform 0.2s ease, border-color 0.2s ease; position: relative;';
+      card.onmouseover = () => { card.style.transform = 'translateY(-4px)'; card.style.borderColor = '#38bdf8'; };
+      card.onmouseout = () => { card.style.transform = 'none'; card.style.borderColor = 'rgba(56,189,248,0.3)'; };
 
       card.innerHTML = `
         <div style="height: 150px; position: relative; overflow: hidden;">
           <img src="${item.poster || item.banner || ''}" alt="${escapeHtml(item.title)}" style="width: 100%; height: 100%; object-fit: cover;" />
           <div style="position: absolute; inset: 0; background: linear-gradient(180deg, transparent 40%, rgba(6,7,10,0.9) 100%);"></div>
-          <div style="position: absolute; bottom: 12px; left: 12px; right: 12px; display: flex; align-items: center; justify-content: space-between;">
-            <span style="background: rgba(167,139,250,0.3); backdrop-filter: blur(8px); border: 1px solid rgba(167,139,250,0.5); color: #fff; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700;">BEDTIME FAVORITE</span>
-            <div style="width: 32px; height: 32px; border-radius: 50%; background: #a78bfa; color: #06070a; display: flex; align-items: center; justify-content: center; font-weight: bold;">▶</div>
+          <div style="position: absolute; bottom: 12px; right: 12px; display: flex; align-items: center; justify-content: flex-end;">
+            <div style="width: 32px; height: 32px; border-radius: 50%; background: #38bdf8; color: #06070a; display: flex; align-items: center; justify-content: center; font-weight: bold;">▶</div>
           </div>
         </div>
         <div style="padding: 16px;">
@@ -311,7 +349,7 @@ export function renderZzzSanctuary(container: HTMLElement | null): void {
           section.style.marginBottom = '32px';
 
           const header = document.createElement('h3');
-          header.style.cssText = 'font-size: 20px; font-weight: 800; color: #a78bfa; margin: 0 0 16px; display: flex; align-items: center; gap: 8px;';
+          header.style.cssText = 'font-size: 20px; font-weight: 800; color: #38bdf8; margin: 0 0 16px; display: flex; align-items: center; gap: 8px;';
           header.innerHTML = `
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
             <span>${escapeHtml(rail.name)}</span>
@@ -323,17 +361,16 @@ export function renderZzzSanctuary(container: HTMLElement | null): void {
 
           rail.items.forEach((item: VodItem) => {
             const card = document.createElement('div');
-            card.style.cssText = 'background: #10141e; border: 1px solid rgba(167,139,250,0.2); border-radius: 16px; overflow: hidden; cursor: pointer; transition: transform 0.2s ease, border-color 0.2s ease; position: relative;';
-            card.onmouseover = () => { card.style.transform = 'translateY(-4px)'; card.style.borderColor = '#a78bfa'; };
-            card.onmouseout = () => { card.style.transform = 'none'; card.style.borderColor = 'rgba(167,139,250,0.2)'; };
+            card.style.cssText = 'background: #10141e; border: 1px solid rgba(56,189,248,0.2); border-radius: 16px; overflow: hidden; cursor: pointer; transition: transform 0.2s ease, border-color 0.2s ease; position: relative;';
+            card.onmouseover = () => { card.style.transform = 'translateY(-4px)'; card.style.borderColor = '#38bdf8'; };
+            card.onmouseout = () => { card.style.transform = 'none'; card.style.borderColor = 'rgba(56,189,248,0.2)'; };
 
             card.innerHTML = `
               <div style="height: 150px; position: relative; overflow: hidden;">
                 <img src="${item.poster || item.banner || ''}" alt="${escapeHtml(item.title)}" style="width: 100%; height: 100%; object-fit: cover;" />
                 <div style="position: absolute; inset: 0; background: linear-gradient(180deg, transparent 40%, rgba(6,7,10,0.9) 100%);"></div>
-                <div style="position: absolute; bottom: 12px; left: 12px; right: 12px; display: flex; align-items: center; justify-content: space-between;">
-                  <span style="background: rgba(167,139,250,0.3); backdrop-filter: blur(8px); border: 1px solid rgba(167,139,250,0.5); color: #fff; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700;">${escapeHtml(item.provider || 'LIVE STREAM')}</span>
-                  <div style="width: 32px; height: 32px; border-radius: 50%; background: #a78bfa; color: #06070a; display: flex; align-items: center; justify-content: center; font-weight: bold;">▶</div>
+                <div style="position: absolute; bottom: 12px; right: 12px; display: flex; align-items: center; justify-content: flex-end;">
+                  <div style="width: 32px; height: 32px; border-radius: 50%; background: #38bdf8; color: #06070a; display: flex; align-items: center; justify-content: center; font-weight: bold;">▶</div>
                 </div>
               </div>
               <div style="padding: 16px;">
@@ -352,12 +389,9 @@ export function renderZzzSanctuary(container: HTMLElement | null): void {
           section.appendChild(row);
           container.appendChild(section);
         });
-      } else {
-        // Fallback Grounding Pillars if catalog is loading
-        renderFallbackGroundingPillars(container);
       }
     } catch {
-      renderFallbackGroundingPillars(container);
+      // Catalog loading error
     }
   });
 
@@ -366,13 +400,13 @@ export function renderZzzSanctuary(container: HTMLElement | null): void {
 }
 
 function renderFallbackGroundingPillars(container: HTMLElement): void {
-  ZZZ_GROUNDING_CATEGORIES.forEach(cat => {
+  OCEAN_GROUNDING_CATEGORIES.forEach(cat => {
     const section = document.createElement('div');
     section.className = 'showcaseRail';
     section.style.marginBottom = '32px';
 
     const header = document.createElement('h3');
-    header.style.cssText = 'font-size: 20px; font-weight: 800; color: #a78bfa; margin: 0 0 16px; display: flex; align-items: center; gap: 8px;';
+    header.style.cssText = 'font-size: 20px; font-weight: 800; color: #38bdf8; margin: 0 0 16px; display: flex; align-items: center; gap: 8px;';
     header.innerHTML = `
       ${cat.iconSvg}
       <span>${escapeHtml(cat.title)}</span>
@@ -384,17 +418,16 @@ function renderFallbackGroundingPillars(container: HTMLElement): void {
 
     cat.items.forEach(item => {
       const card = document.createElement('div');
-      card.style.cssText = 'background: #10141e; border: 1px solid rgba(167,139,250,0.2); border-radius: 16px; overflow: hidden; cursor: pointer; transition: transform 0.2s ease, border-color 0.2s ease; position: relative;';
-      card.onmouseover = () => { card.style.transform = 'translateY(-4px)'; card.style.borderColor = '#a78bfa'; };
-      card.onmouseout = () => { card.style.transform = 'none'; card.style.borderColor = 'rgba(167,139,250,0.2)'; };
+      card.style.cssText = 'background: #10141e; border: 1px solid rgba(56,189,248,0.2); border-radius: 16px; overflow: hidden; cursor: pointer; transition: transform 0.2s ease, border-color 0.2s ease; position: relative;';
+      card.onmouseover = () => { card.style.transform = 'translateY(-4px)'; card.style.borderColor = '#38bdf8'; };
+      card.onmouseout = () => { card.style.transform = 'none'; card.style.borderColor = 'rgba(56,189,248,0.2)'; };
 
       card.innerHTML = `
         <div style="height: 150px; position: relative; overflow: hidden;">
           <img src="${item.poster}" alt="${escapeHtml(item.title)}" style="width: 100%; height: 100%; object-fit: cover;" />
           <div style="position: absolute; inset: 0; background: linear-gradient(180deg, transparent 40%, rgba(6,7,10,0.9) 100%);"></div>
-          <div style="position: absolute; bottom: 12px; left: 12px; right: 12px; display: flex; align-items: center; justify-content: space-between;">
-            <span style="background: rgba(167,139,250,0.3); backdrop-filter: blur(8px); border: 1px solid rgba(167,139,250,0.5); color: #fff; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700;">${cat.badge}</span>
-            <div style="width: 32px; height: 32px; border-radius: 50%; background: #a78bfa; color: #06070a; display: flex; align-items: center; justify-content: center; font-weight: bold;">▶</div>
+          <div style="position: absolute; bottom: 12px; right: 12px; display: flex; align-items: center; justify-content: flex-end;">
+            <div style="width: 32px; height: 32px; border-radius: 50%; background: #38bdf8; color: #06070a; display: flex; align-items: center; justify-content: center; font-weight: bold;">▶</div>
           </div>
         </div>
         <div style="padding: 16px;">
@@ -430,9 +463,9 @@ function wireZzzControlBar(): void {
         (b as HTMLElement).style.color = '#9aa5b5';
         (b as HTMLElement).style.borderColor = 'rgba(255,255,255,0.12)';
       });
-      (btn as HTMLElement).style.background = '#a78bfa';
+      (btn as HTMLElement).style.background = '#38bdf8';
       (btn as HTMLElement).style.color = '#06070a';
-      (btn as HTMLElement).style.borderColor = '#a78bfa';
+      (btn as HTMLElement).style.borderColor = '#38bdf8';
 
       const mins = parseInt((btn as HTMLElement).dataset.mins || '0');
       if (mins > 0) {
@@ -465,7 +498,7 @@ export function toggleNightDimmerMode(): void {
 
   overlay = document.createElement('div');
   overlay.id = 'zzzNightDimmerOverlay';
-  overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(5,6,9,0.95); backdrop-filter: blur(14px); z-index: 99999; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #a78bfa; font-family: "Space Grotesk", sans-serif; cursor: pointer; user-select: none;';
+  overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(5,6,9,0.95); backdrop-filter: blur(14px); z-index: 99999; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #38bdf8; font-family: "Space Grotesk", sans-serif; cursor: pointer; user-select: none;';
   
   const updateClock = () => {
     const now = new Date();
@@ -474,7 +507,7 @@ export function toggleNightDimmerMode(): void {
     const ampm = now.getHours() >= 12 ? 'PM' : 'AM';
     if (overlay) {
       overlay.innerHTML = `
-        <div style="font-size: 88px; font-weight: 800; letter-spacing: 2px; color: rgba(167,139,250,0.65); opacity: 0.8; text-shadow: 0 0 35px rgba(167,139,250,0.4);">${hrs}:${mins} <span style="font-size: 26px;">${ampm}</span></div>
+        <div style="font-size: 88px; font-weight: 800; letter-spacing: 2px; color: rgba(56,189,248,0.65); opacity: 0.8; text-shadow: 0 0 35px rgba(56,189,248,0.4);">${hrs}:${mins} <span style="font-size: 26px;">${ampm}</span></div>
         <p style="margin-top: 16px; font-size: 14px; color: rgba(255,255,255,0.4); font-weight: 600;">Tap anywhere to exit Nightstand Mode</p>
       `;
     }

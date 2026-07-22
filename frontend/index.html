@@ -62,17 +62,11 @@
       </svg>
       <span>Favorites</span>
     </button>
-    <button id="tabZzz" title="veedeeoh.zzz Sleep Sanctuary" class="navBtn" style="color: #a78bfa;">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+    <button id="tabOcean" title="veedeeocean" class="navBtn">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/>
       </svg>
-      <span>veedeeoh.zzz</span>
-    </button>
-    <button id="tabOcean" title="Ocean TV" class="navBtn" style="color: #38bdf8;">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-      </svg>
-      <span>Ocean TV</span>
+      <span>veedee<span style="color: #38bdf8;">ocean</span></span>
     </button>
 
     <div class="sidebar-spacer"></div>
@@ -160,62 +154,6 @@
         <div id="moviesRails"></div>
       </div>
 
-      <!-- Panel 5: veedeeoh.zzz Sleep & Ambient Sanctuary View -->
-      <div id="zzzView" class="viewPanel" hidden>
-        <!-- Floating iOS Control Center Style Sleep Bar -->
-        <div
-          style="background: rgba(16,20,30,0.85); border: 1px solid rgba(167,139,250,0.3); border-radius: 20px; padding: 18px 24px; margin-bottom: 28px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px; backdrop-filter: blur(20px); box-shadow: 0 12px 40px rgba(0,0,0,0.6);">
-          <div style="display: flex; align-items: center; gap: 14px;">
-            <div
-              style="width: 44px; height: 44px; border-radius: 12px; background: rgba(167,139,250,0.2); color: #a78bfa; display: flex; align-items: center; justify-content: center;">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-              </svg>
-            </div>
-            <div>
-              <h2 style="margin: 0; font-size: 20px; font-weight: 800; color: #fff;">veedeeoh.zzz</h2>
-              <p style="margin: 2px 0 0; font-size: 12px; color: #a78bfa; font-weight: 600;" id="zzzTimerStatusText">
-                Sleep Timer: Off</p>
-            </div>
-          </div>
-
-          <!-- Tactile Touch Timer Chips -->
-          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-            <button class="zzzTimerOptionBtn active" data-mins="0"
-              style="padding: 8px 16px; border-radius: 10px; background: #a78bfa; border: 1px solid #a78bfa; color: #06070a; font-size: 14px; font-weight: 800; cursor: pointer;">Off</button>
-            <button class="zzzTimerOptionBtn" data-mins="15"
-              style="padding: 8px 16px; border-radius: 10px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #9aa5b5; font-size: 14px; font-weight: 700; cursor: pointer;">15m</button>
-            <button class="zzzTimerOptionBtn" data-mins="30"
-              style="padding: 8px 16px; border-radius: 10px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #9aa5b5; font-size: 14px; font-weight: 700; cursor: pointer;">30m</button>
-            <button class="zzzTimerOptionBtn" data-mins="60"
-              style="padding: 8px 16px; border-radius: 10px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #9aa5b5; font-size: 14px; font-weight: 700; cursor: pointer;">60m</button>
-            <button class="zzzTimerOptionBtn" data-mins="90"
-              style="padding: 8px 16px; border-radius: 10px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #9aa5b5; font-size: 14px; font-weight: 700; cursor: pointer;">90m</button>
-
-            <!-- Sunrise Alarm & Night Dimmer Triggers -->
-            <button id="zzzAlarmToggleBtn"
-              style="padding: 8px 16px; border-radius: 10px; background: rgba(255, 183, 3, 0.15); border: 1px solid rgba(255, 183, 3, 0.35); color: #ffb703; font-size: 14px; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 6px;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="13" r="8"></circle>
-                <path d="M12 9v4l2 2"></path>
-                <path d="M5 3L2 6"></path>
-                <path d="M22 6l-3-3"></path>
-              </svg>
-              <span>Sunrise Alarm</span>
-            </button>
-            <button id="zzzDimmerToggleBtn"
-              style="padding: 8px 16px; border-radius: 10px; background: rgba(167, 139, 250, 0.15); border: 1px solid rgba(167, 139, 250, 0.35); color: #a78bfa; font-size: 14px; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 6px;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-              </svg>
-              <span>Nightstand Mode</span>
-            </button>
-          </div>
-        </div>
-
-        <div id="zzzRails"></div>
-      </div>
-
       <!-- Panel 6: Ocean TV View Panel -->
       <div id="oceanView" class="viewPanel" hidden>
         <div id="oceanRails"></div>
@@ -252,13 +190,6 @@
             <div id="vdStars">★★★★★</div>
             <div id="vdActions" style="display: flex; gap: 10px; flex-wrap: wrap;">
               <button id="vdPlayBtn">▶ START WATCHING</button>
-              <button id="vdAddZzzBtn"
-                style="padding: 12px 20px; border-radius: 10px; background: rgba(167,139,250,0.15); border: 1px solid rgba(167,139,250,0.4); color: #a78bfa; font-weight: 700; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-                </svg>
-                <span>Add to zzz</span>
-              </button>
             </div>
             <p id="vdSummary"></p>
           </div>

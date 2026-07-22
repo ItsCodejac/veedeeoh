@@ -91,7 +91,11 @@ aside {
 }
 .navBtn:hover, .navBtn.active {
   color: var(--accent);
-  background: rgba(255, 98, 71, 0.1);
+  background: rgba(197, 240, 78, 0.1);
+}
+#tabOcean:hover, #tabOcean.active {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
 }
 .navBtn svg { width: 20px; height: 20px; flex-shrink: 0; }
 .navBtn span { white-space: nowrap; }

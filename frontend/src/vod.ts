@@ -102,10 +102,12 @@ document.addEventListener("click", (e) => {
 });
 
 export async function getVodRails(): Promise<VodRail[]> {
-  if (cachedVodRails) return cachedVodRails;
+  if (cachedVodRails && cachedVodRails.length > 0) return cachedVodRails;
   const res = await fetchVod();
-  cachedVodRails = res.rails;
-  return cachedVodRails;
+  if (res.rails && res.rails.length > 0) {
+    cachedVodRails = res.rails;
+  }
+  return res.rails || [];
 }
 
 function saveResumeProgress(ch: any, streamIdx: number, time: number, duration: number, percentage: number): void {
@@ -697,25 +699,6 @@ export async function openVodDetails(item: VodItem): Promise<void> {
   const select = $<HTMLSelectElement>("vdSeasonSelect");
   const grid = $("vdEpisodeGrid");
   const playBtn = $<HTMLButtonElement>("vdPlayBtn");
-  const addZzzBtn = $<HTMLButtonElement>("vdAddZzzBtn");
-
-  if (addZzzBtn) {
-    import("./zzz").then(zzz => {
-      const isPinned = zzz.isZzzFavorite(item.id);
-      addZzzBtn.innerHTML = `
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="${isPinned ? '#a78bfa' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-        <span>${isPinned ? 'Added to zzz' : 'Add to zzz'}</span>
-      `;
-      addZzzBtn.onclick = () => {
-        zzz.toggleZzzFavorite(item);
-        const nowPinned = zzz.isZzzFavorite(item.id);
-        addZzzBtn.innerHTML = `
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="${nowPinned ? '#a78bfa' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-          <span>${nowPinned ? 'Added to zzz' : 'Add to zzz'}</span>
-        `;
-      };
-    });
-  }
 
   selectContainer.hidden = true;
   select.replaceChildren();
@@ -1434,21 +1417,8 @@ export async function renderHome(): Promise<void> {
     }
 
     // 3. Separate TV and Movies, and Group by Genre
-    import("./profiles").then(p => {
-      const activeP = p.getActiveProfile();
-      const RATING_SEVERITY: Record<string, number> = {
-        "G": 1, "TV-Y": 1, "TV-Y7": 1, "PG": 2, "TV-PG": 2, "PG-13": 3, "TV-14": 3, "R": 4, "TV-MA": 4
-      };
-      const maxCap = RATING_SEVERITY[activeP.max_rating || "TV-MA"] || 4;
-
-      const isAllowed = (item: VodItem) => {
-        if (!item.rating) return true;
-        const sev = RATING_SEVERITY[item.rating.toUpperCase()] || 2;
-        return sev <= maxCap;
-      };
-
-      const moviesItems = allItems.filter(i => (i.type === "movie" || (!i.series_id && i.type !== "series")) && i.type !== "podcast" && isAllowed(i));
-      const tvItems = allItems.filter(i => (i.type === "series" || i.series_id) && isAllowed(i));
+    const moviesItems = allItems.filter(i => (i.type === "movie" || (!i.series_id && i.type !== "series")) && i.type !== "podcast");
+    const tvItems = allItems.filter(i => (i.type === "series" || i.series_id));
       
       const uniqueMovies = Array.from(new Map(moviesItems.map(m => [m.title, m])).values()).filter(i => i.poster || i.banner);
       const uniqueTv = Array.from(new Map(tvItems.map(m => [m.title, m])).values()).filter(i => i.poster || i.banner);
@@ -1518,10 +1488,7 @@ export async function renderHome(): Promise<void> {
     renderGenreRail("Trending Movies", uniqueMovies.filter(m => m.banner), true);
     renderGenreRail("Popular Series", uniqueTv.filter(t => t.banner), true);
 
-    // Render veedeeoh.zzz Sleep & Ambient Rail
-    import("./zzz").then(zzz => {
-      renderGenreRail("🌙 veedeeoh.zzz · Sleep & Ambient Soundscapes", zzz.AMBIENT_SLEEP_ITEMS, true);
-    });
+
 
     // Render Genre Rails (Posters)
     Object.entries(movieGenres).forEach(([genre, items]) => {
@@ -1534,7 +1501,6 @@ export async function renderHome(): Promise<void> {
       if (items.length >= 3 && genre !== "Binge-Worthy Series") {
         renderGenreRail(`${genre} TV`, items, false);
       }
-    });
     });
   } catch (err) {
     loading.textContent = `Failed to load Home dashboard: ${err}`;

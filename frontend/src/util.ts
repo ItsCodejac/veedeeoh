@@ -12,6 +12,30 @@ export function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => HTML_ESCAPES[c] ?? c);
 }
 
+export function showToast(message: string, durationMs = 4000): void {
+  const existing = document.getElementById("appToast");
+  if (existing) existing.remove();
+
+  const toast = document.createElement("div");
+  toast.id = "appToast";
+  toast.style.cssText = `
+    position: fixed; bottom: 30px; right: 30px; z-index: 100000;
+    background: #10141e; border: 1px solid rgba(197,240,78,0.4);
+    color: #fff; padding: 14px 22px; border-radius: 14px;
+    font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 700;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.8); display: flex; align-items: center; gap: 12px;
+    transition: opacity 0.3s ease;
+  `;
+  toast.innerHTML = `<span>${escapeHtml(message)}</span>`;
+
+  document.body.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    setTimeout(() => toast.remove(), 300);
+  }, durationMs);
+}
+
 // Detect the Pluto "not available in your region" loop by sampling the frame:
 // an overwhelmingly black screen with Pluto-yellow accents and little else.
 // Calibrated so genuinely dark content (no yellow) is never flagged.
@@ -38,85 +62,8 @@ export function isGeoBlockBumper(video: HTMLVideoElement): boolean {
   }
 }
 
-export function fmtTime(epochSeconds: number): string {
-  return new Date(epochSeconds * 1000).toLocaleTimeString([], {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
 export function setupHorizontalScroll(scroller: HTMLElement, parent: HTMLElement): void {
-  // 1. Click and drag logic
-  let isDown = false;
-  let startX = 0;
-  let scrollLeft = 0;
-  let isDragging = false;
-
-  scroller.addEventListener("mousedown", (e) => {
-    isDown = true;
-    isDragging = false;
-    scroller.style.cursor = "grabbing";
-    startX = e.pageX - scroller.offsetLeft;
-    scrollLeft = scroller.scrollLeft;
-  });
-
-  const stopDrag = () => {
-    isDown = false;
-    scroller.style.cursor = "";
-    // Snap back from rubber banding
-    scroller.style.transition = "transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)";
-    scroller.style.transform = "translateX(0px)";
-    setTimeout(() => {
-      scroller.style.transition = "";
-    }, 300);
-  };
-
-  scroller.addEventListener("mouseleave", stopDrag);
-  scroller.addEventListener("mouseup", stopDrag);
-  
-  scroller.addEventListener("mousemove", (e) => {
-    if (!isDown) return;
-    e.preventDefault();
-    isDragging = true;
-    const x = e.pageX - scroller.offsetLeft;
-    const walk = (x - startX) * 2;
-    
-    const maxScroll = scroller.scrollWidth - scroller.clientWidth;
-    const nextScroll = scrollLeft - walk;
-
-    if (nextScroll < 0) {
-      // Rubber band on the left edge
-      const overscroll = -nextScroll;
-      const resistance = Math.min(overscroll * 0.3, 100); 
-      scroller.style.transform = `translateX(${resistance}px)`;
-      scroller.scrollLeft = 0;
-    } else if (nextScroll > maxScroll) {
-      // Rubber band on the right edge
-      const overscroll = nextScroll - maxScroll;
-      const resistance = Math.min(overscroll * 0.3, 100);
-      scroller.style.transform = `translateX(-${resistance}px)`;
-      scroller.scrollLeft = maxScroll;
-    } else {
-      scroller.style.transform = "translateX(0px)";
-      scroller.scrollLeft = nextScroll;
-    }
-  });
-
-  scroller.addEventListener("click", (e) => {
-    if (isDragging) {
-      e.preventDefault();
-      e.stopPropagation();
-      isDragging = false;
-    }
-  }, true);
-
-  // Block native browser drag-and-drop of images/links
-  scroller.addEventListener("dragstart", (e) => {
-    e.preventDefault();
-  });
-
-  // 2. Netflix-style scroll arrows
-  parent.style.position = "relative";
+  if (parent.querySelector(".scrollArrow")) return;
   
   const leftBtn = document.createElement("button");
   leftBtn.className = "scrollArrow left";

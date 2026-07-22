@@ -1,19 +1,8 @@
-import { getStoredProfiles, openProfileEditor, getActiveProfile, promptPinVerification } from './profiles';
+import { getStoredProfiles, openProfileEditor, getActiveProfile } from './profiles';
 import { getSession } from './auth';
 
 export function openSettingsModal(): void {
-  const activeProfile = getActiveProfile();
-  const profiles = getStoredProfiles();
-  
-  // Find master PIN if set on any household profile
-  const masterPin = profiles.find(p => p.pin)?.pin || activeProfile.pin;
-
-  // Gating: If currently in Kids Mode or profile has a PIN, require Parent PIN verification
-  if ((activeProfile.is_kids || activeProfile.pin || masterPin) && masterPin) {
-    promptPinVerification(masterPin, () => renderSettingsModalInternal());
-  } else {
-    renderSettingsModalInternal();
-  }
+  renderSettingsModalInternal();
 }
 
 function renderSettingsModalInternal(): void {
@@ -26,6 +15,16 @@ function renderSettingsModalInternal(): void {
 
   const defaultAccName = (session && session.email) ? session.email.split('@')[0]! : 'My Household';
   const accName = localStorage.getItem('veedeeoh_account_name') || defaultAccName;
+
+  // Pending invites
+  let pendingInvites: any[] = [];
+  try {
+    const raw = localStorage.getItem('veedeeoh_pending_invites') || '[]';
+    pendingInvites = JSON.parse(raw);
+  } catch {
+    pendingInvites = [];
+  }
+
   const modal = document.createElement('div');
   modal.id = 'settingsModal';
   modal.style.cssText = `
@@ -74,11 +73,11 @@ function renderSettingsModalInternal(): void {
             <div style="display: flex; align-items: center; justify-content: space-between; background: #080a10; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 12px 16px;">
               <div style="display: flex; align-items: center; gap: 12px;">
                 <div style="width: 36px; height: 36px; border-radius: 8px; background: ${p.avatar_color}; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #06070a;">
-                  ${p.is_kids ? '🎈' : p.name.charAt(0).toUpperCase()}
+                  ${p.name.charAt(0).toUpperCase()}
                 </div>
                 <div>
                   <div style="font-weight: 700; font-size: 15px;">${escapeHtml(p.name)} ${p.id === activeProfile.id ? '<span style="color: #c5f04e; font-size: 12px;">(Active)</span>' : ''}</div>
-                  <div style="font-size: 12px; color: #9aa5b5;">${p.is_kids ? 'veedeeoh.kidz' : 'Standard'} · Rating Max: ${p.max_rating} ${p.pin ? '· 🔒 PIN Set' : ''}</div>
+                  <div style="font-size: 12px; color: #9aa5b5;">Standard Profile</div>
                 </div>
               </div>
               <button class="settingsEditProfileBtn" data-id="${p.id}" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 6px 12px; border-radius: 8px; font-size: 13px; cursor: pointer;">Edit</button>
@@ -87,20 +86,40 @@ function renderSettingsModalInternal(): void {
         </div>
       </div>
 
-      <!-- Anti-Netflix Member Sharing -->
+      <!-- Anti-Netflix Direct Link Member Sharing -->
       <div style="margin-bottom: 24px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
           <div>
-            <h3 style="margin: 0; font-size: 18px; font-weight: 700;">🤝 Non-Geolocked Family Invites</h3>
-            <div style="font-size: 12px; color: #06d6a0; font-weight: 700;">Anti-Netflix Model: Zero IP locks. Members log in with their OWN email.</div>
+            <h3 style="margin: 0; font-size: 18px; font-weight: 700;">🤝 Non-Geolocked Direct Invites</h3>
+            <div style="font-size: 12px; color: #06d6a0; font-weight: 700;">Zero IP locks. Generate & text/email direct links to family anywhere.</div>
           </div>
         </div>
         <div style="background: #080a10; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 16px;">
-          <p style="margin: 0 0 12px; font-size: 13px; color: #9aa5b5;">Invite family, roommates, or college kids to use your household plan anywhere in the world without sharing passwords:</p>
-          <div style="display: flex; gap: 10px;">
-            <input type="email" id="inviteMemberEmail" placeholder="family.member@gmail.com" style="flex: 1; padding: 10px 14px; background: #10141e; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 14px; outline: none;" />
-            <button id="sendInviteBtn" style="background: #06d6a0; color: #06070a; border: none; padding: 10px 18px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer;">Send Invite</button>
+          <p style="margin: 0 0 12px; font-size: 13px; color: #9aa5b5;">Generate a direct non-geolocked invitation link for family members or roommates:</p>
+          <div style="display: flex; gap: 10px; margin-bottom: ${pendingInvites.length > 0 ? '16px' : '0'};">
+            <input type="text" id="inviteMemberEmail" placeholder="Member name or email (e.g. Sarah)" style="flex: 1; padding: 10px 14px; background: #10141e; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 14px; outline: none;" />
+            <button id="sendInviteBtn" style="background: #06d6a0; color: #06070a; border: none; padding: 10px 18px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer;">Generate Link</button>
           </div>
+
+          ${pendingInvites.length > 0 ? `
+            <div style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 14px;">
+              <div style="font-size: 12px; font-weight: 700; color: #9aa5b5; text-transform: uppercase; margin-bottom: 10px;">ACTIVE HOUSEHOLD INVITE LINKS</div>
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                ${pendingInvites.map((inv: any) => `
+                  <div style="display: flex; align-items: center; justify-content: space-between; background: #10141e; padding: 10px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+                    <div>
+                      <div style="font-size: 14px; font-weight: 700; color: #fff;">${escapeHtml(inv.email)}</div>
+                      <div style="font-size: 11px; color: #9aa5b5;">Created ${escapeHtml(inv.invitedAt || 'Recently')}</div>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                      <button class="copyInviteLinkBtn" data-url="${escapeHtml(inv.inviteUrl)}" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #c5f04e; padding: 4px 10px; border-radius: 6px; font-size: 12px; cursor: pointer;">Copy Link</button>
+                      <button class="revokeInviteBtn" data-email="${escapeHtml(inv.email)}" style="background: rgba(255,94,126,0.15); border: 1px solid rgba(255,94,126,0.3); color: #ff5e7e; padding: 4px 10px; border-radius: 6px; font-size: 12px; cursor: pointer;">Revoke</button>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
         </div>
       </div>
 
@@ -163,6 +182,94 @@ function renderSettingsModalInternal(): void {
         modal.remove();
         openProfileEditor(target);
       }
+    });
+  });
+
+  // Direct Link Generator Handler
+  const sendInviteBtn = modal.querySelector('#sendInviteBtn') as HTMLButtonElement | null;
+  const inviteEmailInput = modal.querySelector('#inviteMemberEmail') as HTMLInputElement | null;
+
+  if (sendInviteBtn && inviteEmailInput) {
+    sendInviteBtn.addEventListener('click', async () => {
+      const name = inviteEmailInput.value.trim();
+      if (!name) {
+        alert('Please enter a member name or email.');
+        return;
+      }
+
+      sendInviteBtn.disabled = true;
+      sendInviteBtn.textContent = 'Generating...';
+
+      try {
+        const inviteCode = 'inv_' + Math.random().toString(36).substring(2, 10);
+        const inviteUrl = `${window.location.origin}/landing.html?invite=${inviteCode}&acc=${encodeURIComponent(accName)}`;
+
+        // Add to active household invite links
+        const rawPending = localStorage.getItem('veedeeoh_pending_invites') || '[]';
+        let pending: any[] = [];
+        try { pending = JSON.parse(rawPending); } catch {}
+
+        pending = pending.filter((x: any) => x.email !== name);
+        pending.unshift({
+          email: name,
+          invitedAt: new Date().toLocaleDateString(),
+          inviteUrl,
+          code: inviteCode
+        });
+        localStorage.setItem('veedeeoh_pending_invites', JSON.stringify(pending));
+
+        // Copy direct link to clipboard instantly
+        if (navigator.clipboard) {
+          await navigator.clipboard.writeText(inviteUrl).catch(() => {});
+        }
+
+        inviteEmailInput.value = '';
+        alert(`✅ Non-Geolocked Invite link created for "${name}"!\n\nLink copied to your clipboard:\n${inviteUrl}`);
+        
+        modal.remove();
+        openSettingsModal();
+      } catch (err) {
+        alert(`Failed to generate invite link: ${err}`);
+      } finally {
+        if (sendInviteBtn) {
+          sendInviteBtn.disabled = false;
+          sendInviteBtn.textContent = 'Generate Link';
+        }
+      }
+    });
+  }
+
+  // Copy Link Button Handlers
+  const copyBtns = modal.querySelectorAll('.copyInviteLinkBtn');
+  copyBtns.forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const url = (btn as HTMLElement).dataset.url;
+      if (url && navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+        (btn as HTMLElement).textContent = 'Copied!';
+        setTimeout(() => {
+          (btn as HTMLElement).textContent = 'Copy Link';
+        }, 2000);
+      }
+    });
+  });
+
+  // Revoke Button Handlers
+  const revokeBtns = modal.querySelectorAll('.revokeInviteBtn');
+  revokeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const email = (btn as HTMLElement).dataset.email;
+      if (!email) return;
+
+      const rawPending = localStorage.getItem('veedeeoh_pending_invites') || '[]';
+      let pending: any[] = [];
+      try { pending = JSON.parse(rawPending); } catch {}
+
+      pending = pending.filter((x: any) => x.email !== email);
+      localStorage.setItem('veedeeoh_pending_invites', JSON.stringify(pending));
+
+      modal.remove();
+      openSettingsModal();
     });
   });
 }

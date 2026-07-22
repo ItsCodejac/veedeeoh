@@ -1,7 +1,7 @@
 import "./style.css";
 import { fetchCatalog, fetchWatched } from "./api";
 import { state } from "./state";
-import { $ } from "./util";
+import { $, showToast } from "./util";
 import { wireVodDetails, renderShows, renderMovies, wireSearchInputs, renderHome } from "./vod";
 import { getSession, isCloudMode, restoreSession, signOut } from "./auth";
 
@@ -27,11 +27,33 @@ async function boot(): Promise<void> {
 
   renderHome();
   wireSearchInputs();
+
+  // Check for non-geolocked family invite link activation
+  const urlParams = new URLSearchParams(window.location.search);
+  const inviteCode = urlParams.get("invite");
+  const accName = urlParams.get("acc");
+  const pendingInviteRaw = localStorage.getItem("veedeeoh_pending_household_invite");
+
+  if (inviteCode || pendingInviteRaw) {
+    let householdName = "Family Household";
+    if (accName) householdName = decodeURIComponent(accName);
+    else if (pendingInviteRaw) {
+      try {
+        const parsed = JSON.parse(pendingInviteRaw);
+        if (parsed.householdName) householdName = parsed.householdName;
+      } catch {}
+    }
+
+    localStorage.removeItem("veedeeoh_pending_household_invite");
+    showToast(`🎉 Welcome to ${householdName}! Create your profile to get started.`, 5000);
+    window.history.replaceState({}, document.title, window.location.pathname);
+    import("./profiles").then(p => p.openProfileEditor());
+  }
 }
 
 function wireSidebar(): void {
-  const tabs = ["tabHome", "tabShows", "tabMovies", "tabFavs", "tabZzz", "tabOcean"];
-  const views = ["homeView", "showsView", "moviesView", "zzzView", "oceanView"];
+  const tabs = ["tabHome", "tabShows", "tabMovies", "tabFavs", "tabOcean"];
+  const views = ["homeView", "showsView", "moviesView", "oceanView"];
 
   function switchView(activeTabId: string) {
 
@@ -63,18 +85,9 @@ function wireSidebar(): void {
     const brand = document.getElementById("brand");
     const mobileBrand = document.querySelector(".mobile-brand");
 
-    if (activeTabId === "tabZzz") {
-      if (brand) brand.innerHTML = `veedeeoh<span style="color:#a78bfa;">.zzz</span>`;
-      if (mobileBrand) mobileBrand.innerHTML = `v<span style="color:#a78bfa;">.zzz</span>`;
-      document.body.classList.add("zzz-mode-active");
-
-      // Screen Wake Lock API
-      if ("wakeLock" in navigator) {
-        navigator.wakeLock.request("screen").catch(() => {});
-      }
-    } else if (activeTabId === "tabOcean") {
-      if (brand) brand.innerHTML = `veedeeoh<span style="color:#38bdf8;">.ocean</span>`;
-      if (mobileBrand) mobileBrand.innerHTML = `v<span style="color:#38bdf8;">.ocean</span>`;
+    if (activeTabId === "tabOcean") {
+      if (brand) brand.innerHTML = `veedee<span style="color:#38bdf8;">ocean</span>`;
+      if (mobileBrand) mobileBrand.innerHTML = `v<span style="color:#38bdf8;">ocean</span>`;
       document.body.classList.add("zzz-mode-active");
 
       if ("wakeLock" in navigator) {
@@ -102,9 +115,6 @@ function wireSidebar(): void {
     } else if (activeTabId === "tabFavs") {
       $("homeView").removeAttribute("hidden");
       renderHome();
-    } else if (activeTabId === "tabZzz") {
-      $("zzzView").removeAttribute("hidden");
-      import("./zzz").then(zzz => zzz.renderZzzSanctuary($("zzzRails")));
     } else if (activeTabId === "tabOcean") {
       $("oceanView").removeAttribute("hidden");
       import("./ocean").then(ocean => ocean.renderOceanSanctuary($("oceanRails")));
@@ -131,7 +141,7 @@ function wireSidebar(): void {
       const activeP = p.getActiveProfile();
       if (sidebarEmail) sidebarEmail.textContent = activeP.name;
       if (sidebarAvatar) {
-        sidebarAvatar.textContent = activeP.is_kids ? 'K' : activeP.name.charAt(0).toUpperCase();
+        sidebarAvatar.textContent = activeP.name.charAt(0).toUpperCase();
         sidebarAvatar.style.background = activeP.avatar_color;
       }
     });
@@ -195,25 +205,15 @@ function wireHeader(): void {
     });
   }
 
-  // Wire Household Profiles, Sleep Mode & Settings
-  const zzzBtn = document.getElementById("zzzBtn");
-  if (zzzBtn) {
-    zzzBtn.addEventListener("click", () => {
-      import("./zzz").then(zzz => zzz.openSleepTimerModal());
-    });
-  }
+
 
   const sidebarUser = $("sidebarUser");
   if (sidebarUser) {
     sidebarUser.addEventListener("click", () => {
-      const existing = document.getElementById("userAccountMenuModal");
-      if (existing) {
-        existing.remove();
-        return;
-      }
-
       import("./profiles").then(p => {
         const activeP = p.getActiveProfile();
+        const existing = document.getElementById("userAccountMenuModal");
+        if (existing) existing.remove();
 
         const modal = document.createElement("div");
         modal.id = "userAccountMenuModal";
@@ -221,10 +221,10 @@ function wireHeader(): void {
         modal.innerHTML = `
           <div style="background:#10141e;border:1px solid rgba(255,255,255,0.15);border-radius:20px;max-width:340px;width:100%;padding:24px;box-shadow:0 20px 50px rgba(0,0,0,0.9);text-align:center;">
             <div style="width:60px;height:60px;border-radius:14px;background:${activeP.avatar_color};display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;color:#06070a;margin:0 auto 12px;">
-              ${activeP.is_kids ? '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#06070a" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>' : activeP.name.charAt(0).toUpperCase()}
+              ${activeP.name.charAt(0).toUpperCase()}
             </div>
             <h3 style="margin:0 0 4px;font-size:18px;font-weight:800;">${activeP.name}</h3>
-            <p style="margin:0 0 20px;font-size:12px;color:#9aa5b5;">${activeP.is_kids ? 'veedeeoh.kidz' : 'Standard Profile'}</p>
+            <p style="margin:0 0 20px;font-size:12px;color:#9aa5b5;">Standard Profile</p>
 
             <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
               <button id="menuSwitchProfileBtn" style="padding:12px;border-radius:10px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);color:#fff;font-weight:700;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
@@ -259,7 +259,7 @@ function wireHeader(): void {
               const sidebarAvatar = document.getElementById("sidebarAvatar");
               if (sidebarEmail) sidebarEmail.textContent = newP.name;
               if (sidebarAvatar) {
-                sidebarAvatar.textContent = newP.is_kids ? 'K' : newP.name.charAt(0).toUpperCase();
+                sidebarAvatar.textContent = newP.name.charAt(0).toUpperCase();
                 sidebarAvatar.style.background = newP.avatar_color;
               }
               import("./vod").then(vod => vod.renderHome());

@@ -64,10 +64,7 @@ export interface HouseholdProfile {
   id: string;
   name: string;
   avatar_color: string;
-  role?: 'owner' | 'adult' | 'kids';
-  is_kids: boolean;
-  max_rating: 'G' | 'PG' | 'PG-13' | 'R' | 'TV-MA';
-  pin?: string | null;
+  role?: 'owner' | 'adult';
 }
 
 export interface SleepTimerConfig {

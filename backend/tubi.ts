@@ -16,6 +16,8 @@ const CATEGORY_MAP: Record<string, string> = {
   "docuseries": "Docuseries",
   "adult_animation": "Adult Animation",
   "family_movies": "Family Movies",
+  "kids_and_family": "Kids & Family",
+  "preschool": "Preschool",
   "westerns": "Westerns",
   "lgbt": "LGBTQ+ Storytelling",
   "music": "Music",

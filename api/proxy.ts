@@ -3,6 +3,8 @@ import { handle } from 'hono/vercel';
 
 const app = new Hono();
 
+const BLOCKED_HOSTS = /^(localhost|127\.|169\.254\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|0\.0\.0\.0|::1)/i;
+
 app.get('/proxy', async (c: Context) => {
   const rawUrl = c.req.query('url');
   const obf = c.req.query('obf');
@@ -14,6 +16,11 @@ app.get('/proxy', async (c: Context) => {
   }
 
   try {
+    const parsedUrl = new URL(url);
+    if (BLOCKED_HOSTS.test(parsedUrl.hostname)) {
+      return c.text('Forbidden proxy target', 403);
+    }
+
     const res = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
