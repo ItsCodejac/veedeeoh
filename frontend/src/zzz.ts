@@ -19,10 +19,10 @@ export const ZZZ_GROUNDING_CATEGORIES: ZzzCategory[] = [
         type: 'movie',
         poster: 'https://images.unsplash.com/photo-1542296332-2e4473faf563?w=600&auto=format&fit=crop&q=80',
         banner: 'https://images.unsplash.com/photo-1542296332-2e4473faf563?w=1200&auto=format&fit=crop&q=80',
-        summary: 'Warm crackling fireplace ambiance in crisp 4K. Deep relaxing embers with zero commercial interruptions.',
+        summary: 'Warm crackling fireplace ambiance in crisp HD. Deep relaxing embers with zero commercial interruptions.',
         genre: 'Sleep',
         rating: 'G',
-        url: 'https://vjs.zencdn.net/v/oceans.mp4'
+        url: 'https://assets.mixkit.co/videos/preview/mixkit-fire-in-a-fireplace-close-up-42898-large.mp4'
       },
       {
         id: 'zzz_rain',
@@ -33,7 +33,7 @@ export const ZZZ_GROUNDING_CATEGORIES: ZzzCategory[] = [
         summary: 'Gentle night rain falling against glass with distant rolling thunder for deep sleep and insomnia relief.',
         genre: 'Sleep',
         rating: 'G',
-        url: 'https://media.w3.org/2010/05/sintel/trailer.mp4'
+        url: 'https://assets.mixkit.co/videos/preview/mixkit-rain-drops-on-a-window-pane-41547-large.mp4'
       },
       {
         id: 'zzz_lullaby',
@@ -44,7 +44,7 @@ export const ZZZ_GROUNDING_CATEGORIES: ZzzCategory[] = [
         summary: 'Soothing soft music box lullabies paired with gentle galaxy projector animation for babies and toddlers.',
         genre: 'Sleep',
         rating: 'G',
-        url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'
+        url: 'https://assets.mixkit.co/videos/preview/mixkit-stars-in-space-background-41485-large.mp4'
       }
     ]
   },
@@ -62,7 +62,7 @@ export const ZZZ_GROUNDING_CATEGORIES: ZzzCategory[] = [
         summary: 'Gradual golden hour morning glow with natural forest birdsong for gentle non-jarring wakeup.',
         genre: 'Wake',
         rating: 'G',
-        url: 'https://vjs.zencdn.net/v/oceans.mp4'
+        url: 'https://assets.mixkit.co/videos/preview/mixkit-sun-rising-over-the-mountains-43097-large.mp4'
       },
       {
         id: 'zzz_coastal_tide',
@@ -73,7 +73,7 @@ export const ZZZ_GROUNDING_CATEGORIES: ZzzCategory[] = [
         summary: 'Crisp morning ocean tides washing over sunlit sandy beaches. Refreshing morning audio ambiance.',
         genre: 'Wake',
         rating: 'G',
-        url: 'https://media.w3.org/2010/05/sintel/trailer.mp4'
+        url: 'https://vjs.zencdn.net/v/oceans.mp4'
       }
     ]
   },
@@ -91,7 +91,7 @@ export const ZZZ_GROUNDING_CATEGORIES: ZzzCategory[] = [
         summary: 'Relaxing lo-fi study and sleep beats with continuous animated nightland window visuals.',
         genre: 'Vibe',
         rating: 'G',
-        url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'
+        url: 'https://assets.mixkit.co/videos/preview/mixkit-driving-on-a-highway-at-night-41525-large.mp4'
       },
       {
         id: 'zzz_synth_drive',
@@ -102,7 +102,7 @@ export const ZZZ_GROUNDING_CATEGORIES: ZzzCategory[] = [
         summary: 'Smooth retro synthwave audio paired with endless rainy highway visuals. Perfect evening background vibe.',
         genre: 'Vibe',
         rating: 'G',
-        url: 'https://vjs.zencdn.net/v/oceans.mp4'
+        url: 'https://assets.mixkit.co/videos/preview/mixkit-driving-on-a-highway-at-night-41525-large.mp4'
       }
     ]
   },
@@ -120,7 +120,7 @@ export const ZZZ_GROUNDING_CATEGORIES: ZzzCategory[] = [
         summary: 'Pure 432Hz tuning and binaural delta wave frequencies for deep meditation, stress relief, and REM sleep.',
         genre: 'Meditate',
         rating: 'G',
-        url: 'https://media.w3.org/2010/05/sintel/trailer.mp4'
+        url: 'https://assets.mixkit.co/videos/preview/mixkit-stars-in-space-background-41485-large.mp4'
       },
       {
         id: 'zzz_zen_bamboo',
@@ -131,7 +131,7 @@ export const ZZZ_GROUNDING_CATEGORIES: ZzzCategory[] = [
         summary: 'Tranquil Japanese bamboo water spout (Shishi-odoshi) with Tibetan singing bowls for mindful breathing.',
         genre: 'Meditate',
         rating: 'G',
-        url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'
+        url: 'https://assets.mixkit.co/videos/preview/mixkit-water-flowing-in-a-bamboo-fountain-42618-large.mp4'
       }
     ]
   }
@@ -369,7 +369,7 @@ export function playZzzAmbientItem(item: VodItem): void {
 
   overlay.innerHTML = `
     <!-- Top Sleep Bar HUD -->
-    <div style="position: absolute; top: 0; left: 0; right: 0; padding: 20px 32px; background: linear-gradient(180deg, rgba(6,7,10,0.95) 0%, transparent 100%); z-index: 10; display: flex; justify-content: space-between; align-items: center; gap: 16px; backdrop-filter: blur(12px);">
+    <div id="zzzPlayerHudBar" style="position: absolute; top: 0; left: 0; right: 0; padding: 20px 32px; background: linear-gradient(180deg, rgba(6,7,10,0.95) 0%, transparent 100%); z-index: 10; display: flex; justify-content: space-between; align-items: center; gap: 16px; backdrop-filter: blur(12px); transition: opacity 0.4s ease;">
       <div style="display: flex; align-items: center; gap: 12px;">
         <span style="color: #a78bfa; font-weight: 800; font-size: 18px;">veedeeoh.zzz</span>
         <span style="color: rgba(255,255,255,0.4);">|</span>
@@ -377,10 +377,10 @@ export function playZzzAmbientItem(item: VodItem): void {
       </div>
 
       <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-        <!-- OLED Pitch Blackout Button -->
+        <!-- Blackout Button -->
         <button id="zzzBlackoutBtn" style="padding: 8px 16px; border-radius: 10px; background: rgba(0,0,0,0.6); border: 1px solid rgba(167,139,250,0.4); color: #a78bfa; font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
-          <span>OLED Blackout</span>
+          <span>Blackout</span>
         </button>
 
         <!-- Nightstand Clock Button -->
@@ -397,7 +397,7 @@ export function playZzzAmbientItem(item: VodItem): void {
     </div>
 
     <!-- Video Ambient Viewport -->
-    <div id="zzzVideoContainer" style="flex: 1; position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #000;">
+    <div id="zzzVideoContainer" style="flex: 1; position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #000; transition: opacity 0.5s ease;">
       <video id="zzzActiveVideo" autoplay loop playsinline style="width: 100%; height: 100%; object-fit: cover;">
         <source src="${item.url || ''}" type="video/mp4" />
       </video>
@@ -413,22 +413,30 @@ export function playZzzAmbientItem(item: VodItem): void {
     });
   }
 
-  // Wire Blackout Mode
+  // Wire Blackout Mode & Dim HUD
   const blackoutBtn = overlay.querySelector('#zzzBlackoutBtn') as HTMLButtonElement | null;
   const videoContainer = overlay.querySelector('#zzzVideoContainer') as HTMLElement | null;
-  if (blackoutBtn && videoContainer) {
+  const hudBar = overlay.querySelector('#zzzPlayerHudBar') as HTMLElement | null;
+  
+  if (blackoutBtn && videoContainer && hudBar) {
     let isBlackout = false;
-    blackoutBtn.onclick = () => {
+    blackoutBtn.onclick = (e) => {
+      e.stopPropagation();
       isBlackout = !isBlackout;
       if (isBlackout) {
         videoContainer.style.opacity = "0.01";
-        blackoutBtn.style.background = "#a78bfa";
-        blackoutBtn.style.color = "#06070a";
-        showSleepToast("OLED Blackout Active (Audio Playing)");
+        hudBar.style.opacity = "0.05";
+        showSleepToast("Blackout Active (Tap anywhere to restore controls)");
       } else {
         videoContainer.style.opacity = "1";
-        blackoutBtn.style.background = "rgba(0,0,0,0.6)";
-        blackoutBtn.style.color = "#a78bfa";
+        hudBar.style.opacity = "1";
+      }
+    };
+
+    // Tap anywhere to wake controls if dimmed
+    overlay.onclick = () => {
+      if (isBlackout) {
+        hudBar.style.opacity = hudBar.style.opacity === "1" ? "0.05" : "1";
       }
     };
   }
