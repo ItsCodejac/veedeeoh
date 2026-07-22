@@ -56,3 +56,21 @@ export interface Filters {
   favorites: boolean;
   hideDead: boolean;
 }
+
+export type UserTier = 'founder_vip' | 'giveaway' | 'cloud_paid' | 'trial_7day' | 'trial_dollar_month';
+
+export interface HouseholdProfile {
+  id: string;
+  name: string;
+  avatar_color: string;
+  is_kids: boolean;
+  max_rating: 'G' | 'PG' | 'PG-13' | 'R' | 'TV-MA';
+  pin?: string | null;
+}
+
+export interface SleepTimerConfig {
+  durationMinutes: number;
+  remainingSeconds: number;
+  fadeAudio: boolean;
+  active: boolean;
+}

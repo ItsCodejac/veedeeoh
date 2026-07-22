@@ -156,6 +156,32 @@ function wireHeader(): void {
     });
   }
 
+  // Wire Household Profiles, Sleep Mode & Settings
+  const zzzBtn = $("zzzBtn");
+  if (zzzBtn) {
+    zzzBtn.addEventListener("click", () => {
+      import("./zzz").then(zzz => zzz.openSleepTimerModal());
+    });
+  }
+
+  const settingsBtn = $("settingsBtn");
+  if (settingsBtn) {
+    settingsBtn.addEventListener("click", () => {
+      import("./settings").then(s => s.openSettingsModal());
+    });
+  }
+
+  const headerUserBadge = $("headerUserBadge");
+  if (headerUserBadge) {
+    headerUserBadge.addEventListener("click", () => {
+      import("./profiles").then(p => p.openProfileSwitcher((activeP) => {
+        const headerEmail = $("headerEmail");
+        if (headerEmail) headerEmail.textContent = activeP.name;
+        renderHome();
+      }));
+    });
+  }
+
   if (searchInput) {
     searchInput.addEventListener("input", (e) => {
       clearTimeout(searchTimer);

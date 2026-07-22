@@ -1486,6 +1486,11 @@ export async function renderHome(): Promise<void> {
     renderGenreRail("Trending Movies", uniqueMovies.filter(m => m.banner), true);
     renderGenreRail("Popular Series", uniqueTv.filter(t => t.banner), true);
 
+    // Render veedeeoh.zzz Sleep & Ambient Rail
+    import("./zzz").then(zzz => {
+      renderGenreRail("🌙 veedeeoh.zzz · Sleep & Ambient Soundscapes", zzz.AMBIENT_SLEEP_ITEMS, true);
+    });
+
     // Render Genre Rails (Posters)
     Object.entries(movieGenres).forEach(([genre, items]) => {
       if (items.length >= 3 && genre !== "Hit Films") {
