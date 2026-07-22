@@ -102,12 +102,8 @@ function wireSidebar(): void {
       $("zzzView").removeAttribute("hidden");
       import("./zzz").then(zzz => zzz.renderZzzSanctuary($("zzzRails")));
     } else if (activeTabId === "tabOcean") {
-      const oceanView = $("oceanView");
-      const oceanGrid = $("oceanGrid");
-      if (oceanView) oceanView.removeAttribute("hidden");
-      if (oceanGrid) {
-        import("./ocean").then(ocean => ocean.renderOceanTvView(oceanGrid));
-      }
+      $("oceanView").removeAttribute("hidden");
+      import("./ocean").then(ocean => ocean.renderOceanSanctuary());
     }
   }
 
