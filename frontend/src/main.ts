@@ -21,14 +21,17 @@ async function boot(): Promise<void> {
   state.watched = new Set(watchedList);
   state.health = new Map(Object.entries(data.health));
 
-  // Removed Live TV header population
+  // Ensure homeView is unhidden on boot
+  const homeView = $("homeView");
+  if (homeView) homeView.removeAttribute("hidden");
+
   renderHome();
   wireSearchInputs();
 }
 
 function wireSidebar(): void {
-  const tabs = ["tabHome", "tabShows", "tabMovies", "tabFavs"];
-  const views = ["homeView", "showsView", "moviesView"];
+  const tabs = ["tabHome", "tabShows", "tabMovies", "tabFavs", "tabZzz"];
+  const views = ["homeView", "showsView", "moviesView", "zzzView"];
 
   function switchView(activeTabId: string) {
 
@@ -56,6 +59,25 @@ function wireSidebar(): void {
       if (el) el.setAttribute("hidden", "");
     });
 
+    // Dynamic Logo & Theme Shift
+    const brand = document.getElementById("brand");
+    const mobileBrand = document.querySelector(".mobile-brand");
+
+    if (activeTabId === "tabZzz") {
+      if (brand) brand.innerHTML = `veedeeoh<span style="color:#a78bfa;">.zzz</span>`;
+      if (mobileBrand) mobileBrand.innerHTML = `v<span style="color:#a78bfa;">.zzz</span>`;
+      document.body.classList.add("zzz-mode-active");
+
+      // Screen Wake Lock API
+      if ("wakeLock" in navigator) {
+        navigator.wakeLock.request("screen").catch(() => {});
+      }
+    } else {
+      if (brand) brand.innerHTML = `veedeeoh<span>.</span>`;
+      if (mobileBrand) mobileBrand.innerHTML = `v<span>.</span>`;
+      document.body.classList.remove("zzz-mode-active");
+    }
+
     if (activeTabId === "tabHome") {
       $("homeView").removeAttribute("hidden");
       renderHome();
@@ -72,6 +94,9 @@ function wireSidebar(): void {
     } else if (activeTabId === "tabFavs") {
       $("homeView").removeAttribute("hidden");
       renderHome();
+    } else if (activeTabId === "tabZzz") {
+      $("zzzView").removeAttribute("hidden");
+      import("./zzz").then(zzz => zzz.renderZzzSanctuary($("zzzRails")));
     }
   }
 
@@ -160,7 +185,7 @@ function wireHeader(): void {
   }
 
   // Wire Household Profiles, Sleep Mode & Settings
-  const zzzBtn = $("zzzBtn");
+  const zzzBtn = document.getElementById("zzzBtn");
   if (zzzBtn) {
     zzzBtn.addEventListener("click", () => {
       import("./zzz").then(zzz => zzz.openSleepTimerModal());
