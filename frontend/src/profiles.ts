@@ -4,8 +4,8 @@ import { getSupabase } from './auth';
 const ACTIVE_PROFILE_KEY = 'veedeeoh_active_profile';
 
 const DEFAULT_PROFILES: HouseholdProfile[] = [
-  { id: 'default_main', name: 'Main Profile', avatar_color: '#c5f04e', is_kids: false, max_rating: 'TV-MA' },
-  { id: 'default_kids', name: 'Kidz', avatar_color: '#ff5e7e', is_kids: true, max_rating: 'PG' }
+  { id: 'default_main', name: 'Main Profile', avatar_color: '#c5f04e', role: 'owner', is_kids: false, max_rating: 'TV-MA' },
+  { id: 'default_kids', name: 'Kidz', avatar_color: '#ff5e7e', role: 'kids', is_kids: true, max_rating: 'PG' }
 ];
 
 export function getStoredProfiles(): HouseholdProfile[] {

@@ -1,4 +1,4 @@
-import{getActiveProfile as x,getStoredProfiles as b,promptPinVerification as y,openProfileEditor as f}from"./profiles-DGlbhFUp.js";import{g as h}from"./auth-Dq18GEHP.js";function S(){var a;const i=x(),n=((a=b().find(d=>d.pin))==null?void 0:a.pin)||i.pin;(i.is_kids||i.pin||n)&&n?y(n,()=>g()):g()}function g(){const i=document.getElementById("settingsModal");i&&i.remove();const o=h(),n=b(),a=x(),d=o&&o.email?o.email.split("@")[0]:"My Household",v=localStorage.getItem("veedeeoh_account_name")||d,t=document.createElement("div");t.id="settingsModal",t.style.cssText=`
+import{getActiveProfile as x,getStoredProfiles as b,promptPinVerification as y,openProfileEditor as f}from"./profiles-BkkN4aR3.js";import{g as h}from"./auth-Dq18GEHP.js";function S(){var a;const i=x(),n=((a=b().find(d=>d.pin))==null?void 0:a.pin)||i.pin;(i.is_kids||i.pin||n)&&n?y(n,()=>g()):g()}function g(){const i=document.getElementById("settingsModal");i&&i.remove();const o=h(),n=b(),a=x(),d=o&&o.email?o.email.split("@")[0]:"My Household",v=localStorage.getItem("veedeeoh_account_name")||d,t=document.createElement("div");t.id="settingsModal",t.style.cssText=`
     position: fixed; inset: 0; background: rgba(6,7,10,0.92);
     backdrop-filter: blur(20px); z-index: 9999;
     display: flex; align-items: center; justify-content: center; padding: 20px;
@@ -19,6 +19,7 @@ import{getActiveProfile as x,getStoredProfiles as b,promptPinVerification as y,o
           <div>
             <div style="font-size: 12px; color: #9aa5b5; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">CURRENT ACCOUNT</div>
             <div style="font-size: 18px; font-weight: 700; color: #fff;">${o?s(o.email):"Local / Self-Hosted Guest"}</div>
+            <div style="font-size: 12px; color: #06d6a0; font-weight: 700; margin-top: 4px;">Role: ${a.role==="owner"?"Account Owner (Admin)":"Household Member"}</div>
           </div>
           <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(197,240,78,0.15); border: 1px solid rgba(197,240,78,0.3); padding: 4px 14px; border-radius: 20px; color: #c5f04e; font-size: 12px; font-weight: 700;">
             <span>Founder VIP</span>
