@@ -2838,14 +2838,22 @@ select { max-width: 190px; }
 }
 
 .header-user-badge {
-  display: none;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 20px;
-  padding: 4px 10px 4px 4px;
+  padding: 4px 12px 4px 4px;
   flex-shrink: 0;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: all 0.2s ease;
+}
+.header-user-badge:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(197, 240, 78, 0.4);
 }
 .header-user-badge .sidebar-avatar {
   width: 24px;

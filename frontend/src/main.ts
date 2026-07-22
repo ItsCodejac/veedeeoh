@@ -93,12 +93,19 @@ function wireSidebar(): void {
   const headerUserBadge = document.getElementById("headerUserBadge");
   const logoutBtn = document.getElementById("logoutBtn");
 
+  import("./profiles").then(p => {
+    const activeP = p.getActiveProfile();
+    if (headerEmail) headerEmail.textContent = activeP.name;
+    if (headerAvatar) {
+      headerAvatar.textContent = activeP.is_kids ? 'K' : activeP.name.charAt(0).toUpperCase();
+      headerAvatar.style.background = activeP.avatar_color;
+    }
+  });
+
   if (session) {
     const email = session.email || "";
     if (sidebarEmail) sidebarEmail.textContent = email;
     if (sidebarAvatar) sidebarAvatar.textContent = email.charAt(0).toUpperCase();
-    if (headerEmail) headerEmail.textContent = email;
-    if (headerAvatar) headerAvatar.textContent = email.charAt(0).toUpperCase();
 
     if (logoutBtn) {
       logoutBtn.addEventListener("click", () => {

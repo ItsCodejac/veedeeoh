@@ -9,6 +9,8 @@ export function openSettingsModal(): void {
   const profiles = getStoredProfiles();
   const activeProfile = getActiveProfile();
 
+  const defaultAccName = (session && session.email) ? session.email.split('@')[0]! : 'My Household';
+  const accName = localStorage.getItem('veedeeoh_account_name') || defaultAccName;
   const modal = document.createElement('div');
   modal.id = 'settingsModal';
   modal.style.cssText = `
@@ -28,12 +30,20 @@ export function openSettingsModal(): void {
         <button id="closeSettingsBtn" style="background: none; border: none; color: #9aa5b5; font-size: 24px; cursor: pointer;">✕</button>
       </div>
 
-      <!-- Account Info -->
+      <!-- Account Info & Name -->
       <div style="background: #080a10; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 20px; margin-bottom: 24px;">
-        <div style="font-size: 12px; color: #9aa5b5; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">CURRENT ACCOUNT</div>
-        <div style="font-size: 18px; font-weight: 700; color: #fff;">${session ? escapeHtml(session.email) : 'Local / Self-Hosted Guest'}</div>
-        <div style="margin-top: 10px; display: inline-flex; align-items: center; gap: 8px; background: rgba(197,240,78,0.15); border: 1px solid rgba(197,240,78,0.3); padding: 4px 14px; border-radius: 20px; color: #c5f04e; font-size: 12px; font-weight: 700;">
-          <span>Membership Tier: Founder VIP (Unlimited Profiles)</span>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+          <div>
+            <div style="font-size: 12px; color: #9aa5b5; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">CURRENT ACCOUNT</div>
+            <div style="font-size: 18px; font-weight: 700; color: #fff;">${session ? escapeHtml(session.email) : 'Local / Self-Hosted Guest'}</div>
+          </div>
+          <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(197,240,78,0.15); border: 1px solid rgba(197,240,78,0.3); padding: 4px 14px; border-radius: 20px; color: #c5f04e; font-size: 12px; font-weight: 700;">
+            <span>Founder VIP</span>
+          </div>
+        </div>
+        <div>
+          <label style="display: block; font-size: 12px; color: #9aa5b5; margin-bottom: 6px; font-weight: 700;">HOUSEHOLD / ACCOUNT DISPLAY NAME</label>
+          <input type="text" id="accountDisplayName" value="${escapeHtml(accName)}" placeholder="e.g. Cojac's Household" style="width: 100%; padding: 10px 14px; background: #10141e; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 14px; outline: none;" />
         </div>
       </div>
 
@@ -115,6 +125,16 @@ export function openSettingsModal(): void {
     addProfileBtn.addEventListener('click', () => {
       modal.remove();
       openProfileEditor();
+    });
+  }
+
+  const nameInput = modal.querySelector('#accountDisplayName') as HTMLInputElement | null;
+  if (nameInput) {
+    nameInput.addEventListener('change', () => {
+      const val = nameInput.value.trim();
+      if (val) {
+        localStorage.setItem('veedeeoh_account_name', val);
+      }
     });
   }
 

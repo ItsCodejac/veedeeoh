@@ -1,9 +1,9 @@
-import{getStoredProfiles as x,getActiveProfile as f,openProfileEditor as s}from"./profiles-DGlbhFUp.js";import{g as b}from"./auth-Dq18GEHP.js";function m(){const t=document.getElementById("settingsModal");t&&t.remove();const o=b(),n=x(),p=f(),i=document.createElement("div");i.id="settingsModal",i.style.cssText=`
+import{getStoredProfiles as v,getActiveProfile as u,openProfileEditor as p}from"./profiles-DGlbhFUp.js";import{g as m}from"./auth-Dq18GEHP.js";function k(){const o=document.getElementById("settingsModal");o&&o.remove();const i=m(),d=v(),c=u(),g=i&&i.email?i.email.split("@")[0]:"My Household",x=localStorage.getItem("veedeeoh_account_name")||g,t=document.createElement("div");t.id="settingsModal",t.style.cssText=`
     position: fixed; inset: 0; background: rgba(6,7,10,0.92);
     backdrop-filter: blur(20px); z-index: 9999;
     display: flex; align-items: center; justify-content: center; padding: 20px;
     color: #fff; font-family: 'Space Grotesk', sans-serif;
-  `,i.innerHTML=`
+  `,t.innerHTML=`
     <div style="background: #10141e; border: 1px solid rgba(255,255,255,0.15); border-radius: 24px; max-width: 620px; width: 100%; padding: 32px; box-shadow: 0 24px 60px rgba(0,0,0,0.9); max-height: 90vh; overflow-y: auto;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 16px;">
         <h2 style="margin: 0; font-size: 24px; font-weight: 800; display: inline-flex; align-items: center; gap: 10px;">
@@ -13,12 +13,20 @@ import{getStoredProfiles as x,getActiveProfile as f,openProfileEditor as s}from"
         <button id="closeSettingsBtn" style="background: none; border: none; color: #9aa5b5; font-size: 24px; cursor: pointer;">✕</button>
       </div>
 
-      <!-- Account Info -->
+      <!-- Account Info & Name -->
       <div style="background: #080a10; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 20px; margin-bottom: 24px;">
-        <div style="font-size: 12px; color: #9aa5b5; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">CURRENT ACCOUNT</div>
-        <div style="font-size: 18px; font-weight: 700; color: #fff;">${o?l(o.email):"Local / Self-Hosted Guest"}</div>
-        <div style="margin-top: 10px; display: inline-flex; align-items: center; gap: 8px; background: rgba(197,240,78,0.15); border: 1px solid rgba(197,240,78,0.3); padding: 4px 14px; border-radius: 20px; color: #c5f04e; font-size: 12px; font-weight: 700;">
-          <span>Membership Tier: Founder VIP (Unlimited Profiles)</span>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+          <div>
+            <div style="font-size: 12px; color: #9aa5b5; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">CURRENT ACCOUNT</div>
+            <div style="font-size: 18px; font-weight: 700; color: #fff;">${i?a(i.email):"Local / Self-Hosted Guest"}</div>
+          </div>
+          <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(197,240,78,0.15); border: 1px solid rgba(197,240,78,0.3); padding: 4px 14px; border-radius: 20px; color: #c5f04e; font-size: 12px; font-weight: 700;">
+            <span>Founder VIP</span>
+          </div>
+        </div>
+        <div>
+          <label style="display: block; font-size: 12px; color: #9aa5b5; margin-bottom: 6px; font-weight: 700;">HOUSEHOLD / ACCOUNT DISPLAY NAME</label>
+          <input type="text" id="accountDisplayName" value="${a(x)}" placeholder="e.g. Cojac's Household" style="width: 100%; padding: 10px 14px; background: #10141e; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 14px; outline: none;" />
         </div>
       </div>
 
@@ -29,14 +37,14 @@ import{getStoredProfiles as x,getActiveProfile as f,openProfileEditor as s}from"
           <button id="settingsAddProfileBtn" style="background: #c5f04e; color: #06070a; border: none; padding: 6px 14px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer;">+ Add Profile</button>
         </div>
         <div style="display: flex; flex-direction: column; gap: 10px;">
-          ${n.map(e=>`
+          ${d.map(e=>`
             <div style="display: flex; align-items: center; justify-content: space-between; background: #080a10; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 12px 16px;">
               <div style="display: flex; align-items: center; gap: 12px;">
                 <div style="width: 36px; height: 36px; border-radius: 8px; background: ${e.avatar_color}; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #06070a;">
                   ${e.is_kids?"🎈":e.name.charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <div style="font-weight: 700; font-size: 15px;">${l(e.name)} ${e.id===p.id?'<span style="color: #c5f04e; font-size: 12px;">(Active)</span>':""}</div>
+                  <div style="font-weight: 700; font-size: 15px;">${a(e.name)} ${e.id===c.id?'<span style="color: #c5f04e; font-size: 12px;">(Active)</span>':""}</div>
                   <div style="font-size: 12px; color: #9aa5b5;">${e.is_kids?"veedeeoh.kidz":"Standard"} · Rating Max: ${e.max_rating} ${e.pin?"· 🔒 PIN Set":""}</div>
                 </div>
               </div>
@@ -88,4 +96,4 @@ import{getStoredProfiles as x,getActiveProfile as f,openProfileEditor as s}from"
         </div>
       </div>
     </div>
-  `,document.body.appendChild(i);const d=i.querySelector("#closeSettingsBtn");d&&d.addEventListener("click",()=>i.remove());const a=i.querySelector("#settingsAddProfileBtn");a&&a.addEventListener("click",()=>{i.remove(),s()}),i.querySelectorAll(".settingsEditProfileBtn").forEach(e=>{e.addEventListener("click",()=>{const c=e.dataset.id,r=n.find(g=>g.id===c);r&&(i.remove(),s(r))})})}function l(t){return t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}export{m as openSettingsModal};
+  `,document.body.appendChild(t);const r=t.querySelector("#closeSettingsBtn");r&&r.addEventListener("click",()=>t.remove());const l=t.querySelector("#settingsAddProfileBtn");l&&l.addEventListener("click",()=>{t.remove(),p()});const n=t.querySelector("#accountDisplayName");n&&n.addEventListener("change",()=>{const e=n.value.trim();e&&localStorage.setItem("veedeeoh_account_name",e)}),t.querySelectorAll(".settingsEditProfileBtn").forEach(e=>{e.addEventListener("click",()=>{const f=e.dataset.id,s=d.find(b=>b.id===f);s&&(t.remove(),p(s))})})}function a(o){return o.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}export{k as openSettingsModal};
