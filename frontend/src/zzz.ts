@@ -298,68 +298,8 @@ export function renderZzzSanctuary(container: HTMLElement | null): void {
     container.appendChild(favSection);
   }
 
-  // 2. Fetch live scraped catalog rails from Pluto TV and Tubi
-  import('./vod').then(async (vod) => {
-    try {
-      const rails = await vod.getVodRails();
-      const ambientRails = rails.filter(r => /ambient|sleep|relaxation|naturescape|zenlife|white noise|rain|binaural|meditation|lullaby|fireplace|soundscape|ocean/i.test(r.name));
-
-      if (ambientRails.length > 0) {
-        ambientRails.forEach(rail => {
-          const section = document.createElement('div');
-          section.className = 'showcaseRail';
-          section.style.marginBottom = '32px';
-
-          const header = document.createElement('h3');
-          header.style.cssText = 'font-size: 20px; font-weight: 800; color: #a78bfa; margin: 0 0 16px; display: flex; align-items: center; gap: 8px;';
-          header.innerHTML = `
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-            <span>${escapeHtml(rail.name)}</span>
-          `;
-          section.appendChild(header);
-
-          const row = document.createElement('div');
-          row.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px;';
-
-          rail.items.forEach((item: VodItem) => {
-            const card = document.createElement('div');
-            card.style.cssText = 'background: #10141e; border: 1px solid rgba(167,139,250,0.2); border-radius: 16px; overflow: hidden; cursor: pointer; transition: transform 0.2s ease, border-color 0.2s ease; position: relative;';
-            card.onmouseover = () => { card.style.transform = 'translateY(-4px)'; card.style.borderColor = '#a78bfa'; };
-            card.onmouseout = () => { card.style.transform = 'none'; card.style.borderColor = 'rgba(167,139,250,0.2)'; };
-
-            card.innerHTML = `
-              <div style="height: 150px; position: relative; overflow: hidden;">
-                <img src="${item.poster || item.banner || ''}" alt="${escapeHtml(item.title)}" style="width: 100%; height: 100%; object-fit: cover;" />
-                <div style="position: absolute; inset: 0; background: linear-gradient(180deg, transparent 40%, rgba(6,7,10,0.9) 100%);"></div>
-                <div style="position: absolute; bottom: 12px; left: 12px; right: 12px; display: flex; align-items: center; justify-content: space-between;">
-                  <span style="background: rgba(167,139,250,0.3); backdrop-filter: blur(8px); border: 1px solid rgba(167,139,250,0.5); color: #fff; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700;">${escapeHtml(item.provider || 'LIVE STREAM')}</span>
-                  <div style="width: 32px; height: 32px; border-radius: 50%; background: #a78bfa; color: #06070a; display: flex; align-items: center; justify-content: center; font-weight: bold;">▶</div>
-                </div>
-              </div>
-              <div style="padding: 16px;">
-                <h4 style="margin: 0 0 6px; font-size: 15px; font-weight: 700; color: #fff;">${escapeHtml(item.title)}</h4>
-                <p style="margin: 0; font-size: 12px; color: #9aa5b5; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${escapeHtml(item.summary || item.genre || '')}</p>
-              </div>
-            `;
-
-            card.onclick = () => {
-              playZzzAmbientItem(item);
-            };
-
-            row.appendChild(card);
-          });
-
-          section.appendChild(row);
-          container.appendChild(section);
-        });
-      } else {
-        // Fallback Grounding Pillars if catalog is loading
-        renderFallbackGroundingPillars(container);
-      }
-    } catch {
-      renderFallbackGroundingPillars(container);
-    }
-  });
+  // 2. Curated Grounding Pillars (Sleep, Wake, Vibe, Meditate)
+  renderFallbackGroundingPillars(container);
 
   // Wire Top Floating Controls Bar
   wireZzzControlBar();

@@ -72,6 +72,10 @@ function wireSidebar(): void {
       if ("wakeLock" in navigator) {
         navigator.wakeLock.request("screen").catch(() => {});
       }
+    } else if (activeTabId === "tabOcean") {
+      if (brand) brand.innerHTML = `veedeeoh<span style="color:#38bdf8;">.ocean</span>`;
+      if (mobileBrand) mobileBrand.innerHTML = `v<span style="color:#38bdf8;">.ocean</span>`;
+      document.body.classList.remove("zzz-mode-active");
     } else {
       if (brand) brand.innerHTML = `veedeeoh<span>.</span>`;
       if (mobileBrand) mobileBrand.innerHTML = `v<span>.</span>`;
@@ -98,8 +102,12 @@ function wireSidebar(): void {
       $("zzzView").removeAttribute("hidden");
       import("./zzz").then(zzz => zzz.renderZzzSanctuary($("zzzRails")));
     } else if (activeTabId === "tabOcean") {
-      $("oceanView").removeAttribute("hidden");
-      import("./vod").then(vod => vod.renderOceanTvView($("oceanRails")));
+      const oceanView = $("oceanView");
+      const oceanGrid = $("oceanGrid");
+      if (oceanView) oceanView.removeAttribute("hidden");
+      if (oceanGrid) {
+        import("./ocean").then(ocean => ocean.renderOceanTvView(oceanGrid));
+      }
     }
   }
 
