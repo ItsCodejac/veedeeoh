@@ -28,6 +28,7 @@ export interface VodItem {
   genre?: string | null;
   rating?: string | null;
   duration?: number | null;
+  provider?: string | null;
   url?: string;
   series_id?: string;
   identifier?: string;
