@@ -288,7 +288,7 @@ export function renderZzzSanctuary(container: HTMLElement | null): void {
       `;
 
       card.onclick = () => {
-        import('./vod').then(vod => vod.openVodDetails(item));
+        playZzzAmbientItem(item);
       };
 
       favRow.appendChild(card);
@@ -337,7 +337,7 @@ export function renderZzzSanctuary(container: HTMLElement | null): void {
       `;
 
       card.onclick = () => {
-        import('./vod').then(vod => vod.openVodDetails(item));
+        playZzzAmbientItem(item);
       };
 
       row.appendChild(card);
@@ -349,6 +349,105 @@ export function renderZzzSanctuary(container: HTMLElement | null): void {
 
   // Wire Top Floating Controls Bar
   wireZzzControlBar();
+}
+
+export function playZzzAmbientItem(item: VodItem): void {
+  // Screen Wake Lock API
+  if ("wakeLock" in navigator) {
+    navigator.wakeLock.request("screen").catch(() => {});
+  }
+
+  const existing = document.getElementById("zzzAmbientPlayerOverlay");
+  if (existing) existing.remove();
+
+  const overlay = document.createElement("div");
+  overlay.id = "zzzAmbientPlayerOverlay";
+  overlay.style.cssText = `
+    position: fixed; inset: 0; background: #050609; z-index: 100000;
+    display: flex; flex-direction: column; color: #fff; font-family: "Space Grotesk", sans-serif;
+  `;
+
+  overlay.innerHTML = `
+    <!-- Top Sleep Bar HUD -->
+    <div style="position: absolute; top: 0; left: 0; right: 0; padding: 20px 32px; background: linear-gradient(180deg, rgba(6,7,10,0.95) 0%, transparent 100%); z-index: 10; display: flex; justify-content: space-between; align-items: center; gap: 16px; backdrop-filter: blur(12px);">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="color: #a78bfa; font-weight: 800; font-size: 18px;">veedeeoh.zzz</span>
+        <span style="color: rgba(255,255,255,0.4);">|</span>
+        <span style="color: #fff; font-weight: 700; font-size: 16px;">${escapeHtml(item.title)}</span>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <!-- OLED Pitch Blackout Button -->
+        <button id="zzzBlackoutBtn" style="padding: 8px 16px; border-radius: 10px; background: rgba(0,0,0,0.6); border: 1px solid rgba(167,139,250,0.4); color: #a78bfa; font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+          <span>OLED Blackout</span>
+        </button>
+
+        <!-- Nightstand Clock Button -->
+        <button id="zzzPlayerClockBtn" style="padding: 8px 16px; border-radius: 10px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          <span>Nightstand Mode</span>
+        </button>
+
+        <!-- Exit Sleep Player -->
+        <button id="zzzExitPlayerBtn" style="padding: 8px 16px; border-radius: 10px; background: rgba(255,94,126,0.2); border: 1px solid rgba(255,94,126,0.4); color: #ff5e7e; font-size: 13px; font-weight: 800; cursor: pointer;">
+          ✕ Exit Sleep
+        </button>
+      </div>
+    </div>
+
+    <!-- Video Ambient Viewport -->
+    <div id="zzzVideoContainer" style="flex: 1; position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #000;">
+      <video id="zzzActiveVideo" autoplay loop playsinline style="width: 100%; height: 100%; object-fit: cover;">
+        <source src="${item.url || ''}" type="video/mp4" />
+      </video>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  const videoEl = overlay.querySelector('#zzzActiveVideo') as HTMLVideoElement;
+  if (videoEl) {
+    videoEl.play().catch(err => {
+      console.warn("Ambient video autoplay prevented:", err);
+    });
+  }
+
+  // Wire Blackout Mode
+  const blackoutBtn = overlay.querySelector('#zzzBlackoutBtn') as HTMLButtonElement | null;
+  const videoContainer = overlay.querySelector('#zzzVideoContainer') as HTMLElement | null;
+  if (blackoutBtn && videoContainer) {
+    let isBlackout = false;
+    blackoutBtn.onclick = () => {
+      isBlackout = !isBlackout;
+      if (isBlackout) {
+        videoContainer.style.opacity = "0.01";
+        blackoutBtn.style.background = "#a78bfa";
+        blackoutBtn.style.color = "#06070a";
+        showSleepToast("OLED Blackout Active (Audio Playing)");
+      } else {
+        videoContainer.style.opacity = "1";
+        blackoutBtn.style.background = "rgba(0,0,0,0.6)";
+        blackoutBtn.style.color = "#a78bfa";
+      }
+    };
+  }
+
+  // Wire Nightstand Clock
+  const clockBtn = overlay.querySelector('#zzzPlayerClockBtn') as HTMLButtonElement | null;
+  if (clockBtn) {
+    clockBtn.onclick = () => toggleNightDimmerMode();
+  }
+
+  // Wire Exit Button
+  const exitBtn = overlay.querySelector('#zzzExitPlayerBtn') as HTMLButtonElement | null;
+  if (exitBtn) {
+    exitBtn.onclick = () => {
+      if (videoEl) videoEl.pause();
+      overlay.remove();
+      showSleepToast("Exited sleep mode");
+    };
+  }
 }
 
 function wireZzzControlBar(): void {
