@@ -1,7 +1,22 @@
-import { getStoredProfiles, openProfileEditor, getActiveProfile } from './profiles';
+import { getStoredProfiles, openProfileEditor, getActiveProfile, promptPinVerification } from './profiles';
 import { getSession } from './auth';
 
 export function openSettingsModal(): void {
+  const activeProfile = getActiveProfile();
+  const profiles = getStoredProfiles();
+  
+  // Find master PIN if set on any household profile
+  const masterPin = profiles.find(p => p.pin)?.pin || activeProfile.pin;
+
+  // Gating: If currently in Kids Mode or profile has a PIN, require Parent PIN verification
+  if ((activeProfile.is_kids || activeProfile.pin || masterPin) && masterPin) {
+    promptPinVerification(masterPin, () => renderSettingsModalInternal());
+  } else {
+    renderSettingsModalInternal();
+  }
+}
+
+function renderSettingsModalInternal(): void {
   const existing = document.getElementById('settingsModal');
   if (existing) existing.remove();
 

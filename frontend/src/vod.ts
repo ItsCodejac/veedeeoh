@@ -1415,11 +1415,24 @@ export async function renderHome(): Promise<void> {
     }
 
     // 3. Separate TV and Movies, and Group by Genre
-    const moviesItems = allItems.filter(i => (i.type === "movie" || (!i.series_id && i.type !== "series")) && i.type !== "podcast");
-    const tvItems = allItems.filter(i => i.type === "series" || i.series_id);
-    
-    const uniqueMovies = Array.from(new Map(moviesItems.map(m => [m.title, m])).values()).filter(i => i.poster || i.banner);
-    const uniqueTv = Array.from(new Map(tvItems.map(m => [m.title, m])).values()).filter(i => i.poster || i.banner);
+    import("./profiles").then(p => {
+      const activeP = p.getActiveProfile();
+      const RATING_SEVERITY: Record<string, number> = {
+        "G": 1, "TV-Y": 1, "TV-Y7": 1, "PG": 2, "TV-PG": 2, "PG-13": 3, "TV-14": 3, "R": 4, "TV-MA": 4
+      };
+      const maxCap = RATING_SEVERITY[activeP.max_rating || "TV-MA"] || 4;
+
+      const isAllowed = (item: VodItem) => {
+        if (!item.rating) return true;
+        const sev = RATING_SEVERITY[item.rating.toUpperCase()] || 2;
+        return sev <= maxCap;
+      };
+
+      const moviesItems = allItems.filter(i => (i.type === "movie" || (!i.series_id && i.type !== "series")) && i.type !== "podcast" && isAllowed(i));
+      const tvItems = allItems.filter(i => (i.type === "series" || i.series_id) && isAllowed(i));
+      
+      const uniqueMovies = Array.from(new Map(moviesItems.map(m => [m.title, m])).values()).filter(i => i.poster || i.banner);
+      const uniqueTv = Array.from(new Map(tvItems.map(m => [m.title, m])).values()).filter(i => i.poster || i.banner);
     
     const groupIntoGenres = (items: VodItem[], fallbackGenre: string) => {
       const groups: Record<string, VodItem[]> = {};
@@ -1502,6 +1515,7 @@ export async function renderHome(): Promise<void> {
       if (items.length >= 3 && genre !== "Binge-Worthy Series") {
         renderGenreRail(`${genre} TV`, items, false);
       }
+    });
     });
   } catch (err) {
     loading.textContent = `Failed to load Home dashboard: ${err}`;
