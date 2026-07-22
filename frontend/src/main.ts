@@ -88,33 +88,29 @@ function wireSidebar(): void {
   const sidebarUser = document.getElementById("sidebarUser");
   const sidebarEmail = document.getElementById("sidebarEmail");
   const sidebarAvatar = document.getElementById("sidebarAvatar");
-  const headerEmail = document.getElementById("headerEmail");
-  const headerAvatar = document.getElementById("headerAvatar");
-  const headerUserBadge = document.getElementById("headerUserBadge");
   const logoutBtn = document.getElementById("logoutBtn");
 
-  import("./profiles").then(p => {
-    const activeP = p.getActiveProfile();
-    if (headerEmail) headerEmail.textContent = activeP.name;
-    if (headerAvatar) {
-      headerAvatar.textContent = activeP.is_kids ? 'K' : activeP.name.charAt(0).toUpperCase();
-      headerAvatar.style.background = activeP.avatar_color;
-    }
-  });
+  const updateSidebarProfileDisplay = () => {
+    import("./profiles").then(p => {
+      const activeP = p.getActiveProfile();
+      if (sidebarEmail) sidebarEmail.textContent = activeP.name;
+      if (sidebarAvatar) {
+        sidebarAvatar.textContent = activeP.is_kids ? 'K' : activeP.name.charAt(0).toUpperCase();
+        sidebarAvatar.style.background = activeP.avatar_color;
+      }
+    });
+  };
+
+  updateSidebarProfileDisplay();
 
   if (session) {
-    const email = session.email || "";
-    if (sidebarEmail) sidebarEmail.textContent = email;
-    if (sidebarAvatar) sidebarAvatar.textContent = email.charAt(0).toUpperCase();
-
     if (logoutBtn) {
       logoutBtn.addEventListener("click", () => {
         signOut();
       });
     }
   } else if (!session) {
-    if (sidebarUser) sidebarUser.style.display = "none";
-    if (headerUserBadge) headerUserBadge.style.display = "none";
+    if (sidebarUser) sidebarUser.style.display = "flex";
     if (logoutBtn) logoutBtn.style.display = "none";
   }
 }
@@ -171,9 +167,9 @@ function wireHeader(): void {
     });
   }
 
-  const headerUserBadge = $("headerUserBadge");
-  if (headerUserBadge) {
-    headerUserBadge.addEventListener("click", () => {
+  const sidebarUser = $("sidebarUser");
+  if (sidebarUser) {
+    sidebarUser.addEventListener("click", () => {
       const existing = document.getElementById("userAccountMenuModal");
       if (existing) {
         existing.remove();
@@ -223,8 +219,13 @@ function wireHeader(): void {
           switchBtn.addEventListener("click", () => {
             modal.remove();
             p.openProfileSwitcher((newP) => {
-              const headerEmail = $("headerEmail");
-              if (headerEmail) headerEmail.textContent = newP.name;
+              const sidebarEmail = document.getElementById("sidebarEmail");
+              const sidebarAvatar = document.getElementById("sidebarAvatar");
+              if (sidebarEmail) sidebarEmail.textContent = newP.name;
+              if (sidebarAvatar) {
+                sidebarAvatar.textContent = newP.is_kids ? 'K' : newP.name.charAt(0).toUpperCase();
+                sidebarAvatar.style.background = newP.avatar_color;
+              }
               import("./vod").then(vod => vod.renderHome());
             });
           });
@@ -238,13 +239,6 @@ function wireHeader(): void {
           });
         }
       });
-    });
-  }
-
-  const sidebarUser = $("sidebarUser");
-  if (sidebarUser && headerUserBadge) {
-    sidebarUser.addEventListener("click", () => {
-      headerUserBadge.click();
     });
   }
 
