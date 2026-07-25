@@ -109,12 +109,16 @@ export function setSession(email: string, access_token?: string): void {
   setCookie(AUTH_KEY, json, 365);
 }
 
-export function signOut(): void {
+export async function signOut(): Promise<void> {
+  // Await Supabase clearing its own stored session BEFORE navigating. Otherwise
+  // the landing page's auth check races the still-present session, bounces back
+  // into the app, and boot's access gate fires against a half-torn-down session
+  // (which reads as "no account" and wrongly shows the trial-ended paywall).
+  try {
+    await getSupabase().auth.signOut();
+  } catch {}
   localStorage.removeItem(AUTH_KEY);
   eraseCookie(AUTH_KEY);
-  try {
-    getSupabase().auth.signOut();
-  } catch {}
   if (isCloudMode()) {
     window.location.href = '/landing.html';
   } else {
@@ -130,17 +134,41 @@ export async function signIn(email: string, password: string): Promise<{ mustCha
     });
 
     if (error || !data?.session) {
-      setSession(email.trim().toLowerCase());
+      // Cloud (SaaS) must have a real Supabase session — no local bypass.
+      if (isCloudMode()) throw new Error(error?.message || "Invalid email or password.");
+      setSession(email.trim().toLowerCase()); // self-host only (no Supabase)
       return { mustChangePassword: false };
     }
 
     setSession(data.user.email!, data.session.access_token);
     const mustChangePassword = !!data.user.user_metadata?.must_change_password;
     return { mustChangePassword };
-  } catch {
+  } catch (e) {
+    if (isCloudMode()) throw e; // don't grant access on failure in the cloud
     setSession(email.trim().toLowerCase());
     return { mustChangePassword: false };
   }
+}
+
+/** Magic-link (passwordless email). Sends a one-time login link — no provider
+ *  console setup required. Clicking it returns to the app with a live session. */
+export async function signInWithMagicLink(email: string): Promise<void> {
+  const { error } = await getSupabase().auth.signInWithOtp({
+    email: email.trim().toLowerCase(),
+    options: { emailRedirectTo: `${window.location.origin}/index.html` },
+  });
+  if (error) throw error;
+}
+
+/** Google OAuth. Redirects to Google, then back to the app; getSupabase()'s
+ *  detectSessionInUrl establishes the session on return. Requires the Google
+ *  provider to be enabled in Supabase with a Google Cloud OAuth client. */
+export async function signInWithGoogle(): Promise<void> {
+  const { error } = await getSupabase().auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: `${window.location.origin}/index.html` },
+  });
+  if (error) throw error;
 }
 
 export async function signUp(email: string, password: string): Promise<void> {
@@ -157,7 +185,11 @@ export async function signUp(email: string, password: string): Promise<void> {
 
   if (data.session) {
     setSession(cleanEmail, data.session.access_token);
+  } else if (!isCloudMode()) {
+    setSession(cleanEmail); // self-host only
   } else {
-    setSession(cleanEmail);
+    // Cloud: no session yet means email confirmation is required — don't grant
+    // a local session (that would bypass the gate).
+    throw new Error("Account created. Check your email to confirm, then sign in.");
   }
 }

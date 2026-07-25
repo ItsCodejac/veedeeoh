@@ -1,4 +1,6 @@
 {
+  "buildCommand": "npm run build",
+  "outputDirectory": "src/tvlc/static",
   "routes": [
     { "src": "/", "dest": "/landing.html" },
     { "src": "/privacy", "dest": "/privacy.html" },
@@ -9,5 +11,11 @@
     { "src": "/api/(.*)", "dest": "/api/index.ts" },
     { "src": "/proxy", "dest": "/api/proxy.ts" },
     { "handle": "filesystem" }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/catalog-warm",
+      "schedule": "0 6 * * *"
+    }
   ]
 }

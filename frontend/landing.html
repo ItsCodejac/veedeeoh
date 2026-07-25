@@ -399,6 +399,27 @@
         max-width: 740px;
       }
 
+      .hero-cta {
+        display: flex;
+        gap: 14px;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin: 0 0 18px;
+      }
+
+      .hero-cta .btn {
+        padding: 15px 34px;
+        font-size: 16px;
+        border-radius: 12px;
+      }
+
+      .hero-trust {
+        font-size: 14px;
+        color: var(--dim);
+        margin: 0;
+        text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9);
+      }
+
       .hero-form-container {
         position: relative;
         width: 100%;
@@ -1331,26 +1352,24 @@
       <div class="hero-content">
         <div class="hero-badge" id="heroLiveStats" style="margin: 0 auto 20px; display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 20px; background: rgba(197, 240, 78, 0.08); border: 1px solid rgba(197, 240, 78, 0.25); font-family: var(--display); font-size: 13px; font-weight: 600; color: var(--accent);">
           <span class="live-pulse" style="width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent);"></span>
-          <span id="heroStatsText">⚡ OVER 3,400+ FREE MOVIES & TV SHOWS · UPDATED LIVE</span>
+          <span id="heroStatsText">OVER 3,400+ FREE MOVIES &amp; TV SHOWS, UPDATED LIVE</span>
         </div>
         <h1>All your movies &amp; TV shows. <span class="hero-gradient-text">One place.</span></h1>
-        <p class="hero-subtitle">Stream thousands of movies and TV shows across all your devices. Pristine high-definition playback with zero ad interruptions.</p>
-        
-        <div class="hero-form-container">
-          <form class="hero-form" id="heroForm">
-            <input type="email" id="heroEmailInput" placeholder="Enter email for cloud waitlist..." required />
-            <button type="submit" class="btn btn-accent" id="heroWaitlistBtn">Join Waitlist &gt;</button>
-          </form>
-          <div id="heroWaitlistMessage" style="margin-top: 14px; font-size: 14px; font-weight: 600; color: var(--accent); display: none; text-align: center;"></div>
+        <p class="hero-subtitle">Thousands of free movies and TV shows from services like Pluto TV, Tubi, and the Internet Archive, gathered into one app and played without ads.</p>
+
+        <div class="hero-cta">
+          <button class="btn btn-accent" id="heroTrialBtn">Start free trial</button>
+          <button class="btn btn-outline" id="heroSignInBtn">Sign in</button>
         </div>
+        <p class="hero-trust">7 days free, then $4/mo for 3 profiles. Cancel anytime.</p>
 
       </div>
     </section>
 
     <!-- Category Hub Showcase (Hydrated from real VOD Rails) -->
     <section class="hub-section" id="catalog">
-      <h2 class="section-title">Explore Content</h2>
-      <p class="section-subtitle">Discover titles currently live in our streaming catalog.</p>
+      <h2 class="section-title">Browse by category</h2>
+      <p class="section-subtitle">A sample of what is playing right now, organized the way you actually watch.</p>
 
       <div class="hub-grid" id="hubGrid">
         <!-- Dynamically populated from live VOD rails -->
@@ -1359,8 +1378,8 @@
 
     <!-- Top Watched Showcase (Hydrated from real VOD Catalog) -->
     <section class="top10-section">
-      <h2 class="section-title">Top Watched Catalog</h2>
-      <p class="section-subtitle">Popular VOD titles available to stream instantly on veedeeoh.</p>
+      <h2 class="section-title">Popular this week</h2>
+      <p class="section-subtitle">Titles people are watching most across the veedeeoh catalog.</p>
 
       <div class="top10-row" id="top10Row">
         <!-- Dynamically populated with real top catalog items -->
@@ -1369,8 +1388,8 @@
 
     <!-- Movie Genre Showcase Infinite Film Strip Loop -->
     <section class="genre-section" id="features">
-      <h2 class="section-title" style="text-align: center;">Explore Movie &amp; TV Genres</h2>
-      <p class="section-subtitle" style="text-align: center; margin-bottom: 24px;">Browse continuous film strip collections across thousands of streaming titles.</p>
+      <h2 class="section-title" style="text-align: center;">Something for everyone</h2>
+      <p class="section-subtitle" style="text-align: center; margin-bottom: 24px;">From award winners to anime, classic TV to cult films, all in one library.</p>
 
       <div class="film-strip-border"></div>
 
@@ -1383,27 +1402,27 @@
       <div class="film-strip-border"></div>
     </section>
 
-    <!-- Hosted Infrastructure Pricing Plan (Coming Soon) -->
+    <!-- Cloud Plan Pricing -->
     <section class="pricing-section" id="pricing">
-      <div class="badge" style="margin-bottom: 16px;">COMING SOON</div>
-      <h2 class="section-title">Cloud Hosted Plan</h2>
-      <p class="section-subtitle">Cloud access is opening soon. Join the waitlist to reserve your spot.</p>
+      <div class="badge" style="margin-bottom: 16px;">SIMPLE PRICING</div>
+      <h2 class="section-title">One plan, your whole household</h2>
+      <p class="section-subtitle">Start with a 7-day free trial. No card charged until it ends.</p>
 
       <div class="pricing-card">
         <div class="pricing-header">
-          <div class="pricing-title">Managed Cloud Access</div>
-          <div class="pricing-cost">$5 <span>/ mo</span></div>
+          <div class="pricing-title">Cloud access</div>
+          <div class="pricing-cost">$4 <span>/ mo</span></div>
         </div>
         <div class="pricing-desc">
-          Covers managed cloud infrastructure, proxy bandwidth, and automatic platform updates.
+          Three profiles included. Add more household members for $2/mo each.
         </div>
         <ul class="pricing-list">
-          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Thousands of Movies &amp; TV Shows</li>
-          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Adaptive HLS resolution scaling</li>
-          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Resume progress across all your devices</li>
-          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Cancel anytime with 1-click</li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Thousands of movies and TV shows, no ads</li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> 3 profiles with Kids mode and rating limits</li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Your list and watch progress sync across devices</li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Cancel anytime, no lock-in</li>
         </ul>
-        <button class="btn btn-accent" style="width: 100%; padding: 16px;" onclick="document.getElementById('heroEmailInput').focus(); window.scrollTo({top: 0, behavior: 'smooth'});">Join Cloud Waitlist</button>
+        <button class="btn btn-accent" style="width: 100%; padding: 16px;" id="pricingTrialBtn">Start free trial</button>
       </div>
     </section>
 
@@ -1512,17 +1531,27 @@ Health Check: /api/health</div>
             <span class="faq-icon">+</span>
           </button>
           <div class="faq-answer">
-            veedeeoh is a modern streaming platform for Video-on-Demand. It provides seamless playback of movies and TV shows across smart TVs, phones, tablets, and browsers.
+            veedeeoh gathers free, ad-supported content from services like Pluto TV, Tubi, and the Internet Archive and puts it in one place. You get a single library of movies and TV shows to watch across your browser, phone, tablet, and smart TV, without the ads.
           </div>
         </div>
 
         <div class="faq-item">
           <button class="faq-button" onclick="this.parentElement.classList.toggle('active')">
-            <span>How much does access cost?</span>
+            <span>How much does it cost?</span>
             <span class="faq-icon">+</span>
           </button>
           <div class="faq-answer">
-            Hosted access is $5/month to cover server infrastructure and bandwidth. If you want to host it yourself on your own computer or home lab, it is 100% free and open-source.
+            Cloud access is $4 a month and includes three profiles. Extra household members are $2 a month each. Every account starts with a 7-day free trial, and you can cancel anytime. If you would rather run it on your own hardware, self-hosting is free and open-source.
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-button" onclick="this.parentElement.classList.toggle('active')">
+            <span>Where does the content come from?</span>
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer">
+            All titles come from free, publicly available streaming services and public-domain archives. veedeeoh does not host the video itself; it plays directly from those providers and organizes everything into one clean interface. Available titles change as the providers update their catalogs.
           </div>
         </div>
 
@@ -1532,17 +1561,17 @@ Health Check: /api/health</div>
             <span class="faq-icon">+</span>
           </button>
           <div class="faq-answer">
-            You can stream from any web browser, smartphone, tablet, laptop, or smart TV device with no app downloads required.
+            Any web browser on a phone, tablet, laptop, or smart TV. There is nothing to install. Your profiles, list, and watch progress follow you from one device to the next.
           </div>
         </div>
 
         <div class="faq-item">
           <button class="faq-button" onclick="this.parentElement.classList.toggle('active')">
-            <span>How do I self-host the project?</span>
+            <span>Can I run it myself?</span>
             <span class="faq-icon">+</span>
           </button>
           <div class="faq-answer">
-            We provide pre-built Docker containers and Railway templates. Simply pull the repository from GitHub and run `docker compose up` to start your personal media server.
+            Yes. The self-hosted version is free and open-source. Pull the repository from GitHub and run `docker compose up` to start your own media server on Docker, Unraid, Synology, or a standard Linux server.
           </div>
         </div>
       </div>

@@ -65,6 +65,9 @@ export interface HouseholdProfile {
   name: string;
   avatar_color: string;
   role?: 'owner' | 'adult';
+  is_kids?: boolean;
+  max_rating?: string | null; // e.g. 'TV-G'; null/undefined = no cap (adult)
+  pin?: string | null;        // parental lock to leave a kids profile
 }
 
 export interface SleepTimerConfig {

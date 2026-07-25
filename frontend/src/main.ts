@@ -3,7 +3,124 @@ import { fetchCatalog, fetchWatched } from "./api";
 import { state } from "./state";
 import { $, showToast } from "./util";
 import { wireVodDetails, renderShows, renderMovies, wireSearchInputs, renderHome } from "./vod";
-import { getSession, isCloudMode, restoreSession, signOut } from "./auth";
+import { getSession, isCloudMode, restoreSession, signOut, getSupabase } from "./auth";
+import { getActiveProfile } from "./profiles";
+
+// Playful multicolor kids identity, used for the brand + kids theme.
+const KIDS_WORDMARK = `veedeeoh<span style="color:#7ed957;">.</span><span style="color:#ff9f1c;">k</span><span style="color:#4dabf7;">i</span><span style="color:#ff6b6b;">d</span><span style="color:#a9e34b;">s</span>`;
+
+// Branded ident, played on profile SELECTION (a user gesture, so audio is
+// allowed — cold-boot autoplay can't have sound). Normal or kids variant,
+// tap-to-skip, self-healing. Calls done() when it finishes so the already-loaded
+// home reveals immediately after.
+function playIdent(isKids: boolean, done: () => void): void {
+  const o = document.createElement("div");
+  o.id = "bootIdent";
+  o.style.cssText = "position:fixed;inset:0;z-index:99999;background:#06070a;display:flex;align-items:center;justify-content:center;transition:opacity .5s ease;";
+  const v = document.createElement("video");
+  v.src = isKids ? "/kids-bump.mp4" : "/bump.mp4";
+  v.autoplay = true; v.setAttribute("playsinline", "");
+  v.style.cssText = "width:100%;height:100%;object-fit:contain;";
+  let finished = false;
+  const finish = () => { if (finished) return; finished = true; o.style.opacity = "0"; setTimeout(() => o.remove(), 500); done(); };
+  v.onended = finish; v.onerror = finish; o.onclick = finish;
+  o.appendChild(v);
+  document.body.appendChild(o);
+  setTimeout(finish, 6000); // never trap the user behind a stalled video
+  v.play().catch(() => { v.muted = true; v.play().catch(finish); }); // sound; fall back muted
+}
+
+// Paywall shown when a signed-in user has no active trial/subscription. Blocks
+// the app until they subscribe (Stripe Checkout) — the trial-expiry gate.
+// Fade out and remove the boot splash once the first real screen (Who's Watching,
+// paywall, or home) is ready to take over.
+function hideBootSplash(): void {
+  const s = document.getElementById("bootSplash");
+  if (!s) return;
+  s.style.opacity = "0";
+  setTimeout(() => s.remove(), 400);
+}
+
+// Apply per-profile chrome: kids theme, sidebar contents, and avatar. A kids
+// profile gets a stripped-down sidebar (Home only) and the bright kids theme;
+// a parent profile gets the full nav plus the veedeeoh.kids shortcut.
+function applyProfileChrome(profile: { name?: string; avatar_color?: string; is_kids?: boolean }): void {
+  const isKids = !!profile?.is_kids;
+  document.body.classList.toggle("kids-mode", isKids);
+
+  // Brand identity follows the profile.
+  const brand = document.getElementById("brand");
+  const mobileBrand = document.querySelector(".mobile-brand");
+  if (isKids) {
+    if (brand) brand.innerHTML = KIDS_WORDMARK;
+    if (mobileBrand) mobileBrand.innerHTML = `v<span style="color:#ff9f1c;">k</span>`;
+  } else {
+    if (brand) brand.innerHTML = `veedeeoh<span>.</span>`;
+    if (mobileBrand) mobileBrand.innerHTML = `v<span>.</span>`;
+  }
+
+  // Kids: hide the adult browse tabs; parent: show them.
+  ["tabShows", "tabMovies", "tabFavs"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = isKids ? "none" : "";
+  });
+  // The kids shortcut is a parent-only convenience.
+  const kidsTab = document.getElementById("tabKids");
+  if (kidsTab) { if (isKids) kidsTab.setAttribute("hidden", ""); else kidsTab.removeAttribute("hidden"); }
+
+  const av = document.getElementById("sidebarAvatar");
+  if (av && profile.name) { av.textContent = profile.name.charAt(0).toUpperCase(); if (profile.avatar_color) (av as HTMLElement).style.background = profile.avatar_color; }
+  const em = document.getElementById("sidebarEmail");
+  if (em && profile.name) em.textContent = profile.name;
+}
+
+// Land on Home: hide other panels, reveal home, mark the Home tab active.
+function goHome(): void {
+  ["showsView", "moviesView", "kidsView"].forEach((id) => document.getElementById(id)?.setAttribute("hidden", ""));
+  document.getElementById("homeView")?.removeAttribute("hidden");
+  document.querySelectorAll("aside .navBtn").forEach((b) => b.classList.remove("active"));
+  document.getElementById("tabHome")?.classList.add("active");
+}
+
+// The full profile-entry cycle used at boot AND on every later switch: apply the
+// profile's chrome, play the branded bump, then reveal a freshly rendered Home.
+async function enterAsProfile(profile: { name?: string; avatar_color?: string; is_kids?: boolean }, dataReady?: Promise<unknown>): Promise<void> {
+  applyProfileChrome(profile);
+  const vod = await import("./vod");
+  // Warm the VOD catalog WHILE the branded bump plays, so Home is already built
+  // by the time the bump ends — no plain "loading" screen between them.
+  const railsReady = vod.getVodRails().catch(() => {});
+  playIdent(!!profile.is_kids, async () => {
+    goHome();
+    if (dataReady) await dataReady;
+    await railsReady;
+    void vod.renderHome();
+  });
+}
+
+async function showPaywall(): Promise<void> {
+  hideBootSplash();
+  const { startCheckout } = await import("./db");
+  const o = document.createElement("div");
+  o.id = "paywall";
+  o.style.cssText = "position:fixed;inset:0;z-index:99998;background:#06070a;color:#fff;display:flex;align-items:center;justify-content:center;padding:24px;font-family:'Space Grotesk',sans-serif;text-align:center;";
+  o.innerHTML = `
+    <div style="max-width:440px;">
+      <div style="font-family:'Bricolage Grotesque',sans-serif;font-size:40px;font-weight:800;margin-bottom:10px;">veedeeoh<span style="color:#c5f04e;">.</span></div>
+      <h1 style="font-size:26px;font-weight:800;margin:0 0 10px;">Your free trial has ended</h1>
+      <p style="color:#9aa5b5;font-size:16px;line-height:1.6;margin:0 0 28px;">Subscribe to keep watching — every free service in one ad-free app, across your whole household.</p>
+      <button id="pwSub" style="width:100%;padding:15px;border-radius:12px;background:#c5f04e;color:#06070a;border:none;font-weight:800;font-size:16px;cursor:pointer;">Subscribe — $4/mo · 3 profiles</button>
+      <button id="pwOut" style="margin-top:16px;background:none;border:none;color:#9aa5b5;font-size:13px;cursor:pointer;">Sign out</button>
+    </div>`;
+  document.body.appendChild(o);
+  const sub = o.querySelector("#pwSub") as HTMLButtonElement;
+  sub.onclick = async () => {
+    sub.disabled = true; sub.textContent = "Opening checkout…";
+    try { await startCheckout(); }
+    catch (e: any) { alert("Couldn't start checkout: " + (e?.message || e)); sub.disabled = false; sub.textContent = "Subscribe — $4/mo · 3 profiles"; }
+  };
+  (o.querySelector("#pwOut") as HTMLButtonElement).onclick = () => signOut();
+}
 
 async function boot(): Promise<void> {
   if (isCloudMode()) {
@@ -12,21 +129,63 @@ async function boot(): Promise<void> {
       window.location.href = '/landing.html';
       return;
     }
+    // A legacy local-only session can't write to the DB (no auth.uid()), which
+    // silently breaks profiles/favorites/watch. Require a REAL Supabase session;
+    // if it's missing (not just a network blip), force a fresh login.
+    try {
+      const { data, error } = await getSupabase().auth.getUser();
+      if (!error && !data.user) { signOut(); return; }
+    } catch { /* transient network error — proceed rather than bounce */ }
+
+    // Access gate: no active trial/subscription → paywall, not the app.
+    try {
+      const { hasActiveAccess } = await import("./db");
+      if (!(await hasActiveAccess())) { void showPaywall(); return; }
+    } catch { /* if the check errors, fail open rather than lock out a paying user */ }
   }
 
-  const [data, watchedList] = await Promise.all([fetchCatalog(), fetchWatched()]);
+  // Hydrate profiles first so the active profile + gate list are real.
+  await import("./profiles").then(p => p.hydrateProfilesFromCloud()).catch(() => {});
 
-  state.region = data.region;
-  state.favorites = new Set(data.favorites);
-  state.watched = new Set(watchedList);
-  state.health = new Map(Object.entries(data.health));
+  // Kick off catalog + watched in the BACKGROUND — the profile gate + bump mask
+  // this latency, so the home is fully loaded by the time the user lands on it.
+  const dataReady = Promise.all([fetchCatalog(), fetchWatched()]).then(([data, watchedList]) => {
+    state.region = data.region;
+    state.favorites = new Set(data.favorites);
+    state.watched = new Set(watchedList);
+    state.health = new Map(Object.entries(data.health));
+  }).catch(() => {});
 
-  // Ensure homeView is unhidden on boot
   const homeView = $("homeView");
-  if (homeView) homeView.removeAttribute("hidden");
-
-  renderHome();
   wireSearchInputs();
+
+  // Reveal home only once a profile is chosen and the catalog is in — the splash
+  // and "Who's Watching" gate mask the load so home never appears half-built.
+  // "Who's Watching?" gate → branded bump (with sound, on the tap) → loaded home.
+  // The switcher is the first thing the user sees, so hand the splash off to it.
+  // The SAME enterAsProfile cycle runs here and on every later profile switch.
+  const prof = await import("./profiles");
+  if (isCloudMode()) {
+    prof.openProfileSwitcher((sel) => { void enterAsProfile(sel, dataReady); });
+    hideBootSplash();
+  } else {
+    const active = prof.getActiveProfile();
+    applyProfileChrome(active);
+    hideBootSplash();
+    if (homeView) homeView.removeAttribute("hidden");
+    await dataReady;
+    renderHome();
+  }
+
+  // Stripe Checkout return
+  const billingStatus = new URLSearchParams(window.location.search).get("billing");
+  if (billingStatus === "success") {
+    showToast("🎉 Subscription active — welcome to veedeeoh Cloud!", 6000);
+    window.history.replaceState({}, document.title, window.location.pathname);
+  } else if (billingStatus === "cancel") {
+    showToast("Checkout canceled — no charge was made.", 4000);
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
 
   // Check for non-geolocked family invite link activation
   const urlParams = new URLSearchParams(window.location.search);
@@ -44,16 +203,31 @@ async function boot(): Promise<void> {
       } catch {}
     }
 
-    localStorage.removeItem("veedeeoh_pending_household_invite");
-    showToast(`🎉 Welcome to ${householdName}! Create your profile to get started.`, 5000);
-    window.history.replaceState({}, document.title, window.location.pathname);
-    import("./profiles").then(p => p.openProfileEditor());
+    // Real Supabase token (not the local 'inv_' fallback) + signed in → join the
+    // household for real. Enforces the seat cap; surfaces "household full" if over.
+    if (inviteCode && !inviteCode.startsWith("inv_") && getSession()?.access_token) {
+      try {
+        await (await import("./db")).acceptInvite(inviteCode);
+        await import("./profiles").then(p => p.hydrateProfilesFromCloud());
+        showToast(`🎉 You've joined ${householdName}!`, 5000);
+      } catch (e: any) {
+        showToast(`Couldn't join: ${e?.message || "invalid or full invite"}`, 6000);
+      }
+      localStorage.removeItem("veedeeoh_pending_household_invite");
+      window.history.replaceState({}, document.title, window.location.pathname);
+      renderHome();
+    } else {
+      localStorage.removeItem("veedeeoh_pending_household_invite");
+      showToast(`🎉 Welcome to ${householdName}! Create your profile to get started.`, 5000);
+      window.history.replaceState({}, document.title, window.location.pathname);
+      import("./profiles").then(p => p.openProfileEditor());
+    }
   }
 }
 
 function wireSidebar(): void {
-  const tabs = ["tabHome", "tabShows", "tabMovies", "tabFavs", "tabOcean"];
-  const views = ["homeView", "showsView", "moviesView", "oceanView"];
+  const tabs = ["tabHome", "tabShows", "tabMovies", "tabFavs", "tabKids"];
+  const views = ["homeView", "showsView", "moviesView", "kidsView"];
 
   function switchView(activeTabId: string) {
 
@@ -62,7 +236,7 @@ function wireSidebar(): void {
     if (playerSuite && !playerSuite.hasAttribute("hidden") && !playerSuite.classList.contains("docked")) {
       playerSuite.classList.add("docked");
       const pMin = document.getElementById("pMin");
-      if (pMin) pMin.textContent = "🗗 Expand";
+      if (pMin) pMin.textContent = "Expand";
     }
 
     tabs.forEach((t) => {
@@ -85,19 +259,15 @@ function wireSidebar(): void {
     const brand = document.getElementById("brand");
     const mobileBrand = document.querySelector(".mobile-brand");
 
-    if (activeTabId === "tabOcean") {
-      if (brand) brand.innerHTML = `veedee<span style="color:#38bdf8;">ocean</span>`;
-      if (mobileBrand) mobileBrand.innerHTML = `v<span style="color:#38bdf8;">ocean</span>`;
-      document.body.classList.add("zzz-mode-active");
-
-      if ("wakeLock" in navigator) {
-        navigator.wakeLock.request("screen").catch(() => {});
-      }
+    // In a kids profile the whole app wears the kids identity, on every tab.
+    if (activeTabId === "tabKids" || document.body.classList.contains("kids-mode")) {
+      if (brand) brand.innerHTML = KIDS_WORDMARK;
+      if (mobileBrand) mobileBrand.innerHTML = `v<span style="color:#ff9f1c;">k</span>`;
     } else {
       if (brand) brand.innerHTML = `veedeeoh<span>.</span>`;
       if (mobileBrand) mobileBrand.innerHTML = `v<span>.</span>`;
-      document.body.classList.remove("zzz-mode-active");
     }
+    document.body.classList.remove("zzz-mode-active");
 
     if (activeTabId === "tabHome") {
       $("homeView").removeAttribute("hidden");
@@ -114,10 +284,10 @@ function wireSidebar(): void {
       }
     } else if (activeTabId === "tabFavs") {
       $("homeView").removeAttribute("hidden");
-      renderHome();
-    } else if (activeTabId === "tabOcean") {
-      $("oceanView").removeAttribute("hidden");
-      import("./ocean").then(ocean => ocean.renderOceanSanctuary($("oceanRails")));
+      import("./vod").then(vod => vod.renderFavorites());
+    } else if (activeTabId === "tabKids") {
+      $("kidsView").removeAttribute("hidden");
+      import("./vod").then(vod => vod.renderKids($("kidsRails")));
     }
   }
 
@@ -254,16 +424,9 @@ function wireHeader(): void {
         if (switchBtn) {
           switchBtn.addEventListener("click", () => {
             modal.remove();
-            p.openProfileSwitcher((newP) => {
-              const sidebarEmail = document.getElementById("sidebarEmail");
-              const sidebarAvatar = document.getElementById("sidebarAvatar");
-              if (sidebarEmail) sidebarEmail.textContent = newP.name;
-              if (sidebarAvatar) {
-                sidebarAvatar.textContent = newP.name.charAt(0).toUpperCase();
-                sidebarAvatar.style.background = newP.avatar_color;
-              }
-              import("./vod").then(vod => vod.renderHome());
-            });
+            // Switching runs the SAME branded entry cycle as boot (chrome + bump
+            // + fresh Home). The catalog is already loaded, so no dataReady needed.
+            p.openProfileSwitcher((newP) => { void enterAsProfile(newP); });
           });
         }
 
@@ -298,3 +461,5 @@ wireHeader();
 wireVodDetails();
 initPWA();
 void boot();
+// Safety net: never let the splash trap the user if boot stalls or throws.
+setTimeout(hideBootSplash, 8000);

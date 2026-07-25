@@ -17,3 +17,32 @@ nohup.out
 emails.txt
 *.spec~
 .vercel
+.vercel_disabled/
+
+# Secrets / credentials — NEVER commit
+keys/
+client_secret*.json
+*.apps.googleusercontent.com.json
+*.pem
+*.key
+
+# Supabase CLI local state
+supabase/.temp/
+
+# Generated frontend build output (Vercel + Docker rebuild it from source)
+src/tvlc/static/
+
+# Local DAW / design project files (kept local)
+veedeeoh Project/
+*.als
+*.asd
+*.zip
+Untitled.*
+
+# Branding source assets (kept local)
+Video bump ident design/
+Veedeeoh Bump.mp4
+Video bump ident design 2/
+Veedeeoh Kids Bump.mp4
+veedeeohbump.mp3
+veedeeohkids.mp3

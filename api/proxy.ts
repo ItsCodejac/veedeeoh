@@ -1,5 +1,6 @@
 import { Hono, Context } from 'hono';
 import { handle } from 'hono/vercel';
+import { rewriteM3u8, isPlaylist } from '../backend/proxy';
 
 const app = new Hono();
 
@@ -21,47 +22,28 @@ app.get('/proxy', async (c: Context) => {
       return c.text('Forbidden proxy target', 403);
     }
 
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-        'Referer': 'https://pluto.tv/',
-        'Origin': 'https://pluto.tv'
-      }
-    });
+    const headers: Record<string, string> = {
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+      'Referer': 'https://pluto.tv/',
+      'Origin': 'https://pluto.tv'
+    };
+
+    if (url.includes('pluto.tv') || url.includes('jmp2.uk/plu-')) {
+      headers['X-Forwarded-For'] = '76.81.9.69';
+    }
+
+    const res = await fetch(url, { headers });
 
     if (!res.ok) {
       return c.text(`Proxy target returned HTTP ${res.status}`, res.status as any);
     }
 
     const contentType = res.headers.get('Content-Type') || '';
-    if (contentType.includes('mpegurl') || contentType.includes('m3u') || url.includes('.m3u8')) {
-      let text = await res.text();
-      const baseUrl = new URL(url);
+    if (isPlaylist(url, contentType)) {
+      const text = await res.text();
+      const rewritten = rewriteM3u8(text, res.url || url);
 
-      // 1. Rewrite URI="..." attributes in tags (#EXT-X-KEY, #EXT-X-MEDIA, #EXT-X-MAP)
-      text = text.replace(/(URI=["'])([^"']+)(["'])/gi, (_match, p1, p2, p3) => {
-        try {
-          const abs = new URL(p2, baseUrl).toString();
-          return `${p1}/proxy?url=${encodeURIComponent(abs)}${p3}`;
-        } catch {
-          return _match;
-        }
-      });
-      
-      // 2. Rewrite non-comment playlist lines (sub-playlists, .ts segments)
-      const lines = text.split('\n');
-      const rewrittenLines = lines.map((line) => {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith('#')) return line;
-        try {
-          const abs = new URL(trimmed, baseUrl).toString();
-          return `/proxy?url=${encodeURIComponent(abs)}`;
-        } catch {
-          return line;
-        }
-      });
-
-      return c.text(rewrittenLines.join('\n'), 200, {
+      return c.text(rewritten, 200, {
         'Content-Type': 'application/x-mpegURL',
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': '*',

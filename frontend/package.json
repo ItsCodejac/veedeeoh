@@ -9,7 +9,8 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.7",
-    "hls.js": "^1.5.13"
+    "hls.js": "^1.5.13",
+    "vidstack": "^1.15.6"
   },
   "devDependencies": {
     "typescript": "^5.5.0",

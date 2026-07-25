@@ -3865,3 +3865,79 @@ select { max-width: 190px; }
 }
 
 
+
+/* ===== veedeeoh.kids theme — bright & playful, recognizable from across a room ===== */
+body.kids-mode #mainContent {
+  background:
+    radial-gradient(circle at 12% -5%, rgba(255, 159, 28, 0.22), transparent 42%),
+    radial-gradient(circle at 88% 8%, rgba(77, 171, 247, 0.22), transparent 42%),
+    radial-gradient(circle at 50% 120%, rgba(126, 217, 87, 0.16), transparent 55%),
+    linear-gradient(165deg, #241a54 0%, #122a49 55%, #0a0b18 100%);
+}
+body.kids-mode header {
+  background: linear-gradient(90deg, rgba(255, 107, 107, 0.16), rgba(77, 171, 247, 0.16), rgba(126, 217, 87, 0.16)) !important;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.08);
+}
+body.kids-mode aside {
+  background: linear-gradient(180deg, #1a1442 0%, #0a0b18 100%) !important;
+}
+body.kids-mode .brand { font-size: 26px; }
+
+/* Chunky, rounded, playful cards */
+body.kids-mode .posterCard,
+body.kids-mode .showcaseCard,
+body.kids-mode .posterImage,
+body.kids-mode .showcasePoster,
+body.kids-mode .continueCard,
+body.kids-mode .vodCard {
+  border-radius: 22px !important;
+  overflow: hidden;
+}
+body.kids-mode .posterCard img,
+body.kids-mode .showcaseCard img,
+body.kids-mode .posterImage img,
+body.kids-mode .showcasePoster img,
+body.kids-mode .vodCard img { border-radius: 22px !important; }
+body.kids-mode .posterCard,
+body.kids-mode .showcaseCard,
+body.kids-mode .vodCard { transition: transform 0.15s ease; }
+body.kids-mode .posterCard:hover,
+body.kids-mode .showcaseCard:hover,
+body.kids-mode .vodCard:hover { transform: scale(1.05) rotate(-1deg); }
+
+/* Big friendly rail titles */
+body.kids-mode .showcaseRailHead h2,
+body.kids-mode .railHead h2,
+body.kids-mode .sectionTitle {
+  font-size: clamp(1.4rem, 2.6vw, 2rem) !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.5px;
+}
+body.kids-mode .showcaseTitle { font-size: 15px !important; font-weight: 700; }
+
+/* Bigger, friendlier nav targets */
+body.kids-mode aside .navBtn { font-size: 16px; padding-top: 14px; padding-bottom: 14px; }
+body.kids-mode aside .navBtn svg { width: 24px; height: 24px; }
+
+/* Branded home loader (shown only if the catalog isn't warm yet) */
+.brandLoader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  width: 100%;
+}
+.brandLoaderMark {
+  font-family: "Bricolage Grotesque", "Space Grotesk", sans-serif;
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  color: #fff;
+  animation: brandLoaderPulse 1.1s ease-in-out infinite;
+}
+.brandLoaderMark span { color: #c5f04e; }
+body.kids-mode .brandLoaderMark span { color: #ff9f1c; }
+@keyframes brandLoaderPulse {
+  0%, 100% { opacity: 0.35; transform: scale(0.98); }
+  50% { opacity: 1; transform: scale(1.02); }
+}

@@ -160,6 +160,30 @@ app.get('/api/vod/series/:id', async (c) => {
   }
 });
 
+// Resolve an Internet Archive item to a playable file URL (was previously
+// missing, so Archive Classics + kids cartoons could never play).
+app.get('/api/vod/archive/:id', async (c) => {
+  try {
+    const url = await vod.archiveStream(c.req.param('id'));
+    if (!url) return c.json({ error: 'no playable file' }, 404);
+    return c.json({ url });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 502);
+  }
+});
+
+// Resolve a Tubi movie to a playable HLS URL (adrise content API). Tubi's listing
+// no longer embeds manifests, so movies resolve their stream on demand here.
+app.get('/api/vod/tubi/:id', async (c) => {
+  try {
+    const url = await vod.tubiStream(c.req.param('id'));
+    if (!url) return c.json({ error: 'no playable stream' }, 404);
+    return c.json({ url });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 502);
+  }
+});
+
 // Proxy route
 app.get('/proxy', async (c) => {
   const rawUrl = c.req.query('url');

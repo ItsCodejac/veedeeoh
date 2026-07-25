@@ -1,5 +1,6 @@
 import { getStoredProfiles, openProfileEditor, getActiveProfile } from './profiles';
 import { getSession } from './auth';
+import { startCheckout, openBillingPortal, createInvite } from './db';
 
 export function openSettingsModal(): void {
   renderSettingsModalInternal();
@@ -59,6 +60,10 @@ function renderSettingsModalInternal(): void {
         <div>
           <label style="display: block; font-size: 12px; color: #9aa5b5; margin-bottom: 6px; font-weight: 700;">HOUSEHOLD / ACCOUNT DISPLAY NAME</label>
           <input type="text" id="accountDisplayName" value="${escapeHtml(accName)}" placeholder="e.g. Cojac's Household" style="width: 100%; padding: 10px 14px; background: #10141e; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 14px; outline: none;" />
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 14px;">
+          <button id="btnSubscribe" style="flex: 1; padding: 10px; border-radius: 8px; background: #c5f04e; color: #06070a; border: none; font-weight: 800; font-size: 13px; cursor: pointer;">Subscribe — $4/mo</button>
+          <button id="btnManageBilling" style="flex: 1; padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-weight: 700; font-size: 13px; cursor: pointer;">Manage billing</button>
         </div>
       </div>
 
@@ -155,6 +160,20 @@ function renderSettingsModalInternal(): void {
   const closeBtn = modal.querySelector('#closeSettingsBtn');
   if (closeBtn) closeBtn.addEventListener('click', () => modal.remove());
 
+  const subBtn = modal.querySelector('#btnSubscribe') as HTMLButtonElement | null;
+  if (subBtn) subBtn.addEventListener('click', async () => {
+    subBtn.disabled = true; subBtn.textContent = 'Opening…';
+    try { await startCheckout(); }
+    catch (e: any) { alert(`Could not start checkout: ${e?.message || e}`); subBtn.disabled = false; subBtn.textContent = 'Subscribe — $4/mo'; }
+  });
+
+  const manageBtn = modal.querySelector('#btnManageBilling') as HTMLButtonElement | null;
+  if (manageBtn) manageBtn.addEventListener('click', async () => {
+    manageBtn.disabled = true; manageBtn.textContent = 'Opening…';
+    try { await openBillingPortal(); }
+    catch (e: any) { alert(`No active subscription to manage yet.`); manageBtn.disabled = false; manageBtn.textContent = 'Manage billing'; }
+  });
+
   const addProfileBtn = modal.querySelector('#settingsAddProfileBtn');
   if (addProfileBtn) {
     addProfileBtn.addEventListener('click', () => {
@@ -201,10 +220,19 @@ function renderSettingsModalInternal(): void {
       sendInviteBtn.textContent = 'Generating...';
 
       try {
-        const inviteCode = 'inv_' + Math.random().toString(36).substring(2, 10);
+        // Real Supabase-backed invite (token) when signed in; local fallback otherwise.
+        let inviteCode: string;
+        let inviteId: string | null = null;
+        if (getSession()?.access_token) {
+          const inv = await createInvite(name);
+          inviteCode = inv.token;
+          inviteId = inv.id;
+        } else {
+          inviteCode = 'inv_' + Math.random().toString(36).substring(2, 10);
+        }
         const inviteUrl = `${window.location.origin}/landing.html?invite=${inviteCode}&acc=${encodeURIComponent(accName)}`;
 
-        // Add to active household invite links
+        // Add to active household invite links (for display)
         const rawPending = localStorage.getItem('veedeeoh_pending_invites') || '[]';
         let pending: any[] = [];
         try { pending = JSON.parse(rawPending); } catch {}
@@ -214,7 +242,8 @@ function renderSettingsModalInternal(): void {
           email: name,
           invitedAt: new Date().toLocaleDateString(),
           inviteUrl,
-          code: inviteCode
+          code: inviteCode,
+          id: inviteId
         });
         localStorage.setItem('veedeeoh_pending_invites', JSON.stringify(pending));
 

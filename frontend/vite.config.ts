@@ -3,7 +3,10 @@ import { defineConfig } from "vite";
 export default defineConfig({
   build: {
     outDir: "../src/tvlc/static",
-    emptyOutDir: false,
+    // Clean the output each build so stale hashed chunks don't pile up. Every
+    // persistent file (favicons, bump videos, posters, manifest) lives in
+    // frontend/public and is re-copied, so nothing is lost.
+    emptyOutDir: true,
     rollupOptions: {
       input: {
         main: 'index.html',

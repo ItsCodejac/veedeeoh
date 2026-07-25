@@ -24,6 +24,11 @@
 
 <body>
 
+  <!-- Boot splash: covers the app chrome until the "Who's Watching" gate is ready. -->
+  <div id="bootSplash" style="position:fixed;inset:0;z-index:100000;background:#06070a;display:flex;align-items:center;justify-content:center;transition:opacity .4s ease;">
+    <div style="font-family:'Bricolage Grotesque','Space Grotesk',sans-serif;font-size:44px;font-weight:800;color:#fff;letter-spacing:-1px;">veedeeoh<span style="color:#c5f04e;">.</span></div>
+  </div>
+
   <!-- Sidebar Navigation Dock -->
   <aside>
     <a href="#" id="brand" class="brand">veedeeoh<span>.</span></a>
@@ -62,11 +67,14 @@
       </svg>
       <span>Favorites</span>
     </button>
-    <button id="tabOcean" title="veedeeocean" class="navBtn">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/>
+    <button id="tabKids" title="veedeeoh.kids" class="navBtn" hidden>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c5f04e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+        <line x1="9" y1="9" x2="9.01" y2="9"></line>
+        <line x1="15" y1="9" x2="15.01" y2="9"></line>
       </svg>
-      <span>veedee<span style="color: #38bdf8;">ocean</span></span>
+      <span class="kidsWordmark" style="white-space:nowrap;font-weight:800;">veedeeoh<span style="color:#7ed957;">.</span><span style="color:#ff9f1c;">k</span><span style="color:#4dabf7;">i</span><span style="color:#ff6b6b;">d</span><span style="color:#a9e34b;">s</span></span>
     </button>
 
     <div class="sidebar-spacer"></div>
@@ -99,7 +107,7 @@
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
           <input id="search" type="search" placeholder="Search movies and shows..." autocomplete="off">
-          <button id="searchCloseBtn" class="search-close-btn" title="Close search">✕</button>
+          <button id="searchCloseBtn" class="search-close-btn" title="Close search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
         </div>
         <div id="searchResultsOverlay" hidden>
           <!-- Search results dynamically populated here -->
@@ -127,7 +135,7 @@
     <!-- Scrollable main panel content -->
     <div id="scrollableArea">
       <!-- Panel 1: Home View -->
-      <div id="homeView" class="viewPanel">
+      <div id="homeView" class="viewPanel" hidden>
         <div id="homeHero"></div>
         <div id="homeRails"></div>
       </div>
@@ -159,10 +167,15 @@
         <div id="oceanRails"></div>
       </div>
 
+      <!-- Panel 7: veedeeoh.kids (parent shortcut to a kid-safe browse) -->
+      <div id="kidsView" class="viewPanel" hidden>
+        <div id="kidsRails"></div>
+      </div>
+
       <!-- Dedicated Category View Panel (Netflix / Hulu Pattern) -->
       <div id="categoryView" class="viewPanel" hidden>
         <div class="categoryHeaderBar">
-          <button id="categoryBackBtn" class="categoryBackBtn">← Back</button>
+          <button id="categoryBackBtn" class="categoryBackBtn" style="display:inline-flex;align-items:center;gap:6px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>Back</button>
           <div class="categoryHeaderTitleGroup">
             <h1 id="categoryTitleName">Category Name</h1>
             <span id="categoryItemCount" class="categoryCountBadge">0 titles</span>
@@ -187,13 +200,13 @@
           <div id="vdHeroMeta">
             <h1 id="vdTitle"></h1>
             <div id="vdMeta"></div>
-            <div id="vdStars">★★★★★</div>
+            <div id="vdStars" style="display:inline-flex;gap:3px;align-items:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
             <div id="vdActions" style="display: flex; gap: 10px; flex-wrap: wrap;">
-              <button id="vdPlayBtn">▶ START WATCHING</button>
+              <button id="vdPlayBtn" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>START WATCHING</button>
             </div>
             <p id="vdSummary"></p>
           </div>
-          <button id="vdClose" title="Close show details">✕</button>
+          <button id="vdClose" title="Close show details"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
         </div>
       </div>
       <div id="vodDetailsBody">
@@ -213,18 +226,17 @@
     <div class="vodControlsOverlay">
       <!-- Top Bar -->
       <div class="vodControlsTop">
-        <button id="vodPlayerClose">← Back to Browse</button>
+        <button id="vodPlayerClose" style="display:inline-flex;align-items:center;gap:6px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>Back to Browse</button>
         <span id="vodPlayerTitle"></span>
         <div class="vodControlsTopRight">
-          <button id="vodPlayerExpand" class="controlBtn" title="Expand Fullscreen" style="display: none;">↗
-            Expand</button>
-          <button id="vodPlayerStop" class="controlBtn" title="Close Video" style="display: none;">✕</button>
+          <button id="vodPlayerExpand" class="controlBtn" title="Expand Fullscreen" style="display: none;align-items:center;gap:6px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>Expand</button>
+          <button id="vodPlayerStop" class="controlBtn" title="Close Video" style="display: none;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
         </div>
       </div>
 
       <!-- Center Feedback Ripple Badge (YouTube Style) -->
       <div class="vodControlsCenter" id="vodControlsCenter">
-        <div id="vodCenterFeedback" class="centerFeedbackBadge">▶</div>
+        <div id="vodCenterFeedback" class="centerFeedbackBadge"><svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg></div>
       </div>
 
       <!-- Bottom Bar -->
@@ -237,10 +249,10 @@
 
         <div class="vodControlsRow">
           <div class="vodControlsLeft">
-            <button id="vodPlayBtn" class="controlBtn">▶</button>
-            <button id="vodRewindBtn" class="controlBtn" title="Rewind 10s">↺ 10s</button>
-            <button id="vodForwardBtn" class="controlBtn" title="Forward 10s">↻ 10s</button>
-            <button id="vodNextEpBtn" class="controlBtn" title="Next Episode" style="display: none;">➔|</button>
+            <button id="vodPlayBtn" class="controlBtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg></button>
+            <button id="vodRewindBtn" class="controlBtn" title="Rewind 10s" style="display:inline-flex;align-items:center;gap:4px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>10s</button>
+            <button id="vodForwardBtn" class="controlBtn" title="Forward 10s" style="display:inline-flex;align-items:center;gap:4px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>10s</button>
+            <button id="vodNextEpBtn" class="controlBtn" title="Next Episode" style="display: none;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4" fill="currentColor"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg></button>
             <div class="vodTimeDisplay">
               <span id="vodTimeCurrent">00:00</span>
               <span>/</span>
@@ -250,12 +262,12 @@
 
           <div class="vodControlsRight">
             <div class="vodVolumeControl">
-              <button id="vodMuteBtn" class="controlBtn">🔊</button>
+              <button id="vodMuteBtn" class="controlBtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg></button>
               <input type="range" id="vodVolumeSlider" min="0" max="1" step="0.05" value="1" class="volumeSlider">
             </div>
             <button id="vodCcBtn" class="controlBtn" title="Toggle Captions">CC</button>
-            <button id="vodPipBtn" class="controlBtn" title="Picture in Picture">🗗</button>
-            <button id="vodFullscreenBtn" class="controlBtn" title="Fullscreen">⛶</button>
+            <button id="vodPipBtn" class="controlBtn" title="Picture in Picture"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><rect x="12" y="11" width="8" height="6" rx="1" fill="currentColor" stroke="none"></rect></svg></button>
+            <button id="vodFullscreenBtn" class="controlBtn" title="Fullscreen"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg></button>
           </div>
         </div>
       </div>
@@ -264,14 +276,14 @@
     <!-- Floating Prompt Overlays (Skip Intro / Next Episode) -->
     <div id="vodPlayerPrompts">
       <button id="vodSkipIntroBtn" class="promptBtn" style="display: none;">Skip Intro (+90s)</button>
-      <button id="vodNextEpPromptBtn" class="promptBtn" style="display: none;">Next Episode ➔</button>
+      <button id="vodNextEpPromptBtn" class="promptBtn" style="display: none;align-items:center;gap:8px;">Next Episode<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4" fill="currentColor"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg></button>
     </div>
   </div>
 
   <!-- Party Mode Player Overlay -->
   <div id="partyPlayerOverlay" hidden>
     <div class="partyPlayerHeader">
-      <button id="partyPlayerClose">← Back to Browse</button>
+      <button id="partyPlayerClose" style="display:inline-flex;align-items:center;gap:6px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>Back to Browse</button>
     </div>
 
     <canvas id="partyVisualizer"></canvas>
@@ -284,9 +296,9 @@
         </div>
 
         <div class="moodSelector">
-          <button class="moodChip active" data-mood="chillout">🥞 Chillout</button>
-          <button class="moodChip" data-mood="high-energy">🔥 High Energy</button>
-          <button class="moodChip" data-mood="retro">📺 Retro</button>
+          <button class="moodChip active" data-mood="chillout" style="display:inline-flex;align-items:center;gap:7px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>Chillout</button>
+          <button class="moodChip" data-mood="high-energy" style="display:inline-flex;align-items:center;gap:7px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>High Energy</button>
+          <button class="moodChip" data-mood="retro" style="display:inline-flex;align-items:center;gap:7px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>Retro</button>
         </div>
 
         <div id="partyTrackInfo" class="partyTrackInfo">
@@ -296,8 +308,8 @@
         </div>
 
         <div class="partyButtons">
-          <button id="partyPlayBtn" class="actionBtn primary">▶ PLAY</button>
-          <button id="partyNextBtn" class="actionBtn">➔ NEXT TRACK</button>
+          <button id="partyPlayBtn" class="actionBtn primary" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>PLAY</button>
+          <button id="partyNextBtn" class="actionBtn" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4" fill="currentColor"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>NEXT TRACK</button>
         </div>
 
         <div class="visualizerSelector">

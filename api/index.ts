@@ -2,6 +2,7 @@ import { Hono, Context } from 'hono';
 import { handle } from 'hono/vercel';
 import * as vod from '../backend/vod';
 import * as store from '../backend/store';
+import * as billing from '../backend/billing';
 
 const app = new Hono().basePath('/api');
 
@@ -14,6 +15,21 @@ const ALLOWED_EMAILS = new Set([
   'anthonyg.video@gmail.com',
   'davereed388@gmail.com'
 ]);
+
+// A Supabase client scoped to the CALLER's JWT (anon key + their bearer token),
+// so RLS enforces per-profile ownership. MUST be used for any endpoint touching
+// user data with a client-supplied id — never the service-role key there, which
+// bypasses RLS and lets any caller read/write another profile's rows (IDOR).
+async function callerSupabase(c: Context) {
+  const { createClient } = await import('@supabase/supabase-js');
+  const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
+  const anon = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
+  const authHeader = c.req.header('authorization') || '';
+  return createClient(url, anon, {
+    global: { headers: { Authorization: authHeader } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
 
 app.get('/health', (c: Context) => c.json({ status: 'ok', environment: 'vercel' }));
 
@@ -32,11 +48,31 @@ app.post('/auth/authorize', async (c: Context) => {
   }
 });
 
-app.get('/catalog', (c: Context) => {
+app.get('/catalog', async (c: Context) => {
+  const profileId = c.req.query('profileId');
+  const userRegion = c.req.query('region') || c.req.header('x-vercel-ip-country') || 'US';
+  let favorites: string[] = [];
+
+  // Caller-scoped: RLS returns favorites only for a profile the caller owns.
+  if (profileId) {
+    try {
+      const supabase = await callerSupabase(c);
+      const { data } = await supabase
+        .from('favorites')
+        .select('content_id')
+        .eq('profile_id', profileId);
+      if (data) {
+        favorites = data.map((f: any) => f.content_id);
+      }
+    } catch {
+      // fallback to empty array
+    }
+  }
+
   return c.json({
-    region: { code: 'US', source: 'default' },
-    favorites: [],
-    health: {}
+    region: { code: userRegion.toUpperCase(), source: 'detected' },
+    favorites,
+    health: { ok: true }
   });
 });
 
@@ -74,7 +110,29 @@ app.get('/stats', async (c: Context) => {
 });
 
 app.get('/vod', async (c: Context) => {
-  const region = c.req.query('region') || c.req.header('x-forwarded-for') || undefined;
+  const region = (c.req.query('region') || 'US').toUpperCase();
+
+  const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+
+  if (supabaseUrl && supabaseKey) {
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      const { data } = await supabase
+        .from('catalog_cache')
+        .select('payload')
+        .eq('region', region)
+        .maybeSingle();
+
+      if (data?.payload) {
+        return c.json(data.payload);
+      }
+    } catch (e) {
+      console.warn('Supabase catalog_cache fetch error, falling back to live:', e);
+    }
+  }
+
   const rails: any[] = [];
   let stats: any = { totalTitles: 0, moviesCount: 0, showsCount: 0 };
   try {
@@ -95,6 +153,28 @@ app.get('/vod', async (c: Context) => {
   return c.json({ rails, stats });
 });
 
+app.get('/vod/archive/:id', async (c: Context) => {
+  try {
+    const id = c.req.param('id');
+    if (!id) return c.json({ error: 'Missing Archive ID' }, 400);
+    const streamUrl = await vod.archiveStream(id);
+    return c.json({ url: streamUrl });
+  } catch (e: any) {
+    return c.json({ error: e?.message || 'Failed to load archive stream' }, 500);
+  }
+});
+
+app.get('/vod/tubi/:id', async (c: Context) => {
+  try {
+    const id = c.req.param('id');
+    if (!id) return c.json({ error: 'Missing Tubi ID' }, 400);
+    const url = await vod.tubiStream(id);
+    return c.json({ url });
+  } catch (e: any) {
+    return c.json({ error: e?.message || 'Failed to load Tubi stream' }, 502);
+  }
+});
+
 app.get('/vod/series/:id', async (c: Context) => {
   try {
     const region = c.req.query('region') || c.req.header('x-forwarded-for') || undefined;
@@ -106,5 +186,166 @@ app.get('/vod/series/:id', async (c: Context) => {
   }
 });
 
+app.get('/watched', async (c: Context) => {
+  const profileId = c.req.query('profileId');
+  if (!profileId) return c.json({ watched: [] });
+  try {
+    const supabase = await callerSupabase(c); // RLS scopes to the caller's profiles
+    const { data } = await supabase
+      .from('watch_progress')
+      .select('content_id, position_secs, duration_secs, completed, updated_at')
+      .eq('profile_id', profileId);
+    return c.json({ watched: data || [] });
+  } catch (err: any) {
+    return c.json({ watched: [], error: err?.message });
+  }
+});
+
+app.post('/watched', async (c: Context) => {
+  try {
+    const body = await c.req.json();
+    const { profileId, contentId, positionSecs, durationSecs, completed } = body;
+    if (!profileId || !contentId) {
+      return c.json({ error: 'Missing profileId or contentId' }, 400);
+    }
+    // Only include provided fields so toggling "completed" doesn't reset the
+    // saved resume position (omitted columns keep their existing value on upsert).
+    const payload: any = { profile_id: profileId, content_id: contentId, updated_at: new Date().toISOString() };
+    if (positionSecs !== undefined) payload.position_secs = positionSecs;
+    if (durationSecs !== undefined) payload.duration_secs = durationSecs;
+    if (completed !== undefined) payload.completed = !!completed;
+
+    const supabase = await callerSupabase(c); // RLS with_check enforces ownership
+    const { error } = await supabase
+      .from('watch_progress')
+      .upsert(payload, { onConflict: 'profile_id,content_id' });
+    if (error) throw error;
+    return c.json({ ok: true });
+  } catch (e: any) {
+    return c.json({ error: e?.message || 'Failed to update watch progress' }, 500);
+  }
+});
+
+app.delete('/watched/:id?', async (c: Context) => {
+  try {
+    const profileId = c.req.query('profileId');
+    const contentId = c.req.param('id') || c.req.query('contentId');
+    if (!profileId || !contentId) return c.json({ error: 'Missing profileId or contentId' }, 400);
+
+    const supabase = await callerSupabase(c); // RLS scopes deletes to the caller
+    await supabase.from('watch_progress').delete()
+      .eq('profile_id', profileId)
+      .eq('content_id', contentId);
+    return c.json({ ok: true });
+  } catch (e: any) {
+    return c.json({ error: e?.message || 'Failed to delete watch history' }, 500);
+  }
+});
+
+app.get('/cron/catalog-warm', async (c: Context) => {
+  const authHeader = c.req.header('authorization');
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+
+  try {
+    const catalogData = await vod.getCatalog('US');
+    const archive = await vod.archiveMovies(30);
+    const rails = [...catalogData.rails, { name: '🏛️ Archive Classics', items: archive }];
+    const stats = {
+      ...catalogData.stats,
+      totalTitles: catalogData.stats.totalTitles + archive.length,
+      moviesCount: catalogData.stats.moviesCount + archive.length
+    };
+    const payload = { rails, stats, updatedAt: Date.now() };
+
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+
+    if (supabaseUrl && supabaseKey) {
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      await supabase.from('catalog_cache').upsert({
+        region: 'US',
+        payload,
+        updated_at: new Date().toISOString()
+      });
+    }
+
+    return c.json({ ok: true, stats });
+  } catch (e: any) {
+    return c.json({ error: e?.message || 'Catalog warm failed' }, 500);
+  }
+});
+
+// --- Stripe billing -------------------------------------------------------
+
+async function userFromRequest(c: Context): Promise<{ id: string; email: string } | null> {
+  const auth = c.req.header('authorization');
+  if (!auth || !auth.startsWith('Bearer ')) return null;
+  const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
+  const key = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
+  try {
+    const { createClient } = await import('@supabase/supabase-js');
+    const sb = createClient(url, key);
+    const { data } = await sb.auth.getUser(auth.slice(7));
+    if (!data.user?.email) return null;
+    return { id: data.user.id, email: data.user.email };
+  } catch {
+    return null;
+  }
+}
+
+// Start a $4/mo subscription Checkout (7-day trial). Returns the hosted URL.
+app.post('/billing/checkout', async (c: Context) => {
+  const user = await userFromRequest(c);
+  if (!user) return c.json({ error: 'unauthorized' }, 401);
+  try {
+    const origin = new URL(c.req.url).origin;
+    return c.json({ url: await billing.createCheckoutSession(user.id, user.email, origin) });
+  } catch (e: any) {
+    return c.json({ error: e?.message || 'checkout failed' }, 500);
+  }
+});
+
+// Self-service manage/cancel via the Stripe Customer Portal.
+app.post('/billing/portal', async (c: Context) => {
+  const user = await userFromRequest(c);
+  if (!user) return c.json({ error: 'unauthorized' }, 401);
+  try {
+    const origin = new URL(c.req.url).origin;
+    return c.json({ url: await billing.createPortalSession(user.id, origin) });
+  } catch (e: any) {
+    return c.json({ error: e?.message || 'portal failed' }, 500);
+  }
+});
+
+// Change seat count (extra seats at $2/mo each). Body: { seats: number }.
+app.post('/billing/seats', async (c: Context) => {
+  const user = await userFromRequest(c);
+  if (!user) return c.json({ error: 'unauthorized' }, 401);
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const seats = await billing.setSeats(user.id, Number(body?.seats) || 3);
+    return c.json({ ok: true, seats });
+  } catch (e: any) {
+    return c.json({ error: e?.message || 'seat update failed' }, 500);
+  }
+});
+
+// Stripe webhook — signature-verified, raw body. Sets tier/expiry on payment.
+app.post('/billing/webhook', async (c: Context) => {
+  const sig = c.req.header('stripe-signature') || '';
+  const raw = await c.req.text();
+  try {
+    await billing.handleWebhook(raw, sig);
+    return c.json({ received: true });
+  } catch (e: any) {
+    return c.json({ error: `webhook error: ${e?.message}` }, 400);
+  }
+});
+
 export const GET = handle(app);
 export const POST = handle(app);
+export const DELETE = handle(app);

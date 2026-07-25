@@ -1,8 +1,21 @@
 import Hls from "hls.js";
-import { fetchArchiveStream, fetchVod, fetchVodSeries, toggleWatched } from "./api";
+import { fetchArchiveStream, fetchTubiStream, fetchVod, fetchVodSeries, toggleWatched } from "./api";
 import { state } from "./state";
 import type { Stream, VodItem, VodEpisode, VodRail } from "./types";
 import { escapeHtml, $, setupHorizontalScroll } from "./util";
+import { getActiveProfile } from "./profiles";
+import { maturityCeiling, filterRailsByMaturity, filterRailsForKids, isKidsSafeItem, addFavorite, removeFavorite, saveProgress } from "./db";
+import { openVodPlayer } from "./vodplayer";
+
+// The active profile's real Supabase id (null for local/unsynced placeholders).
+function activeProfileUuid(): string | null {
+  const id = getActiveProfile().id;
+  return id && !id.startsWith("default_") && !id.startsWith("profile_") ? id : null;
+}
+
+// Shared inline icons (no emoji anywhere in the UI).
+const FILM_ICON = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="2" y1="7" x2="7" y2="7"></line><line x1="2" y1="17" x2="7" y2="17"></line><line x1="17" y1="17" x2="22" y2="17"></line><line x1="17" y1="7" x2="22" y2="7"></line></svg>`;
+const CHECK_ICON = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
 
 let vodHls: Hls | null = null;
 let cachedVodRails: VodRail[] | null = null;
@@ -102,12 +115,67 @@ document.addEventListener("click", (e) => {
 });
 
 export async function getVodRails(): Promise<VodRail[]> {
-  if (cachedVodRails && cachedVodRails.length > 0) return cachedVodRails;
-  const res = await fetchVod();
-  if (res.rails && res.rails.length > 0) {
-    cachedVodRails = res.rails;
+  if (!cachedVodRails || cachedVodRails.length === 0) {
+    const res = await fetchVod();
+    if (res.rails && res.rails.length > 0) {
+      cachedVodRails = res.rails;
+    }
   }
-  return res.rails || [];
+  const full = cachedVodRails || [];
+  // Restricted profiles only ever see content at/below their rating cap. This is
+  // the single chokepoint for home/shows/movies, so no render path can surface
+  // adult content to a kids profile. A kids profile is HARD-capped at TV-G (2)
+  // regardless of max_rating — belt-and-suspenders so a mis-set cap can't leak.
+  const p = getActiveProfile();
+  // Kids profiles get the strict genre+maturity gate (not maturity alone), so a
+  // low-rated non-kids title can never appear in the kid view.
+  if (p.is_kids) return filterRailsForKids(full) as VodRail[];
+  const ceiling = maturityCeiling(p.max_rating);
+  return filterRailsByMaturity(full, ceiling) as VodRail[];
+}
+
+// Continue Watching is stored PER PROFILE so a kids profile never sees an adult
+// profile's resume cards (and vice-versa). Keyed on the active profile id.
+function resumeHistoryKey(): string {
+  let id = "default";
+  try { id = getActiveProfile()?.id || "default"; } catch {}
+  return `tvlc_resume_history_${id}`;
+}
+
+function getResumeHistory(): any[] {
+  try { return JSON.parse(localStorage.getItem(resumeHistoryKey()) || "[]"); } catch { return []; }
+}
+
+// Genres the active profile has actually engaged with, most-watched first. Drives
+// personalized rail ordering and the "Because you watched" row.
+function getTasteGenres(): string[] {
+  const counts: Record<string, number> = {};
+  for (const r of getResumeHistory()) {
+    if (r?.genre) counts[r.genre] = (counts[r.genre] || 0) + 1;
+  }
+  return Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([g]) => g);
+}
+
+// Where a taste genre appears in a rail's name → its rank (lower = more relevant).
+function railTasteRank(name: string, taste: string[]): number {
+  const n = name.toLowerCase();
+  for (let i = 0; i < taste.length; i++) {
+    const g = taste[i];
+    if (g && n.includes(g.toLowerCase())) return i;
+  }
+  return 999;
+}
+
+// Order rails by the profile's taste first, then editorial priority, then size.
+function sortRailsByTaste<T extends { name: string; items: any[] }>(rails: T[]): T[] {
+  const taste = getTasteGenres();
+  return rails.sort((a, b) => {
+    const ra = railTasteRank(a.name, taste), rb = railTasteRank(b.name, taste);
+    if (ra !== rb) return ra - rb;
+    const pa = getRailPriorityScore(a.name), pb = getRailPriorityScore(b.name);
+    if (pa !== pb) return pa - pb;
+    return b.items.length - a.items.length;
+  });
 }
 
 function saveResumeProgress(ch: any, streamIdx: number, time: number, duration: number, percentage: number): void {
@@ -118,7 +186,8 @@ function saveResumeProgress(ch: any, streamIdx: number, time: number, duration: 
   const stream = ch.streams[streamIdx];
   if (!stream) return;
 
-  const historyStr = localStorage.getItem("tvlc_resume_history") || "[]";
+  const key = resumeHistoryKey();
+  const historyStr = localStorage.getItem(key) || "[]";
   let history: any[] = [];
   try {
     history = JSON.parse(historyStr);
@@ -136,6 +205,9 @@ function saveResumeProgress(ch: any, streamIdx: number, time: number, duration: 
       episodeTitle: stream.source,
       poster: ch.vodPoster,
       banner: ch.vodBanner,
+      // Kept so the kids gate can be re-applied when rendering the resume rail.
+      maturity: ch.maturity ?? ch.vodItem?.maturity,
+      genre: ch.genre ?? ch.vodItem?.genre,
       time,
       duration,
       percentage,
@@ -149,7 +221,19 @@ function saveResumeProgress(ch: any, streamIdx: number, time: number, duration: 
     history = history.slice(0, 15);
   }
 
-  localStorage.setItem("tvlc_resume_history", JSON.stringify(history));
+  localStorage.setItem(key, JSON.stringify(history));
+  localStorage.removeItem("tvlc_resume_history"); // retire the old cross-profile key
+
+  // Cross-device Continue Watching: mirror to Supabase per-profile (best effort).
+  const pid = activeProfileUuid();
+  if (pid) {
+    void saveProgress(pid, {
+      content_id: itemId,
+      title: ch.name,
+      position_secs: time,
+      duration_secs: duration,
+    }).catch(() => {});
+  }
 }
 
 export function resumeVodPlayback(resumeItem: any): void {
@@ -171,7 +255,9 @@ export function resumeVodPlayback(resumeItem: any): void {
   openVodPlayer(ch, resumeItem.streamIdx, resumeItem.time);
 }
 
-export function openVodPlayer(ch: any, streamIdx: number, startTime: number = 0): void {
+// Legacy hand-rolled player — superseded by the Vidstack module (./vodplayer).
+// Kept as dead-code fallback until the new player is verified on-device, then delete.
+function openVodPlayerLegacy(ch: any, streamIdx: number, startTime: number = 0): void {
   const overlay = $("vodPlayerOverlay");
   const video = $<HTMLVideoElement>("vodVideo");
   const title = $("vodPlayerTitle");
@@ -374,7 +460,7 @@ export function openVodPlayer(ch: any, streamIdx: number, startTime: number = 0)
       <div style="background:#10141e;border:1px solid rgba(255,255,255,0.15);border-radius:18px;max-width:440px;width:100%;padding:28px;color:#fff;font-family:sans-serif;box-shadow:0 20px 50px rgba(0,0,0,0.8);">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
           <h3 style="margin:0;font-size:20px;font-weight:700;">⌨️ Keyboard Shortcuts</h3>
-          <button id="closeHotkeysBtn" style="background:none;border:none;color:#aaa;font-size:20px;cursor:pointer;">✕</button>
+          <button id="closeHotkeysBtn" style="display:inline-flex;align-items:center;justify-content:center;background:none;border:none;color:#aaa;cursor:pointer;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:14px;color:#c4d0e0;">
           <div><code>Space</code> / <code>K</code></div><div>Play / Pause</div>
@@ -669,6 +755,86 @@ function asChannel(item: VodItem, streams: Stream[]): any {
   };
 }
 
+// "My List" toggle in the detail view — injected next to the Play button so it
+// needs no index.html change. Optimistic UI + per-profile Supabase persistence.
+function setupMyListButton(item: VodItem): void {
+  const playBtn = document.getElementById("vdPlayBtn");
+  if (!playBtn || !playBtn.parentElement) return;
+
+  let btn = document.getElementById("vdMyListBtn") as HTMLButtonElement | null;
+  if (!btn) {
+    btn = document.createElement("button");
+    btn.id = "vdMyListBtn";
+    btn.className = playBtn.className;
+    btn.style.cssText = "background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);color:#fff;";
+    playBtn.parentElement.insertBefore(btn, playBtn.nextSibling);
+  }
+
+  const id = item.id;
+  const render = () => {
+    const inList = state.favorites.has(id);
+    btn!.style.display = "inline-flex";
+    btn!.style.alignItems = "center";
+    btn!.style.gap = "8px";
+    const icon = inList
+      ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`
+      : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`;
+    btn!.innerHTML = `${icon}My List`;
+  };
+  render();
+
+  btn.onclick = async () => {
+    const nowIn = !state.favorites.has(id);
+    if (nowIn) state.favorites.add(id); else state.favorites.delete(id);
+    render();
+    const pid = activeProfileUuid();
+    if (!pid) return; // local/self-host: optimistic state only
+    try {
+      if (nowIn) await addFavorite(pid, { content_id: id, title: item.title, poster: item.poster ?? null });
+      else await removeFavorite(pid, id);
+    } catch { /* keep optimistic state */ }
+  };
+}
+
+// Favorites tab — every catalog item the active profile has added to My List.
+export async function renderFavorites(): Promise<void> {
+  const container = $("homeView");
+  if (!container) return;
+  container.replaceChildren();
+
+  const rails = await getVodRails();
+  const seen = new Set<string>();
+  const items: VodItem[] = [];
+  for (const rail of rails) {
+    for (const it of rail.items as VodItem[]) {
+      if (state.favorites.has(it.id) && !seen.has(it.id)) { seen.add(it.id); items.push(it); }
+    }
+  }
+
+  if (items.length === 0) {
+    const empty = document.createElement("div");
+    empty.style.cssText = "color:var(--dim);padding:48px 24px;text-align:center;font-size:16px;";
+    empty.innerHTML = `Your list is empty. Open any title and tap <b>+ My List</b> to save it here.`;
+    container.append(empty);
+    return;
+  }
+
+  const rail = document.createElement("div");
+  rail.className = "rail";
+  rail.innerHTML = `<div class="railHead"><h2>My List</h2><span class="railTag">${items.length} saved</span></div>`;
+  const scroller = document.createElement("div");
+  scroller.className = "railScroller";
+  for (const it of items) {
+    const card = document.createElement("div");
+    card.className = "vodCard";
+    card.innerHTML = `<div class="vodCardArt">${it.poster ? `<img loading="lazy" alt="" src="${escapeHtml(it.poster)}">` : FILM_ICON}</div><div class="vodCardTitle">${escapeHtml(it.title)}</div>`;
+    card.addEventListener("click", () => void openVodDetails(it));
+    scroller.append(card);
+  }
+  rail.append(scroller);
+  container.append(rail);
+}
+
 export async function openVodDetails(item: VodItem): Promise<void> {
   const overlay = $("vodDetailsOverlay");
   overlay.removeAttribute("hidden");
@@ -687,13 +853,15 @@ export async function openVodDetails(item: VodItem): Promise<void> {
   if (item.poster) {
     poster.innerHTML = `<img loading="lazy" alt="" src="${escapeHtml(item.poster)}">`;
   } else {
-    poster.textContent = "🎬";
+    poster.innerHTML = FILM_ICON;
   }
 
   // Populate metadata
   $("vdTitle").textContent = item.title;
   $("vdMeta").textContent = [item.genre, item.rating].filter(Boolean).join(" · ");
   $("vdSummary").textContent = item.summary || "No description available.";
+
+  setupMyListButton(item);
 
   const selectContainer = $("vdSelectorContainer");
   const select = $<HTMLSelectElement>("vdSeasonSelect");
@@ -722,7 +890,7 @@ export async function openVodDetails(item: VodItem): Promise<void> {
     card.className = "episodeCard";
     card.innerHTML = `
       <div class="epThumbWrap">
-        ${bannerImg ? `<img loading="lazy" alt="" src="${escapeHtml(bannerImg)}">` : `<div style="padding: 40px; text-align: center;">🎬</div>`}
+        ${bannerImg ? `<img loading="lazy" alt="" src="${escapeHtml(bannerImg)}">` : `<div style="padding: 40px; text-align: center;">${FILM_ICON}</div>`}
         <div class="epPlayOverlay">▶</div>
         ${durationText ? `<div class="epDuration">${durationText}</div>` : ""}
       </div>
@@ -735,6 +903,44 @@ export async function openVodDetails(item: VodItem): Promise<void> {
       </div>`;
     
     card.addEventListener("click", playMovie);
+    grid.append(card);
+    return;
+  }
+
+  // 1b. Tubi movie — the catalog carries no URL, so resolve the HLS stream on
+  // click via the adrise content API (mirrors the Internet Archive flow).
+  if (String(item.id).startsWith("tubi:") && !item.series_id) {
+    selectContainer.hidden = true;
+    playBtn.textContent = "▶ PLAY MOVIE";
+
+    const playTubi = async (cardEl?: HTMLElement) => {
+      if (cardEl) cardEl.classList.add("loading");
+      try {
+        const url = await fetchTubiStream(String(item.id).replace("tubi:", ""));
+        overlay.setAttribute("hidden", "");
+        openVodPlayer(asChannel(item, [{ url, quality: null, source: "Tubi" }]), 0);
+      } catch (err) {
+        alert(`Couldn't load this title: ${err}`);
+      } finally {
+        if (cardEl) cardEl.classList.remove("loading");
+      }
+    };
+
+    playBtn.onclick = () => playTubi();
+
+    const card = document.createElement("button");
+    card.className = "episodeCard";
+    card.innerHTML = `
+      <div class="epThumbWrap">
+        ${bannerImg ? `<img loading="lazy" alt="" src="${escapeHtml(bannerImg)}">` : `<div style="padding: 40px; text-align: center;">${FILM_ICON}</div>`}
+        <div class="epPlayOverlay">▶</div>
+      </div>
+      <div class="epMeta">
+        <span class="epShowTitle">${escapeHtml(item.title.toUpperCase())}</span>
+        <div class="epTitleRow"><span class="epTitle">Watch Movie</span></div>
+        <p class="epDescription">${escapeHtml(item.summary)}</p>
+      </div>`;
+    card.addEventListener("click", () => playTubi(card));
     grid.append(card);
     return;
   }
@@ -815,16 +1021,16 @@ export async function openVodDetails(item: VodItem): Promise<void> {
 
           card.innerHTML = `
             <div class="epThumbWrap">
-              ${epThumb ? `<img loading="lazy" alt="" src="${escapeHtml(epThumb)}">` : `<div style="padding: 40px; text-align: center;">🎬</div>`}
+              ${epThumb ? `<img loading="lazy" alt="" src="${escapeHtml(epThumb)}">` : `<div style="padding: 40px; text-align: center;">${FILM_ICON}</div>`}
               <div class="epPlayOverlay">▶</div>
-              ${isWatched ? `<div class="epCardWatchedBadge">✓ WATCHED</div>` : ""}
+              ${isWatched ? `<div class="epCardWatchedBadge">${CHECK_ICON} WATCHED</div>` : ""}
               ${durationStr ? `<div class="epDuration">${durationStr}</div>` : ""}
             </div>
             <div class="epMeta">
               <span class="epShowTitle">${escapeHtml(item.title.toUpperCase())}</span>
               <div class="epTitleRow">
                 <span class="epTitle">E${ep.number ?? "?"} - ${escapeHtml(ep.title || "Episode")}</span>
-                <button class="epWatchedToggle" title="${isWatched ? "Mark unwatched" : "Mark watched"}">✓</button>
+                <button class="epWatchedToggle" title="${isWatched ? "Mark unwatched" : "Mark watched"}" style="display:inline-flex;align-items:center;justify-content:center;">${CHECK_ICON}</button>
               </div>
               <p class="epDescription">${escapeHtml(ep.description || "No description available.")}</p>
             </div>
@@ -844,7 +1050,7 @@ export async function openVodDetails(item: VodItem): Promise<void> {
               if (!existingBadge) {
                 const badge = document.createElement("div");
                 badge.className = "epCardWatchedBadge";
-                badge.textContent = "✓ WATCHED";
+                badge.innerHTML = `${CHECK_ICON} WATCHED`;
                 thumbWrap.append(badge);
               }
             } else {
@@ -906,7 +1112,7 @@ export async function openVodDetails(item: VodItem): Promise<void> {
     card.className = "episodeCard";
     card.innerHTML = `
       <div class="epThumbWrap">
-        ${bannerImg ? `<img loading="lazy" alt="" src="${escapeHtml(bannerImg)}">` : `<div style="padding: 40px; text-align: center;">🎬</div>`}
+        ${bannerImg ? `<img loading="lazy" alt="" src="${escapeHtml(bannerImg)}">` : `<div style="padding: 40px; text-align: center;">${FILM_ICON}</div>`}
         <div class="epPlayOverlay">▶</div>
       </div>
       <div class="epMeta">
@@ -931,7 +1137,7 @@ function vodCard(item: VodItem): HTMLElement {
   el.className = "vodCard";
   el.title = item.summary || item.title;
   el.innerHTML = `
-    <span class="vodPoster">${item.poster ? `<img loading="lazy" alt="" src="${escapeHtml(item.poster)}">` : "🎬"}</span>
+    <span class="vodPoster">${item.poster ? `<img loading="lazy" alt="" src="${escapeHtml(item.poster)}">` : FILM_ICON}</span>
     <span class="vodTitle">${escapeHtml(item.title)}</span>
     <span class="vodMeta">${escapeHtml([item.genre, item.rating].filter(Boolean).join(" · "))}</span>`;
   el.addEventListener("click", () => {
@@ -1037,10 +1243,15 @@ function getRailPriorityScore(name: string): number {
   if (n.includes("sci-fi") || n.includes("cyberpunk") || n.includes("fantasy")) return 7;
   if (n.includes("horror") || n.includes("monster")) return 8;
   if (n.includes("docu") || n.includes("reality")) return 9;
-  
-  // Ambient, sleep soundscapes, and fireplaces push to the bottom
+
+  // Kids/family rails sink on a general (adult) home; a kids profile only has
+  // these anyway (so they just sort among themselves), and taste ordering still
+  // lifts them for anyone who actually watches them.
+  if (n.includes("kids") || n.includes("family") || n.includes("preschool") || n.includes("cartoon")) return 900;
+
+  // Ambient, sleep soundscapes, and fireplaces push to the very bottom
   if (n.includes("sleep") || n.includes("ambient") || n.includes("soundscape") || n.includes("fireplace") || n.includes("relax")) return 999;
-  
+
   return 50;
 }
 
@@ -1058,13 +1269,12 @@ export function renderShows(container: HTMLElement): void {
 
   getVodRails().then((rails: VodRail[]) => {
     loading.remove();
-    let showRails = rails
-      .map((rail) => {
-        const items = rail.items.filter((item) => item.series_id);
-        return { name: rail.name, items };
-      })
-      .filter((rail) => rail.items.length > 0)
-      .sort((a, b) => getRailPriorityScore(a.name) - getRailPriorityScore(b.name));
+    const minRail = (showsSearchQuery || showsActiveGenre) ? 1 : 3;
+    let showRails = sortRailsByTaste(
+      rails
+        .map((rail) => ({ name: rail.name, items: rail.items.filter((item) => item.series_id) }))
+        .filter((rail) => rail.items.length >= minRail)
+    );
 
     // Extract all unique genres for filter chips!
     const genresSet = new Set<string>();
@@ -1100,8 +1310,7 @@ export function renderShows(container: HTMLElement): void {
       const msg = document.createElement("div");
       msg.style.color = "var(--dim)";
       msg.style.padding = "24px";
-      const debugInfo = `DEBUG: rails.length=${rails.length}, rails[0].items.length=${rails[0]?.items?.length}, type=${rails[0]?.items?.[0]?.type}, series_id=${rails[0]?.items?.[0]?.series_id}`;
-      msg.textContent = `No On Demand Shows available matching filters. (${debugInfo})`;
+      msg.textContent = "No shows match your filters. Try clearing the search or genre.";
       container.append(msg);
       return;
     }
@@ -1144,7 +1353,7 @@ export function renderShows(container: HTMLElement): void {
             <h2>${escapeHtml(rail.name)}</h2>
             <span class="railTag">${rail.items.length} series</span>
           </div>
-          <button class="railExpandBtn">See All (${rail.items.length}) ➔</button>
+          <button class="railExpandBtn" style="display:inline-flex;align-items:center;gap:6px;">See All (${rail.items.length})<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></button>
         </div>
       `;
       const scroller = document.createElement("div");
@@ -1183,13 +1392,12 @@ export function renderMovies(container: HTMLElement): void {
 
   getVodRails().then((rails: VodRail[]) => {
     loading.remove();
-    let movieRails = rails
-      .map((rail) => {
-        const items = rail.items.filter((item) => !item.series_id);
-        return { name: rail.name, items };
-      })
-      .filter((rail) => rail.items.length > 0)
-      .sort((a, b) => getRailPriorityScore(a.name) - getRailPriorityScore(b.name));
+    const minRail = (moviesSearchQuery || moviesActiveGenre) ? 1 : 3;
+    let movieRails = sortRailsByTaste(
+      rails
+        .map((rail) => ({ name: rail.name, items: rail.items.filter((item) => !item.series_id) }))
+        .filter((rail) => rail.items.length >= minRail)
+    );
 
     // Extract all unique genres for filter chips!
     const genresSet = new Set<string>();
@@ -1268,7 +1476,7 @@ export function renderMovies(container: HTMLElement): void {
             <h2>${escapeHtml(rail.name)}</h2>
             <span class="railTag">${rail.items.length} movies</span>
           </div>
-          <button class="railExpandBtn">See All (${rail.items.length}) ➔</button>
+          <button class="railExpandBtn" style="display:inline-flex;align-items:center;gap:6px;">See All (${rail.items.length})<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></button>
         </div>
       `;
       const scroller = document.createElement("div");
@@ -1293,6 +1501,66 @@ export function renderMovies(container: HTMLElement): void {
   });
 }
 
+/** Parent-facing kid-safe browse (the veedeeoh.kids sidebar shortcut). Always
+ *  applies the kids gate regardless of the active profile, so a parent can hand
+ *  the device to a child straight from their own profile. */
+export async function renderKids(container: HTMLElement): Promise<void> {
+  container.replaceChildren();
+  const loading = document.createElement("div");
+  loading.style.color = "var(--dim)";
+  loading.style.padding = "24px";
+  loading.textContent = "Loading veedeeoh.kids...";
+  container.append(loading);
+
+  try {
+    if (!cachedVodRails || cachedVodRails.length === 0) {
+      const res = await fetchVod();
+      if (res.rails?.length) cachedVodRails = res.rails;
+    }
+    const kidsRails = sortRailsByTaste(filterRailsForKids(cachedVodRails || []));
+    loading.remove();
+
+    const title = document.createElement("div");
+    title.className = "sectionTitle";
+    title.textContent = "veedeeoh.kids";
+    container.append(title);
+
+    if (kidsRails.length === 0) {
+      const msg = document.createElement("div");
+      msg.style.cssText = "color:var(--dim);padding:24px;";
+      msg.textContent = "No kid-safe titles are available right now.";
+      container.append(msg);
+      return;
+    }
+
+    for (const rail of kidsRails) {
+      const el = document.createElement("div");
+      el.className = "rail";
+      el.innerHTML = `
+        <div class="railHead">
+          <div class="railHeadTitle">
+            <h2>${escapeHtml(rail.name)}</h2>
+            <span class="railTag">${rail.items.length} titles</span>
+          </div>
+          <button class="railExpandBtn" style="display:inline-flex;align-items:center;gap:6px;">See All (${rail.items.length})<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></button>
+        </div>
+      `;
+      const scroller = document.createElement("div");
+      scroller.className = "railScroll";
+      rail.items.slice(0, 30).forEach((item) => scroller.append(vodCard(item)));
+      const railHead = el.querySelector(".railHead") as HTMLElement;
+      if (railHead) {
+        railHead.onclick = (e) => { e.stopPropagation(); openCategoryView(rail.name, rail.items); };
+      }
+      el.append(scroller);
+      setupHorizontalScroll(scroller, el);
+      container.append(el);
+    }
+  } catch (err) {
+    loading.textContent = `Failed to load veedeeoh.kids: ${err}`;
+  }
+}
+
 /** Render Podcasts only */
 let heroCarouselInterval: number | undefined;
 
@@ -1301,11 +1569,10 @@ export async function renderHome(): Promise<void> {
   if (!homeContainer) return;
   homeContainer.replaceChildren();
 
-  // Create loading indicator
+  // Branded loader (usually invisible — the catalog is warmed during the bump).
   const loading = document.createElement("div");
-  loading.style.color = "var(--dim)";
-  loading.style.padding = "24px";
-  loading.textContent = "Loading Home Screen...";
+  loading.className = "brandLoader";
+  loading.innerHTML = `<div class="brandLoaderMark">veedeeoh<span>.</span></div>`;
   homeContainer.append(loading);
 
   try {
@@ -1323,13 +1590,18 @@ export async function renderHome(): Promise<void> {
     railsContainer.id = "homeRails";
     homeContainer.append(railsContainer);
 
-    // 1. Continue Watching (Recent Resumes) from localStorage
-    const resumeHistoryStr = localStorage.getItem("tvlc_resume_history") || "[]";
+    // 1. Continue Watching (Recent Resumes) from localStorage, per profile.
+    const resumeHistoryStr = localStorage.getItem(resumeHistoryKey()) || "[]";
     let resumeHistory: any[] = [];
     try {
       resumeHistory = JSON.parse(resumeHistoryStr);
     } catch (e) {
       resumeHistory = [];
+    }
+
+    // Belt-and-suspenders: a kids profile only ever sees kid-safe resume cards.
+    if (getActiveProfile().is_kids) {
+      resumeHistory = resumeHistory.filter((x: any) => isKidsSafeItem(x));
     }
 
     if (resumeHistory.length > 0) {
@@ -1350,7 +1622,7 @@ export async function renderHome(): Promise<void> {
         const imgUrl = item.banner || item.poster || "";
         card.innerHTML = `
           <div class="continueImage">
-            ${imgUrl ? `<img loading="lazy" alt="" src="${escapeHtml(imgUrl)}">` : "🎬"}
+            ${imgUrl ? `<img loading="lazy" alt="" src="${escapeHtml(imgUrl)}">` : `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="2" y1="7" x2="7" y2="7"></line><line x1="2" y1="17" x2="7" y2="17"></line><line x1="17" y1="17" x2="22" y2="17"></line><line x1="17" y1="7" x2="22" y2="7"></line></svg>`}
             <div class="continueProgressWrap">
               <div class="continueProgressBar" style="width: ${item.percentage}%;"></div>
             </div>
@@ -1371,9 +1643,18 @@ export async function renderHome(): Promise<void> {
     // Clear interval if re-rendering
     if (heroCarouselInterval) clearInterval(heroCarouselInterval);
 
-    // Flatten all items and extract a featured pool for the rotating hero
+    // Flatten all items and extract a featured pool for the rotating hero.
     const allItems = rails.flatMap(r => r.items);
-    const featuredPool = allItems.filter(i => i.banner && i.banner.length > 0).slice(0, 5);
+    const isKidsProfile = !!getActiveProfile().is_kids;
+    // On an ADULT profile, don't let kids/animation content dominate the spotlight
+    // just because the backend pins the Kids rail to the front. Push it to the back.
+    const kidsish = (i: any) => {
+      const g = (i.genre || "").toLowerCase();
+      return g.includes("kids") || g.includes("famil") || (typeof i.maturity === "number" && i.maturity <= 1);
+    };
+    const featuredRank = (i: any) => (isKidsProfile ? 0 : (kidsish(i) ? 1 : 0));
+    const withBanner = allItems.filter(i => i.banner && i.banner.length > 0);
+    const featuredPool = [...withBanner].sort((a, b) => featuredRank(a) - featuredRank(b)).slice(0, 5);
     if (featuredPool.length === 0) {
       featuredPool.push(...allItems.filter(i => i.poster && i.poster.length > 0).slice(0, 5));
     }
@@ -1395,8 +1676,8 @@ export async function renderHome(): Promise<void> {
             <div class="vodHeroMeta">${escapeHtml(featured.rating || "TV-MA")}</div>
             <p class="vodHeroSummary">${escapeHtml(featured.summary || "Start watching now.")}</p>
             <div style="display: flex; gap: 10px; margin-top: 14px;">
-              <button class="actionBtn primary" style="padding: 9px 18px; font-size: 13px; border-radius: 8px; font-weight: 700;">
-                ▶ WATCH NOW
+              <button class="actionBtn primary" style="display:inline-flex;align-items:center;gap:8px;padding: 9px 18px; font-size: 13px; border-radius: 8px; font-weight: 700;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>WATCH NOW
               </button>
               <button class="actionBtn" style="padding: 9px 16px; font-size: 13px; border-radius: 8px;">
                 More Info
@@ -1443,18 +1724,17 @@ export async function renderHome(): Promise<void> {
       const uniqueMovies = Array.from(new Map(moviesItems.map(m => [m.title, m])).values()).filter(i => i.poster || i.banner);
       const uniqueTv = Array.from(new Map(tvItems.map(m => [m.title, m])).values()).filter(i => i.poster || i.banner);
     
-    const groupIntoGenres = (items: VodItem[], fallbackGenre: string) => {
+    const groupIntoGenres = (items: VodItem[]) => {
       const groups: Record<string, VodItem[]> = {};
       items.forEach(item => {
-        const g = item.genre || fallbackGenre;
-        if (!groups[g]) groups[g] = [];
-        groups[g].push(item);
+        const g = (item.genre || "").trim() || "__none";
+        (groups[g] = groups[g] || []).push(item);
       });
       return groups;
     };
 
-    const movieGenres = groupIntoGenres(uniqueMovies, "Hit Films");
-    const tvGenres = groupIntoGenres(uniqueTv, "Binge-Worthy Series");
+    const movieGenres = groupIntoGenres(uniqueMovies);
+    const tvGenres = groupIntoGenres(uniqueTv);
     
     const renderGenreRail = (title: string, items: VodItem[], prioritizeBanner: boolean) => {
       if (items.length === 0) return;
@@ -1465,7 +1745,7 @@ export async function renderHome(): Promise<void> {
           <div class="showcaseRailHeadTitle">
             <h2>${escapeHtml(title)}</h2>
           </div>
-          <button class="railExpandBtn">See All (${items.length}) ➔</button>
+          <button class="railExpandBtn" style="display:inline-flex;align-items:center;gap:6px;">See All (${items.length})<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></button>
         </div>
       `;
       const scroller = document.createElement("div");
@@ -1481,7 +1761,7 @@ export async function renderHome(): Promise<void> {
         const imageClass = useBanner ? "showcasePoster" : "posterImage";
         
         card.innerHTML = `
-          <span class="${imageClass}">${imgUrl ? `<img loading="lazy" alt="" src="${escapeHtml(imgUrl)}">` : "🎬"}</span>
+          <span class="${imageClass}">${imgUrl ? `<img loading="lazy" alt="" src="${escapeHtml(imgUrl)}">` : FILM_ICON}</span>
           <span class="showcaseTitle">${escapeHtml(item.title)}</span>
           <span class="showcaseMeta">${escapeHtml([item.genre, item.rating].filter(Boolean).join(" · "))}</span>
         `;
@@ -1504,28 +1784,71 @@ export async function renderHome(): Promise<void> {
       railsContainer.append(el);
     };
 
-    // Render Featured / Top Level (Banners)
-    renderGenreRail("Trending Movies", uniqueMovies.filter(m => m.banner), true);
-    renderGenreRail("Popular Series", uniqueTv.filter(t => t.banner), true);
+    const taste = getTasteGenres();
+    const history = getResumeHistory();
+    const strip = (id?: string) => (id || "").replace("vod:", "");
 
+    // "Because you watched ..." — same genre as the most recent resume, excluding
+    // what's already in progress.
+    if (history[0]?.genre && history[0]?.title) {
+      const g = history[0].genre;
+      const inProgress = new Set(history.map((h: any) => h.itemId));
+      const recs = [...uniqueMovies, ...uniqueTv]
+        .filter(i => i.genre === g && !inProgress.has(strip(i.id)))
+        .slice(0, 20);
+      if (recs.length >= 4) renderGenreRail(`Because you watched ${history[0].title}`, recs, true);
+    }
 
+    // Popular on veedeeoh — real aggregate plays. Hidden until there's enough data.
+    try {
+      const { getPopularContentIds } = await import("./db");
+      const popular = await getPopularContentIds(20);
+      if (popular.length) {
+        const byId = new Map<string, VodItem>();
+        [...uniqueMovies, ...uniqueTv].forEach(i => byId.set(strip(i.id), i));
+        const items = popular.map(p => byId.get(p.content_id)).filter(Boolean) as VodItem[];
+        if (items.length >= 4) renderGenreRail("Popular on veedeeoh", items, true);
+      }
+    } catch {}
 
-    // Render Genre Rails (Posters) - Sorted by priority so Ambient & Fireplaces drop to bottom
-    Object.entries(movieGenres)
-      .sort(([a], [b]) => getRailPriorityScore(a) - getRailPriorityScore(b))
-      .forEach(([genre, items]) => {
-        if (items.length >= 3 && genre !== "Hit Films") {
-          renderGenreRail(`${genre} Movies`, items, false);
-        }
+    // Featured banners — only as a fallback when we have nothing personalized yet.
+    // Non-kids content leads on an adult profile.
+    if (taste.length === 0 && history.length === 0) {
+      const featured = [...uniqueMovies, ...uniqueTv]
+        .filter(i => i.banner)
+        .sort((a, b) => featuredRank(a) - featuredRank(b))
+        .slice(0, 20);
+      if (featured.length >= 4) renderGenreRail("Featured on veedeeoh", featured, true);
+    }
+
+    // Genre rails ordered by the profile's taste first, then editorial priority,
+    // then size (so ambient/sleep sink and the biggest relevant rails rise).
+    const orderGenres = (entries: [string, VodItem[]][]) =>
+      entries.filter(([g]) => g !== "__none").sort(([a, ia], [b, ib]) => {
+        const ra = taste.indexOf(a) === -1 ? 999 : taste.indexOf(a);
+        const rb = taste.indexOf(b) === -1 ? 999 : taste.indexOf(b);
+        if (ra !== rb) return ra - rb;
+        const pa = getRailPriorityScore(a), pb = getRailPriorityScore(b);
+        if (pa !== pb) return pa - pb;
+        return ib.length - ia.length;
       });
-    
-    Object.entries(tvGenres)
-      .sort(([a], [b]) => getRailPriorityScore(a) - getRailPriorityScore(b))
-      .forEach(([genre, items]) => {
-        if (items.length >= 3 && genre !== "Binge-Worthy Series") {
-          renderGenreRail(`${genre} TV`, items, false);
-        }
-      });
+
+    orderGenres(Object.entries(movieGenres)).forEach(([genre, items]) => {
+      if (items.length >= 3) renderGenreRail(`${genre} Movies`, items, false);
+    });
+    orderGenres(Object.entries(tvGenres)).forEach(([genre, items]) => {
+      if (items.length >= 3) renderGenreRail(`${genre} TV`, items, false);
+    });
+
+    // Catch-all so ungenred or tiny-genre titles are never silently dropped.
+    const leftover = (groups: Record<string, VodItem[]>) => [
+      ...(groups["__none"] || []),
+      ...Object.entries(groups).filter(([g, it]) => g !== "__none" && it.length < 3).flatMap(([, it]) => it),
+    ];
+    const moreMovies = leftover(movieGenres);
+    if (moreMovies.length >= 4) renderGenreRail("More Movies", moreMovies, false);
+    const moreTv = leftover(tvGenres);
+    if (moreTv.length >= 4) renderGenreRail("More Series", moreTv, false);
   } catch (err) {
     loading.textContent = `Failed to load Home dashboard: ${err}`;
   }

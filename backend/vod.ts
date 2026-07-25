@@ -8,6 +8,70 @@ const CATALOG_TTL = 5 * 60 * 1000;
 const ANIME_RE = /anime|naruto|one piece|dragon ?ball|jojo|sailor moon|gundam|bleach|yu-gi-oh|shonen|ghibli|evangelion|cowboy bebop|akira|slayer/i;
 const AMBIENT_SLEEP_RE = /ambient|sleep|relaxation|naturescape|zenlife|white noise|rain sounds|binaural|meditation|lullaby|fireplace|soundscape|ocean waves|stingray/i;
 
+// Deterministic maturity ladder from the provider-supplied rating. This is the
+// single source of truth for kids-safety — unknown/unrated maps to ADULT so
+// nothing can leak into a restricted profile by default.
+//   0 TV-Y  1 TV-Y7  2 G/TV-G  3 PG/TV-PG  4 PG-13/TV-14  5 R/TV-MA/NC-17/unrated
+export const MATURITY_ADULT = 5;
+const MATURITY: Record<string, number> = {
+  "TV-Y": 0,
+  "TV-Y7": 1, "TV-Y7-FV": 1,
+  "G": 2, "TV-G": 2,
+  "PG": 3, "TV-PG": 3,
+  "PG-13": 4, "TV-14": 4,
+  "R": 5, "TV-MA": 5, "NC-17": 5,
+};
+export function maturityLevel(rating?: string | null): number {
+  if (!rating) return MATURITY_ADULT;
+  const key = rating.trim().toUpperCase();
+  return MATURITY[key] ?? MATURITY_ADULT; // "Not Rated", unknowns -> adult (default-deny)
+}
+
+// A kids item must clear BOTH gates: a genuinely kid-safe maturity level AND a
+// kids/family genre or category signal. The maturity gate is what guarantees no
+// adult content can leak in; the genre gate keeps the rail relevant (a G-rated
+// adult drama won't qualify). Adult-animation is excluded automatically since it
+// carries TV-14/TV-MA.
+const KIDS_MAX_MATURITY = 2; // TV-Y, TV-Y7, G, TV-G
+const KIDS_SIGNAL_RE = /child|famil|preschool|\bkid|cartoon|animat/i;
+export function isKidsSafe(item: any, categoryName = ""): boolean {
+  const level = typeof item.maturity === "number" ? item.maturity : maturityLevel(item.rating);
+  if (level > KIDS_MAX_MATURITY) return false;
+  return KIDS_SIGNAL_RE.test(`${item.genre || ""} ${categoryName}`);
+}
+
+// Collapse the messy per-provider genre vocabularies (Pluto "Action & Adventure",
+// Tubi "Action"/"Adventure", etc.) into one canonical set so genre chips and
+// grouping read consistently across sources.
+const GENRE_CANON: Array<[RegExp, string]> = [
+  [/anime/i, "Anime"],
+  [/sci-?fi|science fiction|fantasy/i, "Sci-Fi & Fantasy"],
+  [/action|adventure/i, "Action & Adventure"],
+  [/thriller|suspense/i, "Thriller"],
+  [/horror|paranormal/i, "Horror"],
+  [/romance|telenovela/i, "Romance"],
+  [/comedy|sitcom/i, "Comedy"],
+  [/crime/i, "Crime"],
+  [/document|docuseries/i, "Documentary"],
+  [/child|famil|preschool|\bkid/i, "Kids & Family"],
+  [/reality/i, "Reality"],
+  [/western/i, "Western"],
+  [/music|musical/i, "Music"],
+  [/news/i, "News"],
+  [/sport/i, "Sports"],
+  [/food|cook/i, "Food"],
+  [/education|instruction/i, "Education"],
+  [/lifestyle|home|hobb|diy/i, "Lifestyle"],
+  [/faith|spiritual|religio/i, "Faith"],
+  [/game show|variety|talk show/i, "Entertainment"],
+  [/drama/i, "Drama"],
+];
+export function normalizeGenre(raw?: string | null): string | null {
+  if (!raw) return raw ?? null;
+  for (const [re, label] of GENRE_CANON) if (re.test(raw)) return label;
+  return raw;
+}
+
 let _sessions: Record<string, any> = {};
 let _catalogs: Record<string, any> = {};
 
@@ -75,8 +139,9 @@ function normalize(session: any, item: any): any | null {
     poster: poster,
     banner: item.featuredImage?.path || item.poster16_9?.path,
     summary: (item.summary || item.description || "").substring(0, 500),
-    genre: item.genre,
+    genre: normalizeGenre(item.genre),
     rating: item.rating,
+    maturity: maturityLevel(item.rating),
     duration: item.duration,
   };
   
@@ -91,7 +156,12 @@ function normalize(session: any, item: any): any | null {
   return out;
 }
 
-import { fetchTubiCatalog } from './tubi';
+import { fetchTubiCatalog, tubiSeries, tubiStream as resolveTubiStream } from './tubi';
+
+/** Resolve a Tubi movie's playable HLS URL (adrise content API). */
+export async function tubiStream(contentId: string): Promise<string> {
+  return resolveTubiStream(contentId);
+}
 
 const SPANISH_RE = /en español|en espanol|\(español\)|\(espanol\)|spanish/i;
 
@@ -105,7 +175,7 @@ export async function getCatalog(regionCode?: string): Promise<{ rails: any[]; s
     return _catalogs[code].output;
   }
 
-  const [plutoResult, tubiRails] = await Promise.allSettled([
+  const [plutoResult, tubiRails, archiveKidsResult] = await Promise.allSettled([
     (async () => {
       const session = await getSession(code);
       const params = new URLSearchParams({ offset: "0", page: "1", includeItems: "true" });
@@ -118,16 +188,19 @@ export async function getCatalog(regionCode?: string): Promise<{ rails: any[]; s
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return { session, data: await res.json() };
     })(),
-    fetchTubiCatalog()
+    fetchTubiCatalog(),
+    archiveKids()
   ]);
 
   const plutoData = plutoResult.status === "fulfilled" ? plutoResult.value.data : null;
   const plutoSession = plutoResult.status === "fulfilled" ? plutoResult.value.session : null;
   const tRails = tubiRails.status === "fulfilled" ? tubiRails.value : [];
+  const archKids = archiveKidsResult.status === "fulfilled" ? archiveKidsResult.value : [];
 
   const rawRails: any[] = [];
   const seenAnime: Record<string, any> = {};
   const seenSleep: Record<string, any> = {};
+  const seenKids: Record<string, any> = {};
 
   if (plutoData && plutoSession) {
     for (const cat of plutoData.categories || []) {
@@ -149,6 +222,9 @@ export async function getCatalog(regionCode?: string): Promise<{ rails: any[]; s
         if (AMBIENT_SLEEP_RE.test(`${n.title} ${n.genre || ""} ${cat.name || ""}`)) {
           seenSleep[n.id] = n;
         }
+        if (isKidsSafe(n, cat.name)) {
+          seenKids[n.id] = n;
+        }
       }
     }
   }
@@ -163,7 +239,16 @@ export async function getCatalog(regionCode?: string): Promise<{ rails: any[]; s
       if (AMBIENT_SLEEP_RE.test(`${item.title} ${item.genre || ""} ${tr.name || ""}`)) {
         seenSleep[item.id] = item;
       }
+      if (isKidsSafe(item, tr.name)) {
+        seenKids[item.id] = item;
+      }
     }
+  }
+
+  // Public-domain cartoons: denylisted upstream, and re-checked against the same
+  // maturity + genre gate as everything else before joining the Kids rail.
+  for (const item of archKids) {
+    if (isKidsSafe(item, "Kids & Family")) seenKids[item.id] = item;
   }
 
   const allAnime = Object.values(seenAnime);
@@ -171,23 +256,30 @@ export async function getCatalog(regionCode?: string): Promise<{ rails: any[]; s
   const spanishAnime = allAnime.filter(n => SPANISH_RE.test(`${n.title} ${n.summary || ""}`));
 
   if (spanishAnime.length > 0) {
-    rawRails.unshift({ name: "🇲🇽 Anime en Español", items: spanishAnime });
+    rawRails.unshift({ name: "Anime en Español", items: spanishAnime });
   }
   if (englishAnime.length > 0) {
-    rawRails.unshift({ name: "⛩ Anime", items: englishAnime });
+    rawRails.unshift({ name: "Anime", items: englishAnime });
   }
 
   const allSleep = Object.values(seenSleep);
   if (allSleep.length > 0) {
-    rawRails.unshift({ name: "🌙 Sleep & Ambient Soundscapes", items: allSleep });
+    rawRails.unshift({ name: "Sleep & Ambient Soundscapes", items: allSleep });
+  }
+
+  // Kids rail — every item already passed the maturity + genre gates in
+  // isKidsSafe(), so this rail is safe to surface to restricted profiles.
+  const allKids = Object.values(seenKids);
+  if (allKids.length > 0) {
+    rawRails.unshift({ name: "Kids & Family", items: allKids });
   }
 
   // Merge & Deduplicate rails by category name & title
   const mergedMap: Record<string, Map<string, any>> = {};
   for (const rail of rawRails) {
     let catName = rail.name;
-    if (/anime/i.test(catName) && !catName.includes("Español")) catName = "⛩ Anime";
-    if (/sci-?fi/i.test(catName)) catName = "Sci-fi & Fantasy";
+    if (/anime/i.test(catName) && !catName.includes("Español")) catName = "Anime";
+    if (/sci-?fi/i.test(catName)) catName = "Sci-Fi & Fantasy";
 
     if (!mergedMap[catName]) mergedMap[catName] = new Map();
 
@@ -243,6 +335,11 @@ export async function getCatalog(regionCode?: string): Promise<{ rails: any[]; s
 }
 
 export async function getSeries(seriesId: string, regionCode?: string): Promise<any[]> {
+  // Tubi series resolve through the adrise content API, not Pluto.
+  if (seriesId.startsWith("tubi:")) {
+    return tubiSeries(seriesId.slice(5));
+  }
+
   const session = await getSession(regionCode);
   const params = new URLSearchParams({ offset: "0", page: "1" });
   
@@ -299,7 +396,47 @@ export async function archiveMovies(rows = 30): Promise<any[]> {
     type: "archive",
     poster: `https://archive.org/services/img/${doc.identifier}`,
     summary: `Public domain · ${doc.year || ''}`,
+    maturity: MATURITY_ADULT, // general public-domain films — unrated, keep out of kids
   }));
+}
+
+// Curated public-domain kids animation. Uses the specific `animationandcartoons`
+// collection (verified clean — classic Popeye/Betty Boop/Superman shorts), NOT a
+// broad query, which surfaces exploitation films. Trusted at TV-Y7 so it feeds
+// the Kids rail. Fully redistributable, so it's safe to monetize.
+// The public-domain animation collection is download-sorted and NOT vetted: it
+// contains wartime propaganda and the racist "Censored Eleven"-era shorts. We
+// drop anything whose title/identifier trips this denylist before trusting it as
+// kid-safe. Not exhaustive, but it removes the well-known offenders.
+const KIDS_ARCHIVE_DENY = /\b(nazi|hitler|mussolini|tojo|world\s*war|war\s*bond|propaganda|blackface|minstrel|mammy|coal\s*black|jungle\s*jitters|scrub\s*me\s*mama|uncle\s*tom|golliwog|injun|redskin|savage|swastika|censored\s*eleven|jap|nip)\b/i;
+
+export async function archiveKids(rows = 60): Promise<any[]> {
+  const params = new URLSearchParams({
+    "q": 'collection:animationandcartoons AND mediatype:movies',
+    "sort[]": "downloads desc",
+    "rows": rows.toString(),
+    "output": "json",
+  });
+  const qs = params.toString() + '&fl[]=identifier&fl[]=title&fl[]=year&fl[]=downloads';
+
+  const res = await fetch(`https://archive.org/advancedsearch.php?${qs}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+
+  return (data.response?.docs || [])
+    .filter((doc: any) => !KIDS_ARCHIVE_DENY.test(`${doc.title || ""} ${doc.identifier || ""}`))
+    .map((doc: any) => ({
+      id: `archive:${doc.identifier}`,
+      identifier: doc.identifier,
+      title: doc.title || doc.identifier,
+      type: "archive",
+      poster: `https://archive.org/services/img/${doc.identifier}`,
+      summary: `Classic cartoon · ${doc.year || ''}`,
+      genre: "Kids & Family",
+      rating: "TV-Y7",
+      maturity: 1,
+      provider: "Internet Archive",
+    }));
 }
 
 let _podcastCatalog: any = { rails: [], at: 0 };

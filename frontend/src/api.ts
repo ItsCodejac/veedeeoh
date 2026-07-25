@@ -1,6 +1,14 @@
 import type { Catalog, VodEpisode, VodRail } from "./types";
 import { state } from "./state";
 import { getSession } from "./auth";
+import { getActiveProfile } from "./profiles";
+
+// The active profile's real Supabase id, or null for local/unsynced placeholders
+// ('default_main' and 'profile_<ts>' are not valid household_profiles rows).
+function activeProfileId(): string | null {
+  const id = getActiveProfile().id;
+  return id && !id.startsWith("default_") && !id.startsWith("profile_") ? id : null;
+}
 
 async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const session = await getSession();
@@ -12,7 +20,8 @@ async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<R
 }
 
 export async function fetchCatalog(): Promise<Catalog> {
-  const res = await apiFetch("/api/catalog");
+  const pid = activeProfileId();
+  const res = await apiFetch(`/api/catalog${pid ? `?profileId=${encodeURIComponent(pid)}` : ""}`);
   if (!res.ok) throw new Error(`catalog fetch failed: ${res.status}`);
   return res.json();
 }
@@ -64,11 +73,22 @@ export async function fetchArchiveStream(identifier: string): Promise<string> {
   return (await res.json()).url;
 }
 
+/** Resolve a Tubi movie's HLS stream on demand (movies carry no URL in the catalog). */
+export async function fetchTubiStream(tubiId: string): Promise<string> {
+  const res = await apiFetch(`/api/vod/tubi/${encodeURIComponent(tubiId)}`);
+  if (!res.ok) throw new Error(`tubi fetch failed: ${res.status}`);
+  return (await res.json()).url;
+}
+
+// Returns the content ids the active profile has completed (for the ✓ marks).
 export async function fetchWatched(): Promise<string[]> {
+  const pid = activeProfileId();
+  if (!pid) return [];
   try {
-    const res = await apiFetch("/api/watched");
+    const res = await apiFetch(`/api/watched?profileId=${encodeURIComponent(pid)}`);
     if (!res.ok) return [];
-    return res.json();
+    const rows = (await res.json())?.watched ?? [];
+    return rows.filter((r: any) => r.completed).map((r: any) => r.content_id as string);
   } catch {
     return [];
   }
@@ -77,20 +97,21 @@ export async function fetchWatched(): Promise<string[]> {
 export async function toggleWatched(episodeId: string, force?: boolean): Promise<boolean> {
   const current = state.watched.has(episodeId);
   const target = force !== undefined ? force : !current;
-  
   if (target === current) return current;
+
+  const pid = activeProfileId();
 
   if (target) {
     state.watched.add(episodeId);
-    await apiFetch("/api/watched", {
+    if (pid) await apiFetch("/api/watched", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: episodeId }),
+      body: JSON.stringify({ profileId: pid, contentId: episodeId, completed: true }),
     });
     return true;
   } else {
     state.watched.delete(episodeId);
-    await apiFetch(`/api/watched/${encodeURIComponent(episodeId)}`, { method: "DELETE" });
+    if (pid) await apiFetch(`/api/watched/${encodeURIComponent(episodeId)}?profileId=${encodeURIComponent(pid)}`, { method: "DELETE" });
     return false;
   }
 }
