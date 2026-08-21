@@ -154,8 +154,26 @@ class VodPlayer {
     this.overlay.style.cssText = mode === "mini" ? MINI_CSS : FULL_CSS;
     if (this.root) this.root.dataset.mode = mode;
     if (this.pipBtn) this.pipBtn.style.display = mode === "mini" ? "none" : this.pipBtn.dataset.ready ? "flex" : "none";
-    const close = this.root?.querySelector<HTMLElement>("[data-role=close]");
-    if (close) close.style.display = mode === "mini" ? "flex" : "none";
+
+    const q = (role: string) => this.root?.querySelector<HTMLElement>(`[data-role=${role}]`);
+    const mini = mode === "mini";
+
+    // Close sits clear of Vidstack's own top chrome at full size, and tucks into
+    // the corner when the box is small.
+    const close = q("close");
+    if (close) {
+      close.style.top = mini ? "8px" : "20px";
+      close.style.right = mini ? "8px" : "68px";
+      close.style.width = close.style.height = mini ? "32px" : "40px";
+      close.style.background = mini ? "#222" : "rgba(0,0,0,0.55)";
+      close.style.display = "flex";
+    }
+    const expand = q("expand");
+    if (expand) expand.style.display = mini ? "flex" : "none";
+    const shield = q("shield");
+    if (shield) shield.style.display = mini ? "block" : "none";
+    const minimize = q("minimize");
+    if (minimize) minimize.style.display = mini ? "none" : "flex";
   }
 
   private titleFor(stream: any): string {
@@ -197,14 +215,32 @@ class VodPlayer {
       () => void this.togglePip());
     root.appendChild(this.pipBtn);
 
+    // Close is available in BOTH modes. Previously it only appeared in mini, so
+    // the only way out of full screen was to minimise first and then close.
     root.appendChild(this.iconBtn("close", "Close player",
-      "position:absolute;top:8px;right:8px;z-index:70;display:none;width:32px;height:32px;background:#222;",
+      "position:absolute;z-index:70;",
       `<line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>`,
       () => closeVodPlayer()));
 
-    // Clicking the mini box restores it. Scoped to mini so it never interferes
-    // with the control bar at full size.
-    root.addEventListener("click", () => { if (this.mode === "mini") this.setMode("full"); }, { signal: this.ac.signal });
+    // Explicit restore control, so returning to full size does not depend on
+    // knowing that the box is clickable.
+    root.appendChild(this.iconBtn("expand", "Back to full screen",
+      "position:absolute;top:8px;left:8px;z-index:70;display:none;width:32px;height:32px;background:#222;",
+      `<polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line>`,
+      () => this.setMode("full")));
+
+    // In mini mode a transparent shield sits over the video and swallows the
+    // click. Without it the restore click also reached Vidstack, which toggled
+    // pause -- so restoring the player paused it and you had to click again.
+    const shield = document.createElement("div");
+    shield.dataset.role = "shield";
+    shield.style.cssText = "position:absolute;inset:0;z-index:55;display:none;cursor:pointer;";
+    shield.addEventListener("click", (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      this.setMode("full");
+    }, { signal: this.ac.signal });
+    root.appendChild(shield);
 
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && !this.overlay.hasAttribute("hidden") && !document.fullscreenElement) closeVodPlayer();
