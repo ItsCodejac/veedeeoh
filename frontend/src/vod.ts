@@ -836,17 +836,16 @@ export async function renderFavorites(): Promise<void> {
 
   const rail = document.createElement("div");
   rail.className = "rail";
-  rail.innerHTML = `<div class="railHead"><h2>My List</h2><span class="railTag">${items.length} saved</span></div>`;
+  rail.innerHTML = `<div class="railHead"><div class="railHeadTitle"><h2>My List</h2><span class="railTag">${items.length} saved</span></div></div>`;
   const scroller = document.createElement("div");
-  scroller.className = "railScroller";
-  for (const it of items) {
-    const card = document.createElement("div");
-    card.className = "vodCard";
-    card.innerHTML = `<div class="vodCardArt">${it.poster ? `<img loading="lazy" alt="" src="${escapeHtml(it.poster)}">` : FILM_ICON}</div><div class="vodCardTitle">${escapeHtml(it.title)}</div>`;
-    card.addEventListener("click", () => void openVodDetails(it));
-    scroller.append(card);
-  }
+  // "railScroll" and the shared vodCard() helper, matching every other rail.
+  // This built its own markup with classes that exist nowhere in style.css
+  // (railScroller / vodCardArt / vodCardTitle), so the cards fell back to
+  // unstyled blocks: full-width posters stacked one per row.
+  scroller.className = "railScroll";
+  for (const it of items) scroller.append(vodCard(it));
   rail.append(scroller);
+  setupHorizontalScroll(scroller, rail);
   container.append(rail);
 }
 
