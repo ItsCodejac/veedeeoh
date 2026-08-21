@@ -118,6 +118,13 @@ export async function signOut(): Promise<void> {
     await getSupabase().auth.signOut();
   } catch {}
   localStorage.removeItem(AUTH_KEY);
+  // Profile state is per ACCOUNT, so it must not survive a sign-out. Boot now
+  // restores the persisted profile rather than always showing the picker, so
+  // leaving these behind drops the next person to sign in straight into the
+  // previous account's profile -- including a kids one, applying its rating
+  // limits to somebody else's library.
+  localStorage.removeItem('veedeeoh_active_profile');
+  localStorage.removeItem('veedeeoh_household_profiles');
   eraseCookie(AUTH_KEY);
   if (isCloudMode()) {
     window.location.href = '/landing.html';
