@@ -170,8 +170,6 @@ class VodPlayer {
     }
     const expand = q("expand");
     if (expand) expand.style.display = mini ? "flex" : "none";
-    const shield = q("shield");
-    if (shield) shield.style.display = mini ? "block" : "none";
     const minimize = q("minimize");
     if (minimize) minimize.style.display = mini ? "none" : "flex";
   }
@@ -229,18 +227,35 @@ class VodPlayer {
       `<polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line>`,
       () => this.setMode("full")));
 
-    // In mini mode a transparent shield sits over the video and swallows the
-    // click. Without it the restore click also reached Vidstack, which toggled
-    // pause -- so restoring the player paused it and you had to click again.
-    const shield = document.createElement("div");
-    shield.dataset.role = "shield";
-    shield.style.cssText = "position:absolute;inset:0;z-index:55;display:none;cursor:pointer;";
-    shield.addEventListener("click", (e) => {
+    // In mini mode, clicking bare video restores to full size, but Vidstack's own
+    // controls must keep working. A blanket shield over the box blocked the play
+    // button too; letting the click through instead meant Vidstack's tap-to-pause
+    // gesture fired and restoring always paused playback.
+    //
+    // So: intercept in the CAPTURE phase, before the gesture handler runs, and
+    // bail out if the click landed on a control. composedPath() is used rather
+    // than closest() because Vidstack renders controls inside shadow roots,
+    // which retargets event.target to the host element.
+    const isControl = (e: Event) =>
+      (e.composedPath() as HTMLElement[]).some((el) => {
+        const tag = el?.tagName?.toLowerCase?.() || "";
+        return (
+          tag === "button" ||
+          tag === "input" ||
+          tag === "media-controls" ||
+          tag.endsWith("-button") ||
+          tag.endsWith("-slider") ||
+          tag.endsWith("-menu") ||
+          el?.getAttribute?.("role") === "button"
+        );
+      });
+
+    root.addEventListener("click", (e) => {
+      if (this.mode !== "mini" || isControl(e)) return;
       e.stopPropagation();
       e.preventDefault();
       this.setMode("full");
-    }, { signal: this.ac.signal });
-    root.appendChild(shield);
+    }, { capture: true, signal: this.ac.signal });
 
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && !this.overlay.hasAttribute("hidden") && !document.fullscreenElement) closeVodPlayer();
