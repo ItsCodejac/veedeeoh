@@ -1,4 +1,4 @@
-import { getSession, restoreSession, signIn, signUp, signInWithGoogle } from './src/auth';
+import { getSession, restoreSession, signIn, signUp, signInWithGoogle, signInWithPasskey } from './src/auth';
 
 async function checkAuth() {
   const session = await restoreSession();
@@ -84,99 +84,91 @@ const closeAuthBtn = document.getElementById('closeAuthBtn') as HTMLButtonElemen
 const authForm = document.getElementById('authForm') as HTMLFormElement;
 const emailInput = document.getElementById('emailInput') as HTMLInputElement;
 const passwordInput = document.getElementById('passwordInput') as HTMLInputElement;
-const submitBtn = document.getElementById('submitBtn') as HTMLButtonElement;
-const authMessage = document.getElementById('authMessage') as HTMLDivElement;
 
-// Inject "Continue with Google" above the email/password form (no HTML edit).
-(function addGoogleAuth() {
-  const box = authModal?.querySelector('.modal-box');
-  if (!box || box.querySelector('#googleAuthBtn')) return;
-  const btn = document.createElement('button');
-  btn.id = 'googleAuthBtn';
-  btn.type = 'button';
-  btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 48 48" style="flex:none"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.9 2.4 30.3 0 24 0 14.6 0 6.4 5.4 2.4 13.2l7.9 6.1C12.2 13.2 17.6 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.6c0-1.6-.1-3.1-.4-4.6H24v9.1h12.4c-.5 2.9-2.1 5.3-4.6 7l7.1 5.5c4.2-3.9 6.6-9.6 6.6-16z"/><path fill="#FBBC05" d="M10.3 28.3c-.5-1.4-.8-2.8-.8-4.3s.3-3 .8-4.3l-7.9-6.1C.9 16.5 0 20.1 0 24s.9 7.5 2.4 10.6l7.9-6.3z"/><path fill="#34A853" d="M24 48c6.3 0 11.6-2.1 15.5-5.7l-7.1-5.5c-2 1.3-4.5 2.1-8.4 2.1-6.4 0-11.8-3.7-13.7-8.9l-7.9 6.3C6.4 42.6 14.6 48 24 48z"/></svg> Continue with Google`;
-  btn.style.cssText = "width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:12px;border-radius:10px;background:#fff;color:#1a1a1a;border:none;font-weight:700;font-size:15px;cursor:pointer;margin-bottom:16px;";
-  btn.addEventListener('click', async () => {
-    btn.disabled = true; btn.textContent = 'Redirecting…';
-    try { await signInWithGoogle(); }
-    catch (e: any) {
-      if (authMessage) { authMessage.textContent = e?.message || 'Google sign-in failed'; authMessage.style.color = '#ff8a8a'; }
-      btn.disabled = false; btn.innerHTML = 'Continue with Google';
-    }
-  });
-  const divider = document.createElement('div');
-  divider.textContent = 'or';
-  divider.style.cssText = "text-align:center;color:#7a8598;font-size:12px;margin:0 0 16px;";
-  const anchor = authForm && authForm.parentElement === box ? authForm : box.querySelector('h2')?.nextElementSibling || null;
-  box.insertBefore(btn, anchor);
-  box.insertBefore(divider, anchor);
-})();
+const authStepEmail = document.getElementById('authStepEmail') as HTMLDivElement;
+const authStepPassword = document.getElementById('authStepPassword') as HTMLDivElement;
+const authStepSuccess = document.getElementById('authStepSuccess') as HTMLDivElement;
+const displayEmail = document.getElementById('displayEmail') as HTMLSpanElement;
+
+const continueBtn = document.getElementById('continueBtn') as HTMLButtonElement;
+const submitBtn = document.getElementById('submitBtn') as HTMLButtonElement;
+const passkeyBtn = document.getElementById('passkeyBtn') as HTMLButtonElement;
+const googleAuthBtn = document.getElementById('googleAuthBtn') as HTMLButtonElement;
+const editEmailBtn = document.getElementById('editEmailBtn') as HTMLButtonElement;
+const backToSignInBtn = document.getElementById('backToSignInBtn') as HTMLButtonElement;
+const authModeToggleBtn = document.getElementById('authModeToggleBtn') as HTMLDivElement;
+const passkeyContainer = document.getElementById('passkeyContainer') as HTMLDivElement;
+
+const authTitle = document.getElementById('authTitle') as HTMLHeadingElement;
+const authSubtitle = document.getElementById('authSubtitle') as HTMLParagraphElement;
+const authMessage = document.getElementById('authMessage') as HTMLDivElement;
+const successTitle = document.getElementById('successTitle') as HTMLHeadingElement;
+const successMessage = document.getElementById('successMessage') as HTMLParagraphElement;
 
 function renderAuthModalUI() {
-  const modalBox = authModal?.querySelector('.modal-box');
-  if (!modalBox) return;
-
-  const h2 = modalBox.querySelector('h2');
-  const p = modalBox.querySelector('p');
-
   if (isSignUpMode) {
-    if (h2) h2.textContent = 'Create Account & Join Household';
-    if (p) p.textContent = 'Enter your email and create a password to set up your account.';
-    if (passwordInput) passwordInput.placeholder = 'Create Password (min 6 chars)';
-    if (submitBtn) submitBtn.textContent = 'Create Account & Join Household →';
+    authTitle.textContent = 'Create Account';
+    authSubtitle.textContent = 'Enter your email to join the household.';
+    passwordInput.placeholder = 'Create Password (min 6 chars)';
+    submitBtn.textContent = 'Create Account';
+    authModeToggleBtn.innerHTML = `Already have an account? <span>Sign In</span>`;
+    
   } else {
-    if (h2) h2.textContent = 'Sign In';
-    if (p) p.textContent = 'Enter your email and password to access your library.';
-    if (passwordInput) passwordInput.placeholder = 'Password';
-    if (submitBtn) submitBtn.textContent = 'Sign In →';
+    authTitle.textContent = 'Welcome Back';
+    authSubtitle.textContent = 'Enter your email to access your library.';
+    passwordInput.placeholder = 'Password';
+    submitBtn.textContent = 'Sign In';
+    authModeToggleBtn.innerHTML = `New user invited by family? <span>Create Account</span>`;
+    
   }
+}
 
-  // Add Mode Toggle Link if not present
-  let toggleBtn = modalBox.querySelector('#authModeToggleBtn') as HTMLElement;
-  if (!toggleBtn) {
-    toggleBtn = document.createElement('div');
-    toggleBtn.id = 'authModeToggleBtn';
-    toggleBtn.style.cssText = 'margin-top: 14px; text-align: center; font-size: 13px; color: #9aa5b5; cursor: pointer; font-family: sans-serif;';
-    modalBox.appendChild(toggleBtn);
-
-    toggleBtn.addEventListener('click', () => {
-      isSignUpMode = !isSignUpMode;
-      renderAuthModalUI();
-    });
+function showStep(step: 'email' | 'password' | 'success') {
+  authStepEmail.classList.remove('active');
+  authStepPassword.classList.remove('active');
+  authStepSuccess.classList.remove('active');
+  
+  if (step === 'email') {
+    authStepEmail.classList.add('active');
+    setTimeout(() => emailInput.focus(), 50);
+  } else if (step === 'password') {
+    authStepPassword.classList.add('active');
+    setTimeout(() => passwordInput.focus(), 50);
+  } else if (step === 'success') {
+    authStepSuccess.classList.add('active');
   }
-
-  toggleBtn.innerHTML = isSignUpMode 
-    ? `Already have an account? <span style="color: #c5f04e; text-decoration: underline;">Sign In</span>` 
-    : `New user invited by family? <span style="color: #c5f04e; text-decoration: underline;">Create Account</span>`;
 }
 
 function openAuth() {
-  if (authModal) {
-    renderAuthModalUI();
-    authModal.style.display = 'flex';
-    if (emailInput) emailInput.focus();
-  }
+  if (!authModal) return;
+  renderAuthModalUI();
+  authModal.style.display = 'flex';
+  showStep('email');
+  
+  // Trigger animation
+  setTimeout(() => {
+    authModal.classList.add('show');
+    emailInput.focus();
+  }, 10);
 }
 
-// Open the modal already switched to account creation (the "Start free trial" path).
 function openAuthSignup() {
   isSignUpMode = true;
   openAuth();
 }
 
 function closeAuth() {
-  if (authModal) {
+  if (!authModal) return;
+  authModal.classList.remove('show');
+  setTimeout(() => {
     authModal.style.display = 'none';
     authMessage.style.display = 'none';
     authForm.reset();
-  }
+  }, 300); // Wait for transition
 }
 
 if (navAuthBtn) navAuthBtn.addEventListener('click', openAuth);
 if (closeAuthBtn) closeAuthBtn.addEventListener('click', closeAuth);
-
-// Hero + pricing CTAs. "Start free trial" opens the modal in account-creation
-// mode; "Sign in" opens it in the default sign-in mode.
 document.getElementById('heroTrialBtn')?.addEventListener('click', openAuthSignup);
 document.getElementById('pricingTrialBtn')?.addEventListener('click', openAuthSignup);
 document.getElementById('heroSignInBtn')?.addEventListener('click', openAuth);
@@ -187,6 +179,84 @@ if (authModal) {
   });
 }
 
+if (authModeToggleBtn) {
+  authModeToggleBtn.addEventListener('click', () => {
+    isSignUpMode = !isSignUpMode;
+    renderAuthModalUI();
+  });
+}
+
+if (editEmailBtn) {
+  editEmailBtn.addEventListener('click', () => {
+    authMessage.style.display = 'none';
+    showStep('email');
+  });
+}
+
+if (backToSignInBtn) {
+  backToSignInBtn.addEventListener('click', () => {
+    authMessage.style.display = 'none';
+    isSignUpMode = false;
+    renderAuthModalUI();
+    showStep('email');
+  });
+}
+
+if (continueBtn) {
+  continueBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    const email = emailInput.value.trim();
+    if (!email) {
+      emailInput.reportValidity();
+      return;
+    }
+    displayEmail.textContent = email;
+    authMessage.style.display = 'none';
+    showStep('password');
+  });
+}
+
+if (googleAuthBtn) {
+  googleAuthBtn.addEventListener('click', async () => {
+    const originalText = googleAuthBtn.innerHTML;
+    googleAuthBtn.disabled = true; 
+    googleAuthBtn.innerHTML = 'Redirecting...';
+    try { 
+      await signInWithGoogle(); 
+    } catch (e: any) {
+      authMessage.textContent = e?.message || 'Google sign-in failed'; 
+      authMessage.style.display = 'block';
+      googleAuthBtn.disabled = false; 
+      googleAuthBtn.innerHTML = originalText;
+    }
+  });
+}
+
+if (passkeyBtn) {
+  passkeyBtn.addEventListener('click', async () => {
+    passkeyBtn.disabled = true;
+    const originalText = passkeyBtn.innerHTML;
+    passkeyBtn.innerHTML = 'Prompting...';
+    try {
+      await signInWithPasskey();
+      showStep('success');
+      successTitle.textContent = 'Welcome Back';
+      successMessage.textContent = 'Passkey verified successfully. Redirecting...';
+      setTimeout(() => {
+        window.location.href = '/index.html';
+      }, 1000);
+    } catch (e: any) {
+      authMessage.textContent = e?.message || 'Passkey sign-in failed. You may need to enroll a passkey first in your account settings.';
+      authMessage.style.display = 'block';
+    } finally {
+      passkeyBtn.disabled = false;
+      passkeyBtn.innerHTML = originalText;
+    }
+  });
+}
+
+
+
 if (authForm) {
   authForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -195,45 +265,44 @@ if (authForm) {
 
     if (!email || !password) {
       authMessage.style.display = 'block';
-      authMessage.style.color = '#ff3b30';
       authMessage.textContent = 'Please provide both email and password.';
       return;
     }
 
     submitBtn.disabled = true;
+    const originalText = submitBtn.textContent;
     submitBtn.textContent = isSignUpMode ? 'Creating Account...' : 'Verifying...';
     
     try {
       if (isSignUpMode) {
         await signUp(email, password);
-        authMessage.style.display = 'block';
-        authMessage.style.color = '#c5f04e';
-        authMessage.textContent = 'Account created. Redirecting to setup...';
+        showStep('success');
+        successTitle.textContent = 'Account Created';
+        successMessage.textContent = 'Account created successfully. Redirecting to your dashboard...';
         setTimeout(() => {
           window.location.href = '/index.html';
-        }, 500);
+        }, 1500);
       } else {
         const { mustChangePassword } = await signIn(email, password);
-        authMessage.style.display = 'block';
-        authMessage.style.color = '#c5f04e';
+        showStep('success');
+        successTitle.textContent = 'Welcome Back';
         if (mustChangePassword) {
-          authMessage.textContent = 'Access granted! You must set a new password first...';
+          successMessage.textContent = 'Access granted! Redirecting to set a new password...';
           setTimeout(() => {
             window.location.href = '/change-password.html';
-          }, 600);
+          }, 1000);
         } else {
-          authMessage.textContent = 'Access granted! Redirecting to streaming app...';
+          successMessage.textContent = 'Access granted! Redirecting...';
           setTimeout(() => {
             window.location.href = '/index.html';
-          }, 400);
+          }, 1000);
         }
       }
-    } catch (err: any) {
+    } catch (e: any) {
       authMessage.style.display = 'block';
-      authMessage.style.color = '#ff3b30';
-      authMessage.textContent = err.message || (isSignUpMode ? 'Account creation failed.' : 'Invalid email or password.');
+      authMessage.textContent = e?.message || 'Authentication failed.';
       submitBtn.disabled = false;
-      submitBtn.textContent = isSignUpMode ? 'Create Account & Join Household →' : 'Sign In →';
+      submitBtn.textContent = originalText;
     }
   });
 }
@@ -272,7 +341,10 @@ function interleaveByCategory(items: PosterItem[]): PosterItem[] {
   const out: PosterItem[] = [];
   for (let i = 0, added = true; added; i++) {
     added = false;
-    for (const list of lists) if (i < list.length) { out.push(list[i]); added = true; }
+    for (const list of lists) {
+      const item = list[i];
+      if (item) { out.push(item); added = true; }
+    }
   }
   return out;
 }

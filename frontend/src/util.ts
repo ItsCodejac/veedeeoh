@@ -62,18 +62,87 @@ export function isGeoBlockBumper(video: HTMLVideoElement): boolean {
   }
 }
 
+/** Full-page branded loader: shimmering wordmark + pulse dot + progress track. */
+export function buildBrandLoader(): HTMLElement {
+  const el = document.createElement("div");
+  el.className = "brandLoader";
+  el.innerHTML = `
+    <div class="brandLoaderMark">
+      <span class="brandLoaderWord">veedeeoh</span>
+      <span class="brandLoaderDot"></span>
+    </div>
+    <div class="brandLoaderTrack"><div class="brandLoaderTrackFill"></div></div>
+  `;
+  return el;
+}
+
+/** Shimmering rail placeholder shown while a catalog fetch is in flight. */
+export function buildRailSkeleton(cardCount = 5): HTMLElement {
+  const el = document.createElement("div");
+  el.className = "railSkeleton";
+
+  const title = document.createElement("div");
+  title.className = "railSkeletonTitle";
+  title.innerHTML = `<div class="skeletonSweep"></div>`;
+  el.append(title);
+
+  const cards = document.createElement("div");
+  cards.className = "railSkeletonCards";
+  for (let i = 0; i < cardCount; i++) {
+    const card = document.createElement("div");
+    card.className = "skeletonCard";
+    card.innerHTML = `<div class="skeletonSweep" style="animation-delay: ${(i * 0.12).toFixed(2)}s"></div>`;
+    cards.append(card);
+  }
+  el.append(cards);
+
+  const lines = document.createElement("div");
+  lines.className = "railSkeletonLines";
+  for (let i = 0; i < cardCount; i++) {
+    const group = document.createElement("div");
+    group.className = "skeletonLineGroup";
+    group.innerHTML = `
+      <div class="skeletonLine"><div class="skeletonSweep dim" style="animation-delay: ${(i * 0.12).toFixed(2)}s"></div></div>
+      <div class="skeletonLineShort"></div>
+    `;
+    lines.append(group);
+  }
+  el.append(lines);
+
+  return el;
+}
+
+/** Compact inline loader (three bouncing dots) for small surfaces. */
+export function buildInlineLoader(): HTMLElement {
+  const el = document.createElement("div");
+  el.className = "inlineLoaderBounce";
+  el.innerHTML = `<span></span><span></span><span></span>`;
+  return el;
+}
+
 export function setupHorizontalScroll(scroller: HTMLElement, parent: HTMLElement): void {
   if (parent.querySelector(".scrollArrow")) return;
   
+  const chevron = (dir: "left" | "right") =>
+    `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="${dir === "left" ? "15 18 9 12 15 6" : "9 18 15 12 9 6"}"></polyline></svg>`;
+
   const leftBtn = document.createElement("button");
   leftBtn.className = "scrollArrow left";
-  leftBtn.innerHTML = "❮";
-  
+  leftBtn.innerHTML = chevron("left");
+
   const rightBtn = document.createElement("button");
   rightBtn.className = "scrollArrow right";
-  rightBtn.innerHTML = "❯";
+  rightBtn.innerHTML = chevron("right");
 
   parent.append(leftBtn, rightBtn);
+
+  // Center the arrows on the card row itself (not the rail header), so they never
+  // float detached. Requires the rail to be position:relative (see CSS).
+  const positionArrows = () => {
+    const top = scroller.offsetTop + scroller.clientHeight / 2;
+    leftBtn.style.top = `${top}px`;
+    rightBtn.style.top = `${top}px`;
+  };
 
   const scrollAmount = () => scroller.clientWidth * 0.75;
 
@@ -88,6 +157,7 @@ export function setupHorizontalScroll(scroller: HTMLElement, parent: HTMLElement
   });
 
   const updateArrows = () => {
+    positionArrows();
     const atStart = scroller.scrollLeft <= 10;
     const atEnd = scroller.scrollLeft >= scroller.scrollWidth - scroller.clientWidth - 10;
     leftBtn.style.opacity = atStart ? "0" : "1";

@@ -193,3 +193,12 @@ export async function signUp(email: string, password: string): Promise<void> {
     throw new Error("Account created. Check your email to confirm, then sign in.");
   }
 }
+
+/** Sign in using WebAuthn Passkeys */
+export async function signInWithPasskey(): Promise<void> {
+  const { data, error } = await getSupabase().auth.signInWithPasskey();
+  if (error) throw error;
+  if (data?.session) {
+    setSession(data.session.user.email || 'user', data.session.access_token);
+  }
+}

@@ -5,3 +5,15 @@ backend/node_modules
 dist
 build
 .git
+
+# One-off codemods that rewrite source in place. Must never run in a build, and
+# re-running them now would corrupt already-patched files.
+patch_auth*.js
+scripts/
+# Nested config is ignored by Vercel (root vercel.json governs) but conflicts with it.
+frontend/vercel.json
+.DS_Store
+
+# Local secrets. Vercel injects its own env vars; this should never be uploaded.
+.env
+*.env

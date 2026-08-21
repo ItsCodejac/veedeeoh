@@ -28,6 +28,7 @@ export interface VodItem {
   genre?: string | null;
   rating?: string | null;
   duration?: number | null;
+  pluto_path?: string | null;
   provider?: string | null;
   url?: string;
   series_id?: string;
@@ -64,6 +65,7 @@ export interface HouseholdProfile {
   id: string;
   name: string;
   avatar_color: string;
+  avatar_url?: string | null;
   role?: 'owner' | 'adult';
   is_kids?: boolean;
   max_rating?: string | null; // e.g. 'TV-G'; null/undefined = no cap (adult)

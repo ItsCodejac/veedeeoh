@@ -142,12 +142,20 @@ function normalize(session: any, item: any): any | null {
     genre: normalizeGenre(item.genre),
     rating: item.rating,
     maturity: maturityLevel(item.rating),
-    duration: item.duration,
+    // Pluto reports duration in milliseconds; Tubi reports seconds. Normalize to
+    // SECONDS here so every consumer can assume one unit (see tubi.ts).
+    duration: typeof item.duration === "number" ? Math.round(item.duration / 1000) : null,
   };
   
   const path = item.stitched?.path;
   if (item.type === "movie" && path) {
-    out.url = streamUrl(session, path);
+    // Store the SHORT UNSIGNED path, not a signed URL. A signed stitcher URL is
+    // ~3700 chars and carries a 24h JWT: baking 4300 of them into the cached
+    // payload made it 21MB (74% just these URLs), which blew the Postgres
+    // statement timeout so the cache write silently failed and the catalog went
+    // stale for 10 days — and the tokens expired inside it anyway. Resolve on
+    // click instead, exactly like Tubi and Internet Archive already do.
+    out.pluto_path = path;
   } else if (item.type === "series") {
     out.series_id = item._id;
   } else {
@@ -157,6 +165,14 @@ function normalize(session: any, item: any): any | null {
 }
 
 import { fetchTubiCatalog, tubiSeries, tubiStream as resolveTubiStream } from './tubi';
+
+/** Sign a Pluto stitcher path with a FRESH session token. Called per play click,
+ *  so the 24h JWT is always minutes old rather than however stale the cache is. */
+export async function plutoStream(path: string, regionCode?: string): Promise<string> {
+  if (!path.startsWith("/stitch/")) throw new Error("Invalid Pluto path");
+  const session = await getSession(regionCode);
+  return streamUrl(session, path);
+}
 
 /** Resolve a Tubi movie's playable HLS URL (adrise content API). */
 export async function tubiStream(contentId: string): Promise<string> {
@@ -245,10 +261,11 @@ export async function getCatalog(regionCode?: string): Promise<{ rails: any[]; s
     }
   }
 
-  // Public-domain cartoons: denylisted upstream, and re-checked against the same
-  // maturity + genre gate as everything else before joining the Kids rail.
+  // Public-domain cartoons. Note isKidsSafe() cannot vouch for these: archiveKids()
+  // stamps genre/rating/maturity itself, so the gate would only be re-reading our
+  // own values. The real gate is the human-vetted allowlist inside archiveKids().
   for (const item of archKids) {
-    if (isKidsSafe(item, "Kids & Family")) seenKids[item.id] = item;
+    seenKids[item.id] = item;
   }
 
   const allAnime = Object.values(seenAnime);
@@ -315,7 +332,7 @@ export async function getCatalog(regionCode?: string): Promise<{ rails: any[]; s
   for (const rail of rails) {
     for (const item of rail.items) {
       const key = normalizeTitleKey(item.title);
-      if (item.type === "movie" || item.url) {
+      if (item.type === "movie" || item.pluto_path) {
         uniqueMovies.set(key, item);
       } else {
         uniqueShows.set(key, item);
@@ -365,7 +382,7 @@ export async function getSeries(seriesId: string, regionCode?: string): Promise<
           number: ep.number,
           url: streamUrl(session, path),
           description: ep.description || ep.summary || "",
-          duration: ep.duration,
+          duration: typeof ep.duration === "number" ? Math.round(ep.duration / 1000) : null,
           thumbnail: thumbnail,
         });
       }
@@ -400,15 +417,21 @@ export async function archiveMovies(rows = 30): Promise<any[]> {
   }));
 }
 
-// Curated public-domain kids animation. Uses the specific `animationandcartoons`
-// collection (verified clean — classic Popeye/Betty Boop/Superman shorts), NOT a
-// broad query, which surfaces exploitation films. Trusted at TV-Y7 so it feeds
-// the Kids rail. Fully redistributable, so it's safe to monetize.
-// The public-domain animation collection is download-sorted and NOT vetted: it
-// contains wartime propaganda and the racist "Censored Eleven"-era shorts. We
-// drop anything whose title/identifier trips this denylist before trusting it as
-// kid-safe. Not exhaustive, but it removes the well-known offenders.
-const KIDS_ARCHIVE_DENY = /\b(nazi|hitler|mussolini|tojo|world\s*war|war\s*bond|propaganda|blackface|minstrel|mammy|coal\s*black|jungle\s*jitters|scrub\s*me\s*mama|uncle\s*tom|golliwog|injun|redskin|savage|swastika|censored\s*eleven|jap|nip)\b/i;
+// Public-domain animation from the `animationandcartoons` collection.
+//
+// SAFETY: this collection is download-ranked and NOT vetted. It contains wartime
+// propaganda and racist caricature shorts. A title-substring denylist was tried
+// here and does not work — 1940s cartoon titles do not contain words like "nazi"
+// or "minstrel", so the denylist dropped 0 of the top 60 results while certifying
+// "Bugs Bunny - All This and Rabbit Stew" (1941), Bosko shorts, and "Jerky Turkey"
+// (1945) as TV-Y7. Deny-by-keyword cannot be made safe over an uncurated archive.
+//
+// So this path now fails CLOSED: only identifiers explicitly vetted by a human and
+// listed below are trusted for the Kids rail. Empty means nothing is served, which
+// is the correct default. Add identifiers here after watching them.
+const KIDS_ARCHIVE_ALLOW = new Set<string>([
+  // e.g. "ElephantsDream" — only after a human has reviewed the actual film.
+]);
 
 export async function archiveKids(rows = 60): Promise<any[]> {
   const params = new URLSearchParams({
@@ -424,7 +447,7 @@ export async function archiveKids(rows = 60): Promise<any[]> {
   const data = await res.json();
 
   return (data.response?.docs || [])
-    .filter((doc: any) => !KIDS_ARCHIVE_DENY.test(`${doc.title || ""} ${doc.identifier || ""}`))
+    .filter((doc: any) => KIDS_ARCHIVE_ALLOW.has(doc.identifier))
     .map((doc: any) => ({
       id: `archive:${doc.identifier}`,
       identifier: doc.identifier,

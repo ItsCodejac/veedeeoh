@@ -1,10 +1,10 @@
 import Hls from "hls.js";
-import { fetchArchiveStream, fetchTubiStream, fetchVod, fetchVodSeries, toggleWatched } from "./api";
+import { fetchArchiveStream, fetchPlutoStream, fetchTubiStream, fetchVod, fetchVodSeries, toggleWatched } from "./api";
 import { state } from "./state";
 import type { Stream, VodItem, VodEpisode, VodRail } from "./types";
-import { escapeHtml, $, setupHorizontalScroll } from "./util";
+import { escapeHtml, $, setupHorizontalScroll, buildBrandLoader, buildRailSkeleton, showToast } from "./util";
 import { getActiveProfile } from "./profiles";
-import { maturityCeiling, filterRailsByMaturity, filterRailsForKids, isKidsSafeItem, addFavorite, removeFavorite, saveProgress } from "./db";
+import { maturityCeiling, filterRailsByMaturity, filterRailsForKids, isKidsSafeItem, addFavorite, removeFavorite, saveProgress, getWatchHistory } from "./db";
 import { openVodPlayer } from "./vodplayer";
 
 // The active profile's real Supabase id (null for local/unsynced placeholders).
@@ -129,8 +129,11 @@ export async function getVodRails(): Promise<VodRail[]> {
   const p = getActiveProfile();
   // Kids profiles get the strict genre+maturity gate (not maturity alone), so a
   // low-rated non-kids title can never appear in the kid view.
-  if (p.is_kids) return filterRailsForKids(full) as VodRail[];
   const ceiling = maturityCeiling(p.max_rating);
+  // Kids profiles get the genre+maturity gate AND their own rating cap. Applying
+  // only the kids gate would ignore max_rating entirely, so a profile set to
+  // "Little Kids (TV-Y)" would still be shown TV-Y7 and G titles.
+  if (p.is_kids) return filterRailsByMaturity(filterRailsForKids(full), Math.min(2, ceiling)) as VodRail[];
   return filterRailsByMaturity(full, ceiling) as VodRail[];
 }
 
@@ -813,8 +816,20 @@ export async function renderFavorites(): Promise<void> {
 
   if (items.length === 0) {
     const empty = document.createElement("div");
-    empty.style.cssText = "color:var(--dim);padding:48px 24px;text-align:center;font-size:16px;";
-    empty.innerHTML = `Your list is empty. Open any title and tap <b>+ My List</b> to save it here.`;
+    empty.style.cssText = "flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 38px; padding: 120px 60px 40px; margin-top: 40px;";
+    empty.innerHTML = `
+      <div style="display: flex; align-items: flex-end; gap: 22px; height: 226px">
+        <div style="width: 132px; height: 186px; border-radius: 10px; border: 2px dashed #22262E; transform: rotate(-7deg)"></div>
+        <div style="width: 148px; height: 210px; border-radius: 10px; border: 2px dashed #2B303A; position: relative; display: flex; align-items: center; justify-content: center">
+          <div style="width: 13px; height: 13px; border-radius: 50%; background: #C6F53A; box-shadow: 0 0 22px #C6F53A99"></div>
+        </div>
+        <div style="width: 132px; height: 186px; border-radius: 10px; border: 2px dashed #22262E; transform: rotate(7deg)"></div>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 520px; text-align: center">
+        <div style="font-size: 30px; font-weight: 800; letter-spacing: -0.03em; color: #fff">Nothing on your list yet</div>
+        <div style="font-size: 16px; font-weight: 500; line-height: 1.55; color: #7C828C; text-wrap: pretty">Hit + on anything you want to get to later. It lands here, on every device you watch on.</div>
+      </div>
+    `;
     container.append(empty);
     return;
   }
@@ -873,12 +888,25 @@ export async function openVodDetails(item: VodItem): Promise<void> {
   grid.replaceChildren();
   playBtn.onclick = null;
 
-  // 1. Movie item
-  if (item.url) {
+  // 1. Movie item. Pluto movies carry only `pluto_path` and mint their signed URL
+  // on click; `item.url` is the legacy pre-signed field, still honoured so a
+  // catalog cached by the old code keeps playing until the next warm.
+  if (item.url || item.pluto_path) {
     selectContainer.hidden = true;
-    
-    const playMovie = () => {
-      openVodPlayer(asChannel(item, [{ url: item.url!, quality: null, source: item.genre || "movie" }]), 0);
+
+    const playMovie = async () => {
+      playBtn.disabled = true;
+      const label = playBtn.textContent;
+      try {
+        const url = item.url || (await fetchPlutoStream(item.pluto_path!));
+        openVodPlayer(asChannel(item, [{ url, quality: null, source: item.genre || "movie" }]), 0);
+      } catch (err) {
+        showToast("Couldn't start this title. Try another.");
+        console.error("[vod] pluto resolve failed:", err);
+      } finally {
+        playBtn.disabled = false;
+        playBtn.textContent = label;
+      }
     };
 
     playBtn.onclick = playMovie;
@@ -1016,8 +1044,8 @@ export async function openVodDetails(item: VodItem): Promise<void> {
 
           // Thumbnail thumbnail fallback
           const epThumb = ep.thumbnail || bannerImg;
-          // Duration format (ms to minutes)
-          const durationStr = ep.duration ? `${Math.round(ep.duration / 60000)}m` : "";
+          // Durations arrive normalized to seconds by the backend, for every provider.
+          const durationStr = ep.duration ? `${Math.round(ep.duration / 60)}m` : "";
 
           card.innerHTML = `
             <div class="epThumbWrap">
@@ -1258,10 +1286,7 @@ function getRailPriorityScore(name: string): number {
 /** Render Shows (Series) only */
 export function renderShows(container: HTMLElement): void {
   container.replaceChildren();
-  const loading = document.createElement("div");
-  loading.style.color = "var(--dim)";
-  loading.style.padding = "24px";
-  loading.textContent = "Loading Shows...";
+  const loading = buildRailSkeleton();
   container.append(loading);
 
   const hero = $("showsHero");
@@ -1381,10 +1406,7 @@ export function renderShows(container: HTMLElement): void {
 /** Render Movies only */
 export function renderMovies(container: HTMLElement): void {
   container.replaceChildren();
-  const loading = document.createElement("div");
-  loading.style.color = "var(--dim)";
-  loading.style.padding = "24px";
-  loading.textContent = "Loading Movies...";
+  const loading = buildRailSkeleton();
   container.append(loading);
 
   const hero = $("moviesHero");
@@ -1506,10 +1528,7 @@ export function renderMovies(container: HTMLElement): void {
  *  the device to a child straight from their own profile. */
 export async function renderKids(container: HTMLElement): Promise<void> {
   container.replaceChildren();
-  const loading = document.createElement("div");
-  loading.style.color = "var(--dim)";
-  loading.style.padding = "24px";
-  loading.textContent = "Loading veedeeoh.kids...";
+  const loading = buildRailSkeleton();
   container.append(loading);
 
   try {
@@ -1570,9 +1589,7 @@ export async function renderHome(): Promise<void> {
   homeContainer.replaceChildren();
 
   // Branded loader (usually invisible — the catalog is warmed during the bump).
-  const loading = document.createElement("div");
-  loading.className = "brandLoader";
-  loading.innerHTML = `<div class="brandLoaderMark">veedeeoh<span>.</span></div>`;
+  const loading = buildBrandLoader();
   homeContainer.append(loading);
 
   try {
@@ -1597,6 +1614,29 @@ export async function renderHome(): Promise<void> {
       resumeHistory = JSON.parse(resumeHistoryStr);
     } catch (e) {
       resumeHistory = [];
+    }
+
+    // Cross-device sync: merge Supabase exact timecodes
+    const pid = activeProfileUuid();
+    if (pid) {
+      try {
+        const cloudHistory = await getWatchHistory(pid);
+        cloudHistory.forEach(cloudRow => {
+          if (cloudRow.completed) {
+            resumeHistory = resumeHistory.filter((x: any) => x.itemId !== cloudRow.content_id);
+            return;
+          }
+          const localItem = resumeHistory.find((x: any) => x.itemId === cloudRow.content_id);
+          if (localItem) {
+            localItem.time = cloudRow.position_secs;
+            if (cloudRow.duration_secs) {
+              localItem.percentage = (cloudRow.position_secs / cloudRow.duration_secs) * 100;
+            }
+          }
+        });
+      } catch (e) {
+        console.warn("[vod] getWatchHistory failed", e);
+      }
     }
 
     // Belt-and-suspenders: a kids profile only ever sees kid-safe resume cards.
@@ -1646,11 +1686,16 @@ export async function renderHome(): Promise<void> {
     // Flatten all items and extract a featured pool for the rotating hero.
     const allItems = rails.flatMap(r => r.items);
     const isKidsProfile = !!getActiveProfile().is_kids;
-    // On an ADULT profile, don't let kids/animation content dominate the spotlight
-    // just because the backend pins the Kids rail to the front. Push it to the back.
+    // On an ADULT profile, the spotlight (hero + featured) should show grown-up,
+    // mainstream titles, not kids content the backend pins to the front. Demote
+    // anything that reads as kids/family: a G/TV-G-or-lower rating, an
+    // animation/kids genre, or a kid signal in the title (baby, nursery, etc.).
+    // Note: "animat" matches "Animation" but not "Anime", so anime is not demoted.
+    const KID_SIGNAL = /\bkid|famil|child|preschool|cartoon|animat|toon|nursery|lullab|\bbaby\b|toddler|sing.?along|white noise|sleep sound/i;
     const kidsish = (i: any) => {
-      const g = (i.genre || "").toLowerCase();
-      return g.includes("kids") || g.includes("famil") || (typeof i.maturity === "number" && i.maturity <= 1);
+      const m = typeof i.maturity === "number" ? i.maturity : 5;
+      if (m <= 2) return true; // G / TV-G / TV-Y / TV-Y7 -> not adult-spotlight material
+      return KID_SIGNAL.test(`${i.genre || ""} ${i.title || ""}`);
     };
     const featuredRank = (i: any) => (isKidsProfile ? 0 : (kidsish(i) ? 1 : 0));
     const withBanner = allItems.filter(i => i.banner && i.banner.length > 0);

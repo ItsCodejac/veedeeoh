@@ -169,6 +169,7 @@ export interface HouseholdProfile {
   user_id: string;
   name: string;
   avatar_color: string;
+  avatar_url?: string | null;
   is_kids: boolean;
   max_rating: string | null;
   pin: string | null;
@@ -187,6 +188,7 @@ export async function listProfiles(): Promise<HouseholdProfile[]> {
 export async function createProfile(fields: {
   name: string;
   avatar_color?: string;
+  avatar_url?: string | null;
   is_kids?: boolean;
   max_rating?: string;
   pin?: string | null;
@@ -205,7 +207,7 @@ export async function createProfile(fields: {
 
 export async function updateProfile(
   profileId: string,
-  fields: Partial<Pick<HouseholdProfile, "name" | "avatar_color" | "is_kids" | "max_rating" | "pin">>
+  fields: Partial<Pick<HouseholdProfile, "name" | "avatar_color" | "avatar_url" | "is_kids" | "max_rating" | "pin">>
 ): Promise<void> {
   const sb = getSupabase();
   const { error } = await sb.from("household_profiles").update(fields).eq("id", profileId);
@@ -291,15 +293,30 @@ export async function saveProgress(profileId: string, row: {
     {
       profile_id: profileId,
       content_id: row.content_id,
-      title: row.title ?? null,
+      title: row.title,
       position_secs: Math.floor(row.position_secs),
-      duration_secs: row.duration_secs ? Math.floor(row.duration_secs) : null,
-      completed,
+      duration_secs: row.duration_secs != null ? Math.floor(row.duration_secs) : null,
       updated_at: new Date().toISOString(),
+      completed,
     },
     { onConflict: "profile_id,content_id" }
   );
-  if (error) throw error;
+  if (error) console.warn("[db] saveProgress error", error);
+}
+
+export async function getWatchHistory(profileId: string): Promise<any[]> {
+  const sb = getSupabase();
+  const { data, error } = await sb
+    .from("watch_progress")
+    .select("*")
+    .eq("profile_id", profileId)
+    .order("updated_at", { ascending: false })
+    .limit(15);
+  if (error) {
+    console.warn("[db] getWatchHistory error", error);
+    return [];
+  }
+  return data ?? [];
 }
 
 // ---------------------------------------------------------------------------

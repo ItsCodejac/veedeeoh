@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "build": "cd frontend && npm install && npm run build",
-    "deploy": "vercel --prod"
+    "deploy": "vercel --prod",
+    "warm": "node scripts/warm.mjs"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",

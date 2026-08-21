@@ -985,7 +985,7 @@ select { max-width: 190px; }
 .liveDot { color: var(--dead); animation: blink 1.4s steps(2) infinite; }
 @keyframes blink { 50% { opacity: .15; } }
 
-.rail { margin-top: 26px; }
+.rail { margin-top: 26px; position: relative; }
 .railHead, .showcaseRailHead {
   display: flex;
   align-items: center;
@@ -1838,6 +1838,7 @@ select { max-width: 190px; }
 
 .showcaseRail {
   margin-top: 40px;
+  position: relative;
 }
 .showcaseRailHead {
   padding: 0 16px 16px;
@@ -1869,7 +1870,7 @@ select { max-width: 190px; }
 /* Floating Circular Horizontal Scroll Arrows */
 .scrollArrow {
   position: absolute;
-  top: 40%;
+  top: 50%; /* JS re-centers on the card row; this is a fallback */
   transform: translateY(-50%);
   z-index: 10;
   width: 44px;
@@ -3919,25 +3920,92 @@ body.kids-mode .showcaseTitle { font-size: 15px !important; font-weight: 700; }
 body.kids-mode aside .navBtn { font-size: 16px; padding-top: 14px; padding-bottom: 14px; }
 body.kids-mode aside .navBtn svg { width: 24px; height: 24px; }
 
-/* Branded home loader (shown only if the catalog isn't warm yet) */
+/* Branded loading states (native rebuild of the "Brand Loaders" spec):
+   pure CSS/SVG, no media payload, inherits --brand-accent. */
+:root { --brand-accent: #c5f04e; }
+body.kids-mode { --brand-accent: #ff9f1c; }
+
+@keyframes vdShimmer { 0% { background-position: 130% 0; } 100% { background-position: -130% 0; } }
+@keyframes vdSweep { 0% { transform: translateX(-140%); } 100% { transform: translateX(240%); } }
+@keyframes vdPulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 10px var(--brand-accent), 0 0 34px rgba(197,240,78,0.4); }
+  50% { transform: scale(1.4); box-shadow: 0 0 16px var(--brand-accent), 0 0 60px rgba(197,240,78,0.65); }
+}
+@keyframes vdTrack { 0% { transform: translateX(-100%); } 50% { transform: translateX(0%); } 100% { transform: translateX(100%); } }
+@keyframes vdBounce { 0%, 100% { transform: translateY(0) scale(1.14, 0.86); } 45% { transform: translateY(-22px) scale(0.92, 1.08); } }
+@keyframes vdSpin { to { transform: rotate(360deg); } }
+
+/* App boot / full-page branded loader */
 .brandLoader {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 26px;
   min-height: 60vh;
   width: 100%;
 }
 .brandLoaderMark {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
   font-family: "Bricolage Grotesque", "Space Grotesk", sans-serif;
   font-size: 40px;
   font-weight: 800;
   letter-spacing: -1px;
-  color: #fff;
-  animation: brandLoaderPulse 1.1s ease-in-out infinite;
 }
-.brandLoaderMark span { color: #c5f04e; }
-body.kids-mode .brandLoaderMark span { color: #ff9f1c; }
-@keyframes brandLoaderPulse {
-  0%, 100% { opacity: 0.35; transform: scale(0.98); }
-  50% { opacity: 1; transform: scale(1.02); }
+.brandLoaderWord {
+  background: linear-gradient(100deg, #2e3138 34%, #ffffff 47%, var(--brand-accent) 53%, #2e3138 66%);
+  background-size: 260% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: vdShimmer 1.9s linear infinite;
 }
+.brandLoaderDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--brand-accent);
+  animation: vdPulse 1.9s ease-in-out infinite;
+}
+.brandLoaderTrack {
+  width: 200px;
+  height: 3px;
+  border-radius: 2px;
+  background: #191b21;
+  overflow: hidden;
+}
+.brandLoaderTrackFill {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, var(--brand-accent), transparent);
+  animation: vdTrack 1.9s ease-in-out infinite;
+}
+
+/* Rail skeleton (shimmering placeholder rows, shown while a catalog fetch is in flight) */
+.railSkeleton { display: flex; flex-direction: column; gap: 22px; padding: 6px 0 8px; }
+.railSkeletonTitle { position: relative; width: 210px; height: 16px; border-radius: 6px; background: #14161b; overflow: hidden; }
+.railSkeletonCards { display: flex; gap: 18px; }
+.skeletonCard { position: relative; flex: 1; min-width: 120px; height: 178px; border-radius: 10px; background: #14161b; overflow: hidden; }
+.railSkeletonLines { display: flex; gap: 18px; }
+.skeletonLineGroup { flex: 1; min-width: 120px; display: flex; flex-direction: column; gap: 9px; }
+.skeletonLine { position: relative; width: 72%; height: 11px; border-radius: 5px; background: #14161b; overflow: hidden; }
+.skeletonLineShort { width: 44%; height: 11px; border-radius: 5px; background: #101216; }
+.skeletonSweep {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(197,240,78,0.16) 45%, rgba(255,255,255,0.1) 52%, transparent);
+  animation: vdSweep 1.6s linear infinite;
+}
+.skeletonSweep.dim { background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08) 50%, transparent); }
+
+/* Inline / compact loaders (small surfaces: modal footers, buffering states) */
+.inlineLoaderBounce { display: inline-flex; align-items: flex-end; gap: 8px; height: 28px; }
+.inlineLoaderBounce span {
+  width: 10px; height: 10px; border-radius: 50%; background: var(--brand-accent);
+  animation: vdBounce 0.72s ease-in-out infinite;
+}
+.inlineLoaderBounce span:nth-child(2) { background: #7e8792; animation-delay: 0.1s; }
+.inlineLoaderBounce span:nth-child(3) { background: #4a5058; animation-delay: 0.2s; }
+.inlineLoaderSpin { width: 32px; height: 32px; animation: vdSpin 0.9s linear infinite; }

@@ -3,6 +3,7 @@ import { handle } from 'hono/vercel';
 import * as vod from '../backend/vod';
 import * as store from '../backend/store';
 import * as billing from '../backend/billing';
+import * as emailHelper from '../backend/email';
 
 const app = new Hono().basePath('/api');
 
@@ -84,6 +85,12 @@ app.post('/waitlist', async (c: Context) => {
       return c.json({ error: 'Please enter a valid email address.' }, 400);
     }
     const entry = waitlistStore.add(email);
+    
+    // Asynchronously send waitlist confirmation email via Resend
+    emailHelper.sendWaitlistConfirmationEmail(email).catch(err => {
+      console.warn('[Waitlist] Background email sending failed:', err);
+    });
+
     return c.json({ ok: true, message: "You're on the waitlist! We'll email you as cloud spots open.", entry });
   } catch (err: any) {
     return c.json({ error: 'Failed to record waitlist submission.' }, 500);
@@ -161,6 +168,21 @@ app.get('/vod/archive/:id', async (c: Context) => {
     return c.json({ url: streamUrl });
   } catch (e: any) {
     return c.json({ error: e?.message || 'Failed to load archive stream' }, 500);
+  }
+});
+
+// Pluto movies are cached WITHOUT a signed URL (see backend/vod.ts normalize) —
+// the signature is minted here, per click, so it is never stale.
+app.get('/vod/pluto', async (c: Context) => {
+  try {
+    const path = c.req.query('path');
+    if (!path) return c.json({ error: 'Missing Pluto path' }, 400);
+    if (!path.startsWith('/stitch/')) return c.json({ error: 'Invalid Pluto path' }, 400);
+    const region = c.req.query('region') || undefined;
+    const url = await vod.plutoStream(path, region);
+    return c.json({ url });
+  } catch (e: any) {
+    return c.json({ error: e?.message || 'Failed to load Pluto stream' }, 502);
   }
 });
 
@@ -263,17 +285,36 @@ app.get('/cron/catalog-warm', async (c: Context) => {
     const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
-    if (supabaseUrl && supabaseKey) {
-      const { createClient } = await import('@supabase/supabase-js');
-      const supabase = createClient(supabaseUrl, supabaseKey);
-      await supabase.from('catalog_cache').upsert({
-        region: 'US',
-        payload,
-        updated_at: new Date().toISOString()
-      });
+    if (!supabaseUrl || !supabaseKey) {
+      return c.json({ error: 'Catalog built but NOT persisted: Supabase env vars missing' }, 500);
     }
 
-    return c.json({ ok: true, stats });
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Persisting IS the job of this endpoint: /api/vod serves the cached payload,
+    // so a failed write means the catalog silently goes stale while the cron keeps
+    // reporting success. That exact failure went unnoticed for 10 days. Never
+    // return ok without checking the write.
+    // NOTE: the anon key cannot write here (RLS 42501) — SUPABASE_SERVICE_ROLE_KEY
+    // must be set in the deployment environment.
+    const { error: writeError } = await supabase.from('catalog_cache').upsert(
+      { region: 'US', payload, updated_at: new Date().toISOString() },
+      { onConflict: 'region' }
+    );
+
+    if (writeError) {
+      console.error('[cron] catalog_cache write FAILED:', writeError);
+      return c.json({
+        error: `Catalog built but NOT persisted: ${writeError.message}`,
+        code: writeError.code,
+        hint: writeError.code === '42501'
+          ? 'RLS rejected the write — SUPABASE_SERVICE_ROLE_KEY is probably missing in this environment.'
+          : undefined,
+      }, 500);
+    }
+
+    return c.json({ ok: true, persisted: true, stats });
   } catch (e: any) {
     return c.json({ error: e?.message || 'Catalog warm failed' }, 500);
   }

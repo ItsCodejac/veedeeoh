@@ -46,24 +46,72 @@ function renderSettingsModalInternal(): void {
       </div>
 
       <!-- Account Info & Name -->
+      <!-- Account Info & Name -->
       <div style="background: #080a10; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 20px; margin-bottom: 24px;">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
           <div>
             <div style="font-size: 12px; color: #9aa5b5; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">CURRENT ACCOUNT</div>
             <div style="font-size: 18px; font-weight: 700; color: #fff;">${session ? escapeHtml(session.email) : 'Local / Self-Hosted Guest'}</div>
             <div style="font-size: 12px; color: #06d6a0; font-weight: 700; margin-top: 4px;">Role: ${activeProfile.role === 'owner' ? 'Account Owner (Admin)' : 'Household Member'}</div>
-          </div>
-          <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(197,240,78,0.15); border: 1px solid rgba(197,240,78,0.3); padding: 4px 14px; border-radius: 20px; color: #c5f04e; font-size: 12px; font-weight: 700;">
-            <span>Founder VIP</span>
           </div>
         </div>
         <div>
           <label style="display: block; font-size: 12px; color: #9aa5b5; margin-bottom: 6px; font-weight: 700;">HOUSEHOLD / ACCOUNT DISPLAY NAME</label>
           <input type="text" id="accountDisplayName" value="${escapeHtml(accName)}" placeholder="e.g. Cojac's Household" style="width: 100%; padding: 10px 14px; background: #10141e; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 14px; outline: none;" />
         </div>
-        <div style="display: flex; gap: 10px; margin-top: 14px;">
-          <button id="btnSubscribe" style="flex: 1; padding: 10px; border-radius: 8px; background: #c5f04e; color: #06070a; border: none; font-weight: 800; font-size: 13px; cursor: pointer;">Subscribe — $4/mo</button>
-          <button id="btnManageBilling" style="flex: 1; padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.15); font-weight: 700; font-size: 13px; cursor: pointer;">Manage billing</button>
+      </div>
+
+      <!-- Subscription & Billing -->
+      <div style="margin-bottom: 24px;">
+        <h3 style="margin: 0 0 14px; font-size: 18px; font-weight: 700;">Subscription & Billing</h3>
+        
+        <!-- Premium Active Plan Card -->
+        <div style="background: linear-gradient(145deg, rgba(197,240,78,0.1) 0%, rgba(6,7,10,0) 100%), #080a10; border: 1px solid rgba(197,240,78,0.3); border-radius: 16px; padding: 24px; position: relative; overflow: hidden; margin-bottom: 16px;">
+          <div style="position: absolute; top: -50px; right: -50px; width: 150px; height: 150px; background: rgba(197,240,78,0.15); filter: blur(50px); border-radius: 50%;"></div>
+          
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; position: relative; z-index: 1;">
+            <div>
+              <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(197,240,78,0.2); border: 1px solid rgba(197,240,78,0.4); padding: 4px 12px; border-radius: 20px; color: #c5f04e; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+                Pro Cloud Tier
+              </div>
+              <div style="font-size: 28px; font-weight: 800; color: #fff; margin-bottom: 4px;">$4.00<span style="font-size: 14px; color: #9aa5b5; font-weight: 600;"> / month</span></div>
+              <div style="font-size: 13px; color: #9aa5b5;">Renews on August 28, 2026</div>
+            </div>
+          </div>
+
+          <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); position: relative; z-index: 1;">
+            <ul style="margin: 0 0 20px; padding: 0; list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; color: #d1d5db;">
+              <li style="display: flex; align-items: center; gap: 8px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#06d6a0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> 4K HDR Streaming</li>
+              <li style="display: flex; align-items: center; gap: 8px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#06d6a0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> 3 Household Profiles</li>
+              <li style="display: flex; align-items: center; gap: 8px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#06d6a0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Watch Party Included</li>
+              <li style="display: flex; align-items: center; gap: 8px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#06d6a0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> 4 Concurrent Streams</li>
+            </ul>
+
+            <div style="display: flex; gap: 12px;">
+              <button id="btnManageBilling" style="flex: 2; padding: 12px; border-radius: 10px; background: #c5f04e; color: #06070a; border: none; font-weight: 800; font-size: 14px; cursor: pointer; transition: opacity 0.2s;">Change Plan</button>
+              <button id="btnCancelBilling" style="flex: 1; padding: 12px; border-radius: 10px; background: rgba(255,255,255,0.05); color: #9aa5b5; border: 1px solid rgba(255,255,255,0.1); font-weight: 700; font-size: 14px; cursor: pointer; transition: background 0.2s;">Cancel</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Available Add-ons -->
+        <h4 style="margin: 0 0 12px; font-size: 14px; color: #9aa5b5; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Available Add-ons</h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="font-weight: 700; font-size: 14px; color: #fff; margin-bottom: 4px;">+1 Additional Profile</div>
+              <div style="font-size: 12px; color: #9aa5b5; margin-bottom: 12px;">Expand your household beyond the included 3 profiles.</div>
+            </div>
+            <button class="addonBtn" style="width: 100%; padding: 8px; border-radius: 8px; background: rgba(255,255,255,0.1); border: none; color: #fff; font-weight: 700; font-size: 13px; cursor: pointer;">Add — $1.50/mo</button>
+          </div>
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="font-weight: 700; font-size: 14px; color: #fff; margin-bottom: 4px;">+10GB Watch Party Storage</div>
+              <div style="font-size: 12px; color: #9aa5b5; margin-bottom: 12px;">Extra Cloudflare storage for hosting seamless Watch Parties without egress fees.</div>
+            </div>
+            <button class="addonBtn" style="width: 100%; padding: 8px; border-radius: 8px; background: rgba(255,255,255,0.1); border: none; color: #fff; font-weight: 700; font-size: 13px; cursor: pointer;">Add — $TBD/mo</button>
+          </div>
         </div>
       </div>
 
@@ -118,7 +166,7 @@ function renderSettingsModalInternal(): void {
                     </div>
                     <div style="display: flex; gap: 8px;">
                       <button class="copyInviteLinkBtn" data-url="${escapeHtml(inv.inviteUrl)}" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #c5f04e; padding: 4px 10px; border-radius: 6px; font-size: 12px; cursor: pointer;">Copy Link</button>
-                      <button class="revokeInviteBtn" data-email="${escapeHtml(inv.email)}" style="background: rgba(255,94,126,0.15); border: 1px solid rgba(255,94,126,0.3); color: #ff5e7e; padding: 4px 10px; border-radius: 6px; font-size: 12px; cursor: pointer;">Revoke</button>
+                      <button class="revokeInviteBtn" data-email="${escapeHtml(inv.email)}" data-id="${inv.id || ''}" style="background: rgba(255,94,126,0.15); border: 1px solid rgba(255,94,126,0.3); color: #ff5e7e; padding: 4px 10px; border-radius: 6px; font-size: 12px; cursor: pointer;">Revoke</button>
                     </div>
                   </div>
                 `).join('')}
@@ -128,29 +176,6 @@ function renderSettingsModalInternal(): void {
         </div>
       </div>
 
-      <!-- Playback Preferences -->
-      <div>
-        <h3 style="margin: 0 0 14px; font-size: 18px; font-weight: 700;">Playback & Bandwidth</h3>
-        <div style="background: #080a10; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 14px;">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div>
-              <div style="font-weight: 700; font-size: 14px;">Default Subtitle CC</div>
-              <div style="font-size: 12px; color: #9aa5b5;">Always enable closed captions when available</div>
-            </div>
-            <input type="checkbox" checked style="width: 18px; height: 18px; accent-color: #c5f04e;" />
-          </div>
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div>
-              <div style="font-weight: 700; font-size: 14px;">Stream Quality Cap</div>
-              <div style="font-size: 12px; color: #9aa5b5;">Client-side direct streaming bandwidth limit</div>
-            </div>
-            <select style="background: #10141e; border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 6px 12px; border-radius: 8px; font-size: 13px;">
-              <option value="auto">Auto (Highest Available)</option>
-              <option value="1080p">1080p Full HD</option>
-              <option value="720p">720p Data Saver</option>
-            </select>
-          </div>
-        </div>
       </div>
     </div>
   `;
@@ -160,25 +185,36 @@ function renderSettingsModalInternal(): void {
   const closeBtn = modal.querySelector('#closeSettingsBtn');
   if (closeBtn) closeBtn.addEventListener('click', () => modal.remove());
 
-  const subBtn = modal.querySelector('#btnSubscribe') as HTMLButtonElement | null;
-  if (subBtn) subBtn.addEventListener('click', async () => {
-    subBtn.disabled = true; subBtn.textContent = 'Opening…';
-    try { await startCheckout(); }
-    catch (e: any) { alert(`Could not start checkout: ${e?.message || e}`); subBtn.disabled = false; subBtn.textContent = 'Subscribe — $4/mo'; }
-  });
-
   const manageBtn = modal.querySelector('#btnManageBilling') as HTMLButtonElement | null;
   if (manageBtn) manageBtn.addEventListener('click', async () => {
-    manageBtn.disabled = true; manageBtn.textContent = 'Opening…';
+    manageBtn.disabled = true; manageBtn.textContent = 'Loading Portal...';
     try { await openBillingPortal(); }
-    catch (e: any) { alert(`No active subscription to manage yet.`); manageBtn.disabled = false; manageBtn.textContent = 'Manage billing'; }
+    catch (e: any) { alert(`No active subscription to manage yet.`); manageBtn.disabled = false; manageBtn.textContent = 'Change Plan'; }
+  });
+
+  const cancelBtn = modal.querySelector('#btnCancelBilling') as HTMLButtonElement | null;
+  if (cancelBtn) cancelBtn.addEventListener('click', async () => {
+    if (!confirm('Are you sure you want to cancel your subscription?')) return;
+    cancelBtn.disabled = true; cancelBtn.textContent = 'Loading...';
+    try { await openBillingPortal(); } // In a real app this might hit a cancel endpoint, but portal works
+    catch (e: any) { alert(`Failed to load billing portal.`); cancelBtn.disabled = false; cancelBtn.textContent = 'Cancel'; }
+  });
+
+  const addonBtns = modal.querySelectorAll('.addonBtn');
+  addonBtns.forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const b = btn as HTMLButtonElement;
+      b.disabled = true; b.textContent = 'Redirecting...';
+      try { await startCheckout(); }
+      catch (e: any) { alert(`Checkout failed: ${e.message}`); b.disabled = false; b.textContent = 'Add'; }
+    });
   });
 
   const addProfileBtn = modal.querySelector('#settingsAddProfileBtn');
   if (addProfileBtn) {
     addProfileBtn.addEventListener('click', () => {
       modal.remove();
-      openProfileEditor();
+      openProfileEditor(undefined, () => openSettingsModal());
     });
   }
 
@@ -199,7 +235,7 @@ function renderSettingsModalInternal(): void {
       const target = profiles.find(p => p.id === id);
       if (target) {
         modal.remove();
-        openProfileEditor(target);
+        openProfileEditor(target, () => openSettingsModal());
       }
     });
   });
@@ -286,9 +322,14 @@ function renderSettingsModalInternal(): void {
   // Revoke Button Handlers
   const revokeBtns = modal.querySelectorAll('.revokeInviteBtn');
   revokeBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const email = (btn as HTMLElement).dataset.email;
+      const id = (btn as HTMLElement).dataset.id;
       if (!email) return;
+
+      if (id) {
+        import('./db').then(db => db.revokeInvite(id).catch(console.warn));
+      }
 
       const rawPending = localStorage.getItem('veedeeoh_pending_invites') || '[]';
       let pending: any[] = [];

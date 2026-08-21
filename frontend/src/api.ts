@@ -73,6 +73,14 @@ export async function fetchArchiveStream(identifier: string): Promise<string> {
   return (await res.json()).url;
 }
 
+/** Resolve a Pluto movie's signed HLS URL on demand. The catalog stores only the
+ *  short unsigned path, so the 24h JWT is minted fresh at play time. */
+export async function fetchPlutoStream(path: string): Promise<string> {
+  const res = await apiFetch(`/api/vod/pluto?path=${encodeURIComponent(path)}`);
+  if (!res.ok) throw new Error(`pluto fetch failed: ${res.status}`);
+  return (await res.json()).url;
+}
+
 /** Resolve a Tubi movie's HLS stream on demand (movies carry no URL in the catalog). */
 export async function fetchTubiStream(tubiId: string): Promise<string> {
   const res = await apiFetch(`/api/vod/tubi/${encodeURIComponent(tubiId)}`);

@@ -87,13 +87,14 @@ export async function hydrateProfilesFromCloud(): Promise<void> {
       } catch { /* offline / RLS — fall back to local default */ }
     }
     if (!rows.length) return;
-    const mapped: HouseholdProfile[] = rows.map((r) => ({
+    const mapped: HouseholdProfile[] = rows.map((r, i) => ({
       id: r.id,
       name: r.name,
       avatar_color: r.avatar_color,
       is_kids: r.is_kids,
       max_rating: r.max_rating,
       pin: r.pin,
+      role: i === 0 ? 'owner' : undefined
     }));
     saveProfiles(mapped);
     // If the active profile is a local placeholder (or no longer exists), point
@@ -193,15 +194,18 @@ export function openProfileSwitcher(onSelectProfile?: (p: HouseholdProfile) => v
       <h1 style="font-size: clamp(2rem, 4vw, 3rem); font-weight: 800; margin: 0 0 12px; letter-spacing: -1px;">Who's Watching?</h1>
       <p style="color: #9aa5b5; font-size: 16px; margin: 0 0 40px;">Select your profile to load custom favorites and watch progress</p>
       
-      <div style="display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; margin-bottom: 40px;">
+      <div id="avatarsContainer" style="display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; margin-bottom: 40px;">
         ${profiles.map(p => `
           <button class="profileAvatarBtn" data-id="${p.id}" style="
-            background: none; border: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 14px; transition: transform 0.2s ease; outline: none;
+            background: none; border: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 14px; transition: transform 0.2s ease, opacity 0.2s; outline: none; position: relative;
           ">
             <div style="
-              width: 100px; height: 100px; border-radius: 20px; background: ${p.avatar_color}; display: flex; align-items: center; justify-content: center; font-size: 40px; font-weight: 800; color: #06070a; box-shadow: ${p.id === active.id ? '0 0 0 4px #c5f04e, 0 12px 30px rgba(197,240,78,0.4)' : '0 8px 24px rgba(0,0,0,0.5)'}; position: relative;
+              width: 100px; height: 100px; border-radius: 20px; background: ${p.avatar_url ? `url('${p.avatar_url}') center/cover` : p.avatar_color}; display: flex; align-items: center; justify-content: center; font-size: 40px; font-weight: 800; color: #06070a; box-shadow: ${p.id === active.id ? '0 0 0 4px #c5f04e, 0 12px 30px rgba(197,240,78,0.4)' : '0 8px 24px rgba(0,0,0,0.5)'}; position: relative;
             ">
-              ${p.name.charAt(0).toUpperCase()}
+              ${p.avatar_url ? '' : p.name.charAt(0).toUpperCase()}
+              <div class="editOverlay" style="display: none; position: absolute; inset: 0; background: rgba(0,0,0,0.6); border-radius: 20px; align-items: center; justify-content: center;">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+              </div>
             </div>
             <span style="font-size: 16px; font-weight: 700; color: #fff;">${escapeHtml(p.name)}</span>
           </button>
@@ -232,12 +236,20 @@ export function openProfileSwitcher(onSelectProfile?: (p: HouseholdProfile) => v
 
   document.body.appendChild(modal);
 
+  let isEditing = false;
+
   const btns = modal.querySelectorAll('.profileAvatarBtn');
   btns.forEach(btn => {
     btn.addEventListener('click', async () => {
       const id = (btn as HTMLElement).dataset.id;
       const target = profiles.find(p => p.id === id);
       if (!target) return;
+
+      if (isEditing) {
+        modal.remove();
+        openProfileEditor(target);
+        return;
+      }
 
       // Optional parental lock: a PIN-protected profile requires the PIN to enter.
       if (target.pin) {
@@ -251,9 +263,44 @@ export function openProfileSwitcher(onSelectProfile?: (p: HouseholdProfile) => v
     });
   });
 
+  const requireAdultAuth = async (): Promise<boolean> => {
+    if (!active.is_kids) return true;
+    const adultProfs = profiles.filter(p => !p.is_kids && p.pin);
+    if (adultProfs.length === 0) return true;
+    return await promptForPin(adultProfs[0]!);
+  };
+
   const addBtn = modal.querySelector('#addProfileBtn');
   if (addBtn) {
-    addBtn.addEventListener('click', () => {
+    addBtn.addEventListener('click', async () => {
+      if (!(await requireAdultAuth())) return;
+      
+      const acct = await db.getAccount();
+      const maxSeats = acct?.seats || 3;
+      if (profiles.length >= maxSeats) {
+        modal.innerHTML = `
+          <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 38px; padding: 0 60px 40px; width: 100%; height: 100%; background: #0A0B0E;">
+            <div style="display: flex; align-items: center; gap: 18px">
+              ${profiles.map(p => `<div style="width: 84px; height: 84px; border-radius: 50%; background: ${p.avatar_color || '#C6F53A'}; color: #0A0B0E; font-size: 30px; font-weight: 800; display: flex; align-items: center; justify-content: center">${p.name.charAt(0).toUpperCase()}</div>`).join('')}
+              <div style="width: 84px; height: 84px; border-radius: 50%; border: 2px dashed #2B303A; display: flex; align-items: center; justify-content: center">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#C6F53A" stroke-width="2" stroke-linecap="round" style="width: 30px; height: 30px"><path d="M12 6v12M6 12h12"></path></svg>
+              </div>
+            </div>
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 540px; text-align: center">
+              <div style="font-size: 30px; font-weight: 800; letter-spacing: -0.03em; color: #fff">Your household is full</div>
+              <div style="font-size: 16px; font-weight: 500; line-height: 1.55; color: #7C828C; text-wrap: pretty">All ${profiles.length} seats are in use. Add an extra seat for $1.50 a month, or free one up from settings.</div>
+            </div>
+            <div style="display: flex; gap: 14px">
+              <button id="closeFullBtn" style="padding: 15px 26px; border-radius: 10px; background: #C6F53A; color: #0A0B0E; font-size: 15px; font-weight: 800; cursor: pointer; border: none;">Go back</button>
+              <button onclick="window.location.reload()" style="padding: 15px 26px; border-radius: 10px; border: 1px solid #23272F; color: #D6DAE0; font-size: 15px; font-weight: 700; background: transparent; cursor: pointer;">Manage seats</button>
+            </div>
+          </div>
+        `;
+        const closeBtn = modal.querySelector('#closeFullBtn');
+        if (closeBtn) closeBtn.addEventListener('click', () => { modal.remove(); openProfileSwitcher(); });
+        return;
+      }
+
       modal.remove();
       openProfileEditor();
     });
@@ -261,9 +308,22 @@ export function openProfileSwitcher(onSelectProfile?: (p: HouseholdProfile) => v
 
   const manageBtn = modal.querySelector('#manageProfilesBtn');
   if (manageBtn) {
-    manageBtn.addEventListener('click', () => {
-      modal.remove();
-      openProfileEditor();
+    manageBtn.addEventListener('click', async () => {
+      if (!isEditing && !(await requireAdultAuth())) return;
+      isEditing = !isEditing;
+      manageBtn.innerHTML = isEditing ? 'Done' : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>Manage Profiles';
+      (manageBtn as HTMLElement).style.background = isEditing ? '#fff' : 'rgba(255,255,255,0.08)';
+      (manageBtn as HTMLElement).style.color = isEditing ? '#06070a' : '#fff';
+
+      btns.forEach(btn => {
+        const overlay = btn.querySelector('.editOverlay') as HTMLElement;
+        if (overlay) overlay.style.display = isEditing ? 'flex' : 'none';
+        (btn as HTMLElement).style.opacity = isEditing ? '0.8' : '1';
+      });
+      
+      const addB = modal.querySelector('#addProfileBtn') as HTMLElement;
+      if (addB) addB.style.opacity = isEditing ? '0.3' : '1';
+      if (addB) addB.style.pointerEvents = isEditing ? 'none' : 'auto';
     });
   }
 
@@ -276,7 +336,7 @@ export function openProfileSwitcher(onSelectProfile?: (p: HouseholdProfile) => v
   }
 }
 
-export function openProfileEditor(editingProfile?: HouseholdProfile): void {
+export function openProfileEditor(editingProfile?: HouseholdProfile, onClose?: () => void): void {
   const existing = document.getElementById('profileEditorModal');
   if (existing) existing.remove();
 
@@ -292,8 +352,18 @@ export function openProfileEditor(editingProfile?: HouseholdProfile): void {
   const isEdit = !!editingProfile;
   const pName = editingProfile ? editingProfile.name : '';
   const pColor = editingProfile ? editingProfile.avatar_color : '#c5f04e';
+  const pAvatarUrl = editingProfile?.avatar_url || '';
   const pKids = !!editingProfile?.is_kids;
   const pRating = editingProfile?.max_rating || '';
+
+  const PRESET_AVATARS = [
+    '', // None (use initial)
+    'https://api.dicebear.com/9.x/bottts/svg?seed=Felix',
+    'https://api.dicebear.com/9.x/bottts/svg?seed=Aneka',
+    'https://api.dicebear.com/9.x/bottts/svg?seed=Liam',
+    'https://api.dicebear.com/9.x/bottts/svg?seed=Jude',
+    'https://api.dicebear.com/9.x/bottts/svg?seed=Sarah'
+  ];
 
   modal.innerHTML = `
     <div style="background: #10141e; border: 1px solid rgba(255,255,255,0.15); border-radius: 24px; max-width: 460px; width: 100%; padding: 32px; box-shadow: 0 24px 60px rgba(0,0,0,0.9);">
@@ -306,32 +376,33 @@ export function openProfileEditor(editingProfile?: HouseholdProfile): void {
 
       <div style="margin-bottom: 24px;">
         <label style="display: block; font-size: 13px; color: #9aa5b5; margin-bottom: 8px; font-weight: 700;">AVATAR COLOR</label>
-        <div style="display: flex; gap: 12px;" id="colorPickerRow">
+        <div style="display: flex; gap: 12px; margin-bottom: 16px;" id="colorPickerRow">
           ${['#c5f04e', '#ff5e7e', '#06d6a0', '#118ab2', '#ffd166', '#a78bfa'].map(c => `
             <button class="colorChoiceBtn ${c === pColor ? 'selected' : ''}" data-color="${c}" style="
               width: 38px; height: 38px; border-radius: 10px; background: ${c}; border: ${c === pColor ? '3px solid #fff' : 'none'}; cursor: pointer;
             "></button>
           `).join('')}
         </div>
+        <label style="display: block; font-size: 13px; color: #9aa5b5; margin-bottom: 8px; font-weight: 700;">AVATAR IMAGE</label>
+        <div style="display: flex; gap: 12px; flex-wrap: wrap;" id="avatarPickerRow">
+          ${PRESET_AVATARS.map(url => `
+            <button class="avatarChoiceBtn" data-url="${url}" style="
+              width: 48px; height: 48px; border-radius: 12px; background: ${url ? `url('${url}') center/cover` : '#080a10'}; border: ${url === pAvatarUrl ? '3px solid #fff' : '1px solid rgba(255,255,255,0.1)'}; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #9aa5b5; transition: border 0.2s;
+            ">${url ? '' : 'A'}</button>
+          `).join('')}
+        </div>
       </div>
 
       <div style="margin-bottom: 24px; background:#080a10; border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:16px;">
-        <label style="display:flex; align-items:center; gap:10px; font-size:14px; font-weight:700; cursor:pointer;">
-          <input type="checkbox" id="editKids" ${pKids ? 'checked' : ''} style="width:18px; height:18px; accent-color:#c5f04e;" />
-          Kids profile — restrict to age-appropriate content
-        </label>
-        <div style="margin-top:14px;">
-          <label style="display:block; font-size:13px; color:#9aa5b5; margin-bottom:8px; font-weight:700;">MATURITY CAP</label>
-          <select id="editRating" style="width:100%; padding:12px 16px; background:#10141e; border:1px solid rgba(255,255,255,0.15); border-radius:10px; color:#fff; font-size:15px;">
-            <option value="">No limit (adult)</option>
-            <option value="TV-Y">Little kids (TV-Y)</option>
-            <option value="TV-Y7">Kids 7+ (TV-Y7)</option>
-            <option value="TV-G">Family (TV-G / G)</option>
-            <option value="PG">Older kids (PG / TV-PG)</option>
-            <option value="TV-14">Teen (TV-14 / PG-13)</option>
-          </select>
-          <div style="font-size:11px; color:#9aa5b5; margin-top:6px;">Only titles at or below this rating will appear for this profile.</div>
+        <label style="display:block; font-size:13px; color:#9aa5b5; margin-bottom:12px; font-weight:700;">MATURITY CAP</label>
+        <div style="display: flex; justify-content: space-between; font-size: 11px; color: #9aa5b5; margin-bottom: 8px; font-weight: 700;">
+          <span>Little Kids</span>
+          <span>Older Kids</span>
+          <span>Teen</span>
+          <span>Adult</span>
         </div>
+        <input type="range" id="editMaturitySlider" min="0" max="3" step="1" style="width: 100%; accent-color: #c5f04e; cursor: pointer;" />
+        <div id="maturityDesc" style="font-size:13px; color:#c5f04e; margin-top:14px; font-weight: 800; text-align: center;"></div>
       </div>
 
       <div id="pinFieldWrap" style="margin-bottom: 24px; background:#080a10; border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:16px; ${pKids ? 'display:none;' : ''}">
@@ -340,10 +411,11 @@ export function openProfileEditor(editingProfile?: HouseholdProfile): void {
         <div style="font-size:11px; color:#9aa5b5; margin-top:6px;">Anyone switching into this profile must enter the PIN.${editingProfile?.pin ? ' <button type="button" id="clearPinBtn" style="background:none;border:none;color:#ff6b6b;cursor:pointer;padding:0;font-size:11px;text-decoration:underline;">Remove PIN</button>' : ''}</div>
       </div>
 
-      <div style="display: flex; gap: 12px;">
+      <div style="display: flex; gap: 12px; margin-bottom: ${isEdit && editingProfile?.id !== 'default_main' ? '12px' : '0'};">
         <button id="cancelEditBtn" style="flex: 1; padding: 12px; border-radius: 10px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); color: #fff; font-weight: 700; cursor: pointer;">Cancel</button>
         <button id="saveProfileBtn" style="flex: 1; padding: 12px; border-radius: 10px; background: #c5f04e; border: none; color: #06070a; font-weight: 700; cursor: pointer;">Save Profile</button>
       </div>
+      ${isEdit && editingProfile?.id !== 'default_main' ? `<button id="deleteProfileBtn" style="width: 100%; padding: 12px; border-radius: 10px; background: rgba(255,94,126,0.1); border: 1px solid rgba(255,94,126,0.3); color: #ff5e7e; font-weight: 700; cursor: pointer; transition: all 0.2s;">Delete Profile</button>` : ''}
     </div>
   `;
 
@@ -359,17 +431,38 @@ export function openProfileEditor(editingProfile?: HouseholdProfile): void {
     });
   });
 
-  const ratingSel = modal.querySelector('#editRating') as HTMLSelectElement | null;
-  if (ratingSel) ratingSel.value = pRating;
-  const kidsBox = modal.querySelector('#editKids') as HTMLInputElement | null;
-  const pinWrap = modal.querySelector('#pinFieldWrap') as HTMLElement | null;
-  // Checking "Kids profile" with no cap chosen defaults to a family-safe cap.
-  // Kids profiles never carry a PIN (the PIN protects adult profiles), so hide it.
-  if (kidsBox && ratingSel) {
-    kidsBox.addEventListener('change', () => {
-      if (kidsBox.checked && !ratingSel.value) ratingSel.value = 'TV-G';
-      if (pinWrap) pinWrap.style.display = kidsBox.checked ? 'none' : '';
+  let selectedAvatarUrl = pAvatarUrl;
+  const avatarBtns = modal.querySelectorAll('.avatarChoiceBtn');
+  avatarBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      avatarBtns.forEach(b => (b as HTMLElement).style.border = '1px solid rgba(255,255,255,0.1)');
+      (btn as HTMLElement).style.border = '3px solid #fff';
+      selectedAvatarUrl = (btn as HTMLElement).dataset.url || '';
     });
+  });
+
+  const slider = modal.querySelector('#editMaturitySlider') as HTMLInputElement | null;
+  const matDesc = modal.querySelector('#maturityDesc') as HTMLElement | null;
+  const pinWrap = modal.querySelector('#pinFieldWrap') as HTMLElement | null;
+
+  const RATING_MAP = ['TV-Y', 'PG', 'TV-14', ''];
+  const DESC_MAP = ['Little Kids (TV-Y / G)', 'Older Kids (PG / TV-PG)', 'Teen (TV-14 / PG-13)', 'Adult (No Limit)'];
+
+  if (slider && matDesc) {
+    if (pRating === 'TV-Y' || pRating === 'TV-Y7' || pRating === 'TV-G' || pRating === 'G') slider.value = '0';
+    else if (pRating === 'PG' || pRating === 'TV-PG') slider.value = '1';
+    else if (pRating === 'TV-14' || pRating === 'PG-13') slider.value = '2';
+    else slider.value = '3';
+    if (pKids && !pRating) slider.value = '0'; // default kids
+
+    const updateSlider = () => {
+      const val = parseInt(slider.value, 10);
+      matDesc.textContent = DESC_MAP[val] || '';
+      matDesc.style.color = val === 3 ? '#ff6b6b' : '#c5f04e';
+      if (pinWrap) pinWrap.style.display = val < 3 ? 'none' : '';
+    };
+    slider.addEventListener('input', updateSlider);
+    updateSlider();
   }
 
   let clearPinRequested = false;
@@ -382,10 +475,32 @@ export function openProfileEditor(editingProfile?: HouseholdProfile): void {
     });
   }
 
+  const delBtn = modal.querySelector('#deleteProfileBtn');
+  if (delBtn) {
+    delBtn.addEventListener('click', async () => {
+      if (!confirm('Are you sure you want to delete this profile?')) return;
+      if (editingProfile) {
+        const list = getStoredProfiles().filter(p => p.id !== editingProfile.id);
+        saveProfiles(list);
+        if (cloudEnabled() && !editingProfile.id.startsWith('profile_')) {
+          try { await db.deleteProfile(editingProfile.id); } catch {}
+        }
+        if (getActiveProfile().id === editingProfile.id) setActiveProfile(list[0]!);
+      }
+      modal.remove();
+      if (onClose) onClose();
+      else openProfileSwitcher();
+    });
+  }
+
   const saveBtn = modal.querySelector('#saveProfileBtn');
   const cancelBtn = modal.querySelector('#cancelEditBtn');
 
-  if (cancelBtn) cancelBtn.addEventListener('click', () => modal.remove());
+  if (cancelBtn) cancelBtn.addEventListener('click', () => {
+    modal.remove();
+    if (onClose) onClose();
+    else openProfileSwitcher();
+  });
 
   if (saveBtn) {
     saveBtn.addEventListener('click', async () => {
@@ -396,22 +511,33 @@ export function openProfileEditor(editingProfile?: HouseholdProfile): void {
         return;
       }
 
-      const isKids = !!kidsBox?.checked;
-      let maxRating: string | null = (ratingSel?.value || '') || null;
-      if (isKids && !maxRating) maxRating = 'TV-G';
+      const val = parseInt((modal.querySelector('#editMaturitySlider') as HTMLInputElement).value, 10);
+      const isKids = val < 3;
+      const maxRating = RATING_MAP[val] || null;
 
-      // Resolve the PIN: undefined = leave as-is, null = clear, string = new hash.
       const rawPin = ((modal.querySelector('#editPin') as HTMLInputElement | null)?.value || '').trim();
       let pin: string | null | undefined = undefined;
+      
+      // If the user tries to clear the PIN or set a new one, verify the old PIN first if it exists
+      if ((clearPinRequested || rawPin) && editingProfile?.pin) {
+        const oldPin = prompt('Please enter the current 4-digit PIN to authorize this change:');
+        if (!oldPin) return; // User cancelled
+        const h = await hashPin(oldPin);
+        if (h !== editingProfile.pin) {
+          alert('Incorrect PIN.');
+          return;
+        }
+      }
+
       if (isKids || clearPinRequested) {
-        pin = null; // kids profiles never carry a PIN; or the parent removed it
+        pin = null; 
       } else if (rawPin) {
         if (!/^\d{4}$/.test(rawPin)) { alert('PIN must be exactly 4 digits.'); (saveBtn as HTMLButtonElement).disabled = false; return; }
         pin = await hashPin(rawPin);
       }
 
-      const fields: { name: string; avatar_color: string; is_kids: boolean; max_rating: string | null; pin?: string | null } =
-        { name: nameInput, avatar_color: selectedColor, is_kids: isKids, max_rating: maxRating };
+      const fields: { name: string; avatar_color: string; avatar_url: string | null; is_kids: boolean; max_rating: string | null; pin?: string | null } =
+        { name: nameInput, avatar_color: selectedColor, avatar_url: selectedAvatarUrl || null, is_kids: isKids, max_rating: maxRating };
       if (pin !== undefined) fields.pin = pin;
 
       (saveBtn as HTMLButtonElement).disabled = true;
@@ -426,7 +552,8 @@ export function openProfileEditor(editingProfile?: HouseholdProfile): void {
       }
 
       modal.remove();
-      openProfileSwitcher();
+      if (onClose) onClose();
+      else openProfileSwitcher();
     });
   }
 }

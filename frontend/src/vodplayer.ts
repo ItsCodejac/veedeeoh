@@ -26,27 +26,57 @@ function activeProfileUuid(): string | null {
 
 const proxied = (u: string) => `/proxy?url=${encodeURIComponent(u)}`;
 
-// Mirror the resume-history shape the home "Continue Watching" rail reads, and
-// mirror per-profile progress to Supabase for cross-device resume.
+// Pluto's CDN answers with `access-control-allow-origin: http://pluto.tv`, so a
+// browser can never read its manifests cross-origin no matter how fresh the token
+// is. hls.js fetches manifests over XHR, so every Pluto title fails the CORS check
+// on a direct load. Route Pluto through /proxy up front rather than waiting for an
+// error to trigger a fallback. Tubi (allow-origin: *) and Archive (progressive mp4)
+// are unaffected and stay on the direct CDN path.
+const playable = (u: string) => (/(^|\.)pluto\.tv\//.test(u) ? proxied(u) : u);
+
+// Continue Watching is stored PER PROFILE so a kids profile never sees an adult
+// profile's resume cards. This key must match the one vod.ts reads to render the rail.
+function resumeHistoryKey(): string {
+  let id = "default";
+  try { id = getActiveProfile()?.id || "default"; } catch {}
+  return `tvlc_resume_history_${id}`;
+}
+
+// Mirror progress to BOTH stores. The localStorage write is what makes a title
+// appear in Continue Watching at all; the Supabase row only refines the timecode
+// of an entry that already exists locally. Dropping the local write empties the rail.
 function saveResume(ch: any, idx: number, time: number, duration: number, pct: number): void {
-  if (Date.now() - lastSave < 3000) return;
+  if (Date.now() - lastSave < 5000) return; // limit to every 5s
   lastSave = Date.now();
   const itemId = String(ch.id || "").replace("vod:", "");
   const stream = ch.streams?.[idx];
   if (!stream) return;
 
+  const key = resumeHistoryKey();
   let history: any[] = [];
-  try { history = JSON.parse(localStorage.getItem("tvlc_resume_history") || "[]"); } catch {}
+  try { history = JSON.parse(localStorage.getItem(key) || "[]"); } catch { history = []; }
   history = history.filter((x: any) => x.itemId !== itemId);
   if (pct < 95) {
     history.unshift({
-      id: stream.id || `vod:${itemId}:${idx}`, itemId, title: ch.name,
-      episodeTitle: stream.source, poster: ch.vodPoster, banner: ch.vodBanner,
-      time, duration, percentage: pct, streamIdx: idx, streams: ch.streams, vodItem: ch.vodItem,
+      id: stream.id || `vod:${itemId}:${idx}`,
+      itemId,
+      title: ch.name,
+      episodeTitle: stream.source,
+      poster: ch.vodPoster,
+      banner: ch.vodBanner,
+      // Kept so the kids gate can be re-applied when rendering the resume rail.
+      maturity: ch.maturity ?? ch.vodItem?.maturity,
+      genre: ch.genre ?? ch.vodItem?.genre,
+      time,
+      duration,
+      percentage: pct,
+      streamIdx: idx,
+      streams: ch.streams,
+      vodItem: ch.vodItem,
     });
   }
   if (history.length > 15) history = history.slice(0, 15);
-  localStorage.setItem("tvlc_resume_history", JSON.stringify(history));
+  try { localStorage.setItem(key, JSON.stringify(history)); } catch {}
 
   const pid = activeProfileUuid();
   if (pid) {
@@ -78,6 +108,12 @@ export async function openVodPlayer(ch: any, streamIdx: number, startTime = 0): 
     overlay.style.cssText = "position:fixed;inset:0;z-index:9998;display:block;background:#000;";
   }
 
+  // Teardown previous player instance
+  if (player) {
+    try { player.destroy(); } catch {}
+    player = null;
+  }
+
   // First open: hide the legacy hand-rolled chrome and mount Vidstack full-bleed.
   let mount = document.getElementById("vodPlayerMount");
   if (!mount && overlay) {
@@ -87,23 +123,54 @@ export async function openVodPlayer(ch: any, streamIdx: number, startTime = 0): 
     mount.style.cssText = "position:absolute;inset:0;width:100%;height:100%;background:#000;";
     overlay.appendChild(mount);
 
-    const close = document.createElement("button");
-    close.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
-    close.setAttribute("aria-label", "Close player");
-    close.style.cssText = "position:absolute;top:14px;left:14px;z-index:60;display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;border:none;background:rgba(0,0,0,0.55);color:#fff;cursor:pointer;";
-    close.onclick = () => closeVodPlayer();
-    overlay.appendChild(close);
+    // Minimize button
+    const backBtn = document.createElement("button");
+    backBtn.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>`;
+    backBtn.setAttribute("aria-label", "Minimize player");
+    backBtn.style.cssText = "position:absolute;top:20px;left:20px;z-index:60;display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;border:none;background:rgba(0,0,0,0.55);color:#fff;cursor:pointer;";
+    backBtn.onclick = (e) => {
+      e.stopPropagation();
+      overlay?.classList.add("mini-player");
+    };
+    overlay.appendChild(backBtn);
+
+    // Close button (for PiP mode)
+    const closeBtn = document.createElement("button");
+    closeBtn.id = "vodPiPCloseBtn";
+    closeBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+    closeBtn.setAttribute("aria-label", "Close player");
+    closeBtn.style.cssText = "position:absolute;top:8px;right:8px;z-index:70;display:none;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;border:none;background:#222;color:#fff;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.5);";
+    closeBtn.onclick = (e) => {
+      e.stopPropagation();
+      closeVodPlayer();
+    };
+    overlay.appendChild(closeBtn);
+
+    // Dynamic styling for PiP close button
+    const style = document.createElement("style");
+    style.innerHTML = `
+      #vodPlayerOverlay.mini-player #vodPiPCloseBtn { display: flex !important; }
+      #vodPlayerOverlay.mini-player:hover { cursor: pointer; transform: scale(1.02); transition: transform 0.2s; }
+    `;
+    overlay.appendChild(style);
+
+    // Restore from PiP when clicking the mini-player
+    overlay.addEventListener("click", () => {
+      if (overlay.classList.contains("mini-player")) {
+        overlay.classList.remove("mini-player");
+      }
+    });
 
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && overlay && !overlay.hasAttribute("hidden") && !document.fullscreenElement) closeVodPlayer();
     });
   }
-  if (!mount) return;
+  
+  if (mount) mount.innerHTML = "";
 
   let idx = streamIdx;
   const first = ch.streams?.[idx];
-  // No playable stream → show a clear message instead of handing Vidstack an
-  // undefined src (which surfaced as "Player failed to load undefined").
+  // No playable stream
   if (!first || !first.url) {
     if (mount) {
       mount.innerHTML = `<div style="color:#fff;font:600 15px/1.6 'Space Grotesk',sans-serif;padding:40px;max-width:420px;margin:auto;text-align:center;">This title isn't available to stream right now.<br><span style="color:#9aa5b5;font-weight:500;">Try another title — most of the catalog plays instantly.</span></div>`;
@@ -111,75 +178,110 @@ export async function openVodPlayer(ch: any, streamIdx: number, startTime = 0): 
     return;
   }
 
+  // Create Brand Loader (Bouncing Ball)
+  const loader = document.createElement("div");
+  loader.style.cssText = "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:40;background:#000;";
+  loader.innerHTML = `
+    <div style="display: flex; align-items: flex-end; gap: 10px; height: 40px">
+      <div style="width: 14px; height: 14px; border-radius: 50%; background: #C6F53A; animation: vdBounce 0.72s ease-in-out infinite"></div>
+      <div style="width: 14px; height: 14px; border-radius: 50%; background: #7E8792; animation: vdBounce 0.72s ease-in-out infinite; animation-delay: 0.1s"></div>
+      <div style="width: 14px; height: 14px; border-radius: 50%; background: #4A5058; animation: vdBounce 0.72s ease-in-out infinite; animation-delay: 0.2s"></div>
+    </div>
+    <style>@keyframes vdBounce { 0%, 100% { transform: translateY(0) scale(1.14, 0.86); } 45% { transform: translateY(-22px) scale(0.92, 1.08); } }</style>
+  `;
+  mount!.appendChild(loader);
+
+  // Player Container
+  const playerContainer = document.createElement("div");
+  playerContainer.style.cssText = "width:100%;height:100%;opacity:1;transition:opacity 0.3s ease;";
+  mount!.appendChild(playerContainer);
+
   const load = (i: number) => {
     idx = i;
     const s = ch.streams?.[i];
     if (!s) { closeVodPlayer(); return; }
-    player.title = s.source ? `${ch.name} · ${s.source}` : ch.name;
-    player.src = s.url; // direct CDN first; hls error handler falls back to /proxy
+    if (player) {
+      player.title = s.source ? `${ch.name} · ${s.source}` : ch.name;
+      player.src = playable(s.url);
+    }
   };
 
-  if (!player) {
-    try {
-      // NOTE: do NOT pass `poster` here. Vidstack lazy-imports its poster element
-      // chunk only when a poster is set, and Vite's re-bundle of that chunk can
-      // make the expected export undefined → create() throws "undefined has no
-      // properties" (only for titles that HAVE a poster — the intermittent bug).
-      // The poster is cosmetic; the hero/card art already covers it.
-      player = await VidstackPlayer.create({
-        target: mount,
-        title: ch.name,
-        src: first.url,
-        layout: new VidstackPlayerLayout(),
+  try {
+    player = await VidstackPlayer.create({
+      target: playerContainer,
+      title: first.source ? `${ch.name} · ${first.source}` : ch.name,
+      src: playable(first.url),
+      autoplay: true,
+      currentTime: startTime,
+      layout: new VidstackPlayerLayout(),
+    });
+    
+    // Hide Vidstack's default loading spinner to use our custom one
+    const style = document.createElement("style");
+    style.innerHTML = `media-spinner { display: none !important; }`;
+    playerContainer.appendChild(style);
+
+  } catch (e: any) {
+    console.error("[vodplayer] VidstackPlayer.create failed:", e);
+    const msg = (e && (e.message || String(e))) || "Unknown error";
+    mount!.innerHTML = `<div style="color:#fff;font:600 15px/1.5 sans-serif;padding:32px;max-width:520px">Player failed to load.<br><span style="color:#ff8a8a">${msg}</span></div>`;
+    return;
+  }
+  
+  try {
+    const el = player as HTMLElement;
+    el.style.width = "100%"; el.style.height = "100%";
+    el.style.setProperty("--media-brand", BRAND);
+    (player as any).fullscreenOrientation = "landscape";
+    setTimeout(() => el.focus(), 100);
+  } catch {}
+
+  // hls.js is fetched asynchronously, so `p.instance` is still null when
+  // provider-change fires — guarding on it silently skipped the /proxy fallback
+  // entirely. onInstance fires immediately if the instance already exists and
+  // waits for it otherwise, so it is correct regardless of load timing.
+  player.addEventListener("provider-change", (e: any) => {
+    const p = e.detail;
+    if (p?.type !== "hls") return;
+    p.onInstance((hls: any) => {
+      hls.on("hlsError", (_ev: any, data: any) => {
+        if (data?.fatal && data?.type === "networkError") {
+          const cur = ch.streams?.[idx]?.url;
+          if (cur && !(hls.url || "").includes("/proxy")) { hls.loadSource(proxied(cur)); hls.startLoad(); }
+        }
       });
-    } catch (e: any) {
-      console.error("[vodplayer] VidstackPlayer.create failed:", e);
-      const msg = (e && (e.message || String(e))) || "Unknown error";
-      mount.innerHTML = `<div style="color:#fff;font:600 15px/1.5 sans-serif;padding:32px;max-width:520px">Player failed to load.<br><span style="color:#ff8a8a">${msg}</span></div>`;
-      return;
+    });
+  });
+
+  // Hide the loader only once media can actually play. provider-change fires
+  // before a single byte is fetched, so hiding there made every load failure
+  // look like a working player in front of a black screen.
+  const hideLoader = () => { loader.style.display = "none"; };
+  player.addEventListener("can-play", hideLoader);
+  player.addEventListener("playing", hideLoader);
+
+  // Never fail silently. Without this a 401 or a CORS rejection is invisible.
+  player.addEventListener("error", (e: any) => {
+    console.error("[vodplayer] media error:", e?.detail ?? e);
+    hideLoader();
+    const err = document.createElement("div");
+    err.style.cssText = "position:absolute;inset:0;z-index:45;display:flex;align-items:center;justify-content:center;background:#000;color:#fff;font:600 15px/1.6 'Space Grotesk',sans-serif;text-align:center;padding:40px;";
+    err.innerHTML = `<div>This title didn't load.<br><span style="color:#9aa5b5;font-weight:500;">Try another title, or come back in a bit.</span></div>`;
+    mount!.appendChild(err);
+  });
+
+  player.addEventListener("time-update", () => {
+    const t = player.currentTime, d = player.duration;
+    if (d > 0) {
+      saveResume(ch, idx, t, d, (t / d) * 100);
+      if (t / d > 0.9) markWatched(ch.streams?.[idx]?.id);
     }
-    try {
-      const el = player as HTMLElement;
-      el.style.width = "100%"; el.style.height = "100%";
-      el.style.setProperty("--media-brand", BRAND);
-      (player as any).fullscreenOrientation = "landscape";
-    } catch {}
+  });
 
-    // Direct-CDN → /proxy fallback on a fatal network error (keeps streaming
-    // client-side / zero-Vercel-bandwidth whenever the CDN allows CORS).
-    player.addEventListener("provider-setup", (e: any) => {
-      const p = e.detail;
-      if (p?.type === "hls" && p.instance) {
-        const hls = p.instance;
-        hls.on("hlsError", (_ev: any, data: any) => {
-          if (data?.fatal && data?.type === "networkError") {
-            const cur = ch.streams?.[idx]?.url;
-            if (cur && !(hls.url || "").includes("/proxy")) { hls.loadSource(proxied(cur)); hls.startLoad(); }
-          }
-        });
-      }
-    });
+  player.addEventListener("ended", () => {
+    markWatched(ch.streams?.[idx]?.id);
+    if (idx + 1 < (ch.streams?.length || 0)) load(idx + 1);
+    else closeVodPlayer();
+  });
 
-    player.addEventListener("time-update", () => {
-      const t = player.currentTime, d = player.duration;
-      if (d > 0) {
-        saveResume(ch, idx, t, d, (t / d) * 100);
-        if (t / d > 0.9) markWatched(ch.streams?.[idx]?.id);
-      }
-    });
-
-    player.addEventListener("ended", () => {
-      markWatched(ch.streams?.[idx]?.id);
-      if (idx + 1 < (ch.streams?.length || 0)) load(idx + 1);
-      else closeVodPlayer();
-    });
-  }
-
-  load(idx);
-
-  if (startTime > 0) {
-    const seek = () => { try { player.currentTime = startTime; } catch {} };
-    player.addEventListener("can-play", seek, { once: true });
-  }
-  try { await player.play(); } catch {}
 }

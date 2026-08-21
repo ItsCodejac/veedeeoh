@@ -17,7 +17,7 @@ nohup.out
 emails.txt
 *.spec~
 .vercel
-.vercel_disabled/
+.vercel_disabled*
 
 # Secrets / credentials — NEVER commit
 keys/
