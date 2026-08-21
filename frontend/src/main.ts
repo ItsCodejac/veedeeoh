@@ -499,6 +499,22 @@ function wireHeader(): void {
 import { initPWA } from "./pwa";
 import { installConsoleCapture, mountFeedbackEntry } from "./feedback";
 
+// Every build emits freshly hashed chunks and emptyOutDir removes the previous
+// ones, so a page that was loaded before a deploy will request a chunk that no
+// longer exists. Vercel answers with 404.html, the browser rejects it on MIME
+// type ("text/html"), and the dynamic import throws -- which is what killed
+// playback: the Vidstack layout chunk is loaded lazily by VidstackPlayer.create.
+// Reloading picks up the new index.html and its current hashes. Guarded so a
+// genuinely missing asset cannot put the page in a reload loop.
+window.addEventListener("vite:preloadError", (e) => {
+  const KEY = "veedeeoh_chunk_reload_at";
+  const last = Number(sessionStorage.getItem(KEY) || 0);
+  if (Date.now() - last < 30_000) return; // already tried; let the error surface
+  sessionStorage.setItem(KEY, String(Date.now()));
+  e.preventDefault();
+  location.reload();
+});
+
 wireSidebar();
 wireHeader();
 wireVodDetails();

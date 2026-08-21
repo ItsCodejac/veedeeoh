@@ -2,15 +2,45 @@
   "buildCommand": "npm run build",
   "outputDirectory": "src/tvlc/static",
   "routes": [
-    { "src": "/", "dest": "/landing.html" },
-    { "src": "/privacy", "dest": "/privacy.html" },
-    { "src": "/terms", "dest": "/terms.html" },
-    { "src": "/self-hosting", "dest": "/self-hosting.html" },
-    { "src": "/404", "dest": "/404.html" },
-    { "src": "/change-password", "dest": "/change-password.html" },
-    { "src": "/api/(.*)", "dest": "/api/index.ts" },
-    { "src": "/proxy", "dest": "/api/proxy.ts" },
-    { "handle": "filesystem" }
+    {
+      "src": "/",
+      "dest": "/landing.html"
+    },
+    {
+      "src": "/privacy",
+      "dest": "/privacy.html"
+    },
+    {
+      "src": "/terms",
+      "dest": "/terms.html"
+    },
+    {
+      "src": "/self-hosting",
+      "dest": "/self-hosting.html"
+    },
+    {
+      "src": "/404",
+      "dest": "/404.html"
+    },
+    {
+      "src": "/change-password",
+      "dest": "/change-password.html"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/index.ts"
+    },
+    {
+      "src": "/proxy",
+      "dest": "/api/proxy.ts"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/assets/(.*)",
+      "status": 404
+    }
   ],
   "crons": [
     {
