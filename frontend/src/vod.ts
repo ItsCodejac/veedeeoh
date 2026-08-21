@@ -3,7 +3,7 @@ import { state } from "./state";
 import type { Stream, VodItem, VodEpisode, VodRail } from "./types";
 import { escapeHtml, $, setupHorizontalScroll, buildBrandLoader, buildRailSkeleton, showToast } from "./util";
 import { getActiveProfile, getStoredProfiles } from "./profiles";
-import { maturityCeiling, allowedRatingsFor, addFavorite, removeFavorite, getWatchHistory, listExclusions, listApprovedContent, filterRailsForGatedProfile, tvMaturity, listCollections, createSection, addToCollection, allowForAge, excludeFromProfile, unexcludeFromProfile } from "./db";
+import { maturityCeiling, allowedRatingsFor, addFavorite, removeFavorite, getWatchHistory, listExclusions, listApprovedContent, filterRailsForGatedProfile, tvMaturity, listCollections, listCollectionItems, createSection, addToCollection, allowForAge, excludeFromProfile, unexcludeFromProfile } from "./db";
 import { openVodPlayer } from "./vodplayer";
 
 // The active profile's real Supabase id (null for local/unsynced placeholders).
@@ -1627,5 +1627,72 @@ export async function renderHome(): Promise<void> {
     if (moreTv.length >= 4) renderGenreRail("More Series", moreTv, false);
   } catch (err) {
     loading.textContent = `Failed to load Home dashboard: ${err}`;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Custom sidebar sections
+//
+// A section is a household collection with show_as_tab set -- the same concept
+// as the kids collections, at a different scope. Adding a title via the plus
+// button on a card creates one; this renders them as sidebar tabs and views.
+// ---------------------------------------------------------------------------
+
+/** Sections belonging to the signed-in household, for the sidebar. */
+export async function listSections(): Promise<{ id: string; name: string }[]> {
+  const all = await listCollections().catch(() => []);
+  return all.filter((c) => c.scope === "household" && c.show_as_tab).map((c) => ({ id: c.id, name: c.name }));
+}
+
+/** Render one section's titles. Runs everything through the same profile gate as
+ *  the catalog, so a section cannot become a way around a restricted profile. */
+export async function renderSection(container: HTMLElement, collectionId: string, name: string): Promise<void> {
+  container.replaceChildren();
+  const loading = buildRailSkeleton();
+  container.append(loading);
+
+  try {
+    const [ids, rails] = await Promise.all([listCollectionItems(collectionId), getVodRails()]);
+    const wanted = new Set(ids);
+    const seen = new Set<string>();
+    const items: VodItem[] = [];
+    for (const rail of rails) {
+      for (const it of rail.items as VodItem[]) {
+        if (wanted.has(String(it.id)) && !seen.has(it.id)) { seen.add(it.id); items.push(it); }
+      }
+    }
+    loading.remove();
+
+    const title = document.createElement("div");
+    title.className = "sectionTitle";
+    title.textContent = name;
+    container.append(title);
+
+    if (!items.length) {
+      const empty = document.createElement("div");
+      empty.style.cssText = "padding:40px 18px;color:#7C828C;font-size:14px;line-height:1.6;max-width:520px;";
+      empty.textContent = ids.length
+        ? "Nothing in this section is available to this profile right now."
+        : "Nothing here yet. Hover any title and use the + button to add it.";
+      container.append(empty);
+      return;
+    }
+
+    const rail = document.createElement("div");
+    rail.className = "rail";
+    rail.innerHTML = `<div class="railHead"><div class="railHeadTitle"><h2>${escapeHtml(name)}</h2><span class="railTag">${items.length}</span></div></div>`;
+    const scroller = document.createElement("div");
+    scroller.className = "railScroll";
+    for (const it of items) scroller.append(vodCard(it));
+    rail.append(scroller);
+    setupHorizontalScroll(scroller, rail);
+    container.append(rail);
+  } catch (err) {
+    loading.remove();
+    const e = document.createElement("div");
+    e.style.cssText = "padding:40px 18px;color:#ff6b6b;font-size:14px;";
+    e.textContent = "Couldn't load this section.";
+    container.append(e);
+    console.error("[vod] renderSection", err);
   }
 }

@@ -1,7 +1,7 @@
 import "./style.css";
 import { fetchCatalog, fetchWatched } from "./api";
 import { state } from "./state";
-import { $, showToast } from "./util";
+import { $, showToast, escapeHtml } from "./util";
 import { wireVodDetails, renderShows, renderMovies, wireSearchInputs, renderHome } from "./vod";
 import { getSession, isCloudMode, restoreSession, signOut, getSupabase } from "./auth";
 import { getActiveProfile } from "./profiles";
@@ -239,6 +239,11 @@ async function boot(): Promise<void> {
 
 function wireSidebar(): void {
   const tabs = ["tabHome", "tabShows", "tabMovies", "tabFavs", "tabKids"];
+
+  // Section tabs are created at runtime, so their active state is managed
+  // alongside the fixed ones rather than inside the tabs array.
+  const clearSectionActive = () =>
+    document.querySelectorAll<HTMLElement>("[data-section-id]").forEach((b) => b.classList.remove("active"));
   const views = ["homeView", "showsView", "moviesView", "kidsView"];
 
   function switchView(activeTabId: string) {
@@ -249,6 +254,12 @@ function wireSidebar(): void {
       playerSuite.classList.add("docked");
       const pMin = document.getElementById("pMin");
       if (pMin) pMin.textContent = "Expand";
+    }
+
+    clearSectionActive();
+    if (activeTabId.startsWith("tabSection:")) {
+      const id = activeTabId.slice("tabSection:".length);
+      document.querySelector<HTMLElement>(`[data-section-id="${CSS.escape(id)}"]`)?.classList.add("active");
     }
 
     tabs.forEach((t) => {
@@ -300,6 +311,14 @@ function wireSidebar(): void {
     } else if (activeTabId === "tabKids") {
       $("kidsView").removeAttribute("hidden");
       import("./vod").then(vod => vod.renderKids($("kidsRails")));
+    } else if (activeTabId.startsWith("tabSection:")) {
+      // Custom sections reuse homeView as their surface rather than each one
+      // owning a container, so adding a section costs no markup.
+      const el = $("homeView");
+      el.removeAttribute("hidden");
+      const id = activeTabId.slice("tabSection:".length);
+      const btn = document.querySelector<HTMLElement>(`[data-section-id="${CSS.escape(id)}"]`);
+      import("./vod").then((vod) => vod.renderSection(el, id, btn?.dataset.sectionName || "Section"));
     }
   }
 
@@ -311,6 +330,32 @@ function wireSidebar(): void {
       });
     }
   });
+
+  // Build the household's custom section tabs beneath the fixed nav, and rebuild
+  // them whenever one is created from a card's + button.
+  const mountSections = async () => {
+    const anchor = document.getElementById("tabKids") || document.getElementById("tabFavs");
+    if (!anchor?.parentElement) return;
+    document.querySelectorAll("[data-section-id]").forEach((n) => n.remove());
+    // A kids profile does not get household sections: they are curated by an
+    // adult for an adult sidebar, and the content gate would filter them anyway.
+    if (document.body.classList.contains("kids-mode")) return;
+    const vod = await import("./vod");
+    const sections = await vod.listSections().catch(() => []);
+    for (const sec of sections) {
+      const b = document.createElement("button");
+      b.className = "navBtn";
+      b.dataset.sectionId = sec.id;
+      b.dataset.sectionName = sec.name;
+      b.title = sec.name;
+      b.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h6l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"></path></svg><span>${escapeHtml(sec.name)}</span>`;
+      b.addEventListener("click", () => switchView(`tabSection:${sec.id}`));
+      anchor.parentElement.insertBefore(b, anchor.nextSibling);
+    }
+  };
+  void mountSections();
+  window.addEventListener("veedeeoh:sections-changed", () => void mountSections());
+  window.addEventListener("veedeeoh:profile-changed", () => void mountSections());
 
   const session = getSession();
   const sidebarUser = document.getElementById("sidebarUser");
