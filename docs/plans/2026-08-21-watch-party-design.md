@@ -59,6 +59,23 @@ Join: link -> sign in -> password if set -> seat check -> connect.
 only component that knows how many viewers are connected right now. A row count
 in Postgres cannot express that.
 
+### Hosting is the account owner's, not per-profile
+
+Only the ACCOUNT OWNER can create a party. Watch Party is an account-level
+entitlement (and, in phase 3, a paid add-on), so it attaches to the owner rather
+than being granted to every profile in the household.
+
+  - Owner profile: can create, host and control a party.
+  - Other household profiles: can join a party, cannot create one.
+  - Kids profiles: can never host, under any configuration.
+
+This is checked server-side against the account, not by hiding the tab. Hiding
+the Watch Party tab from non-owner profiles is a UI convenience, not the control
+-- the same mistake as main.ts hiding Household Settings on kids profiles
+without enforcing anything behind it.
+
+### Joining
+
 A free account is required to join. Not a paid one -- the party link is then a
 growth funnel where every guest is a captured account, rather than an anonymous
 uncapped pass to the catalog. Paid-only was rejected because it limits users to
