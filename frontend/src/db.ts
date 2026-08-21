@@ -522,6 +522,10 @@ export function allowedRatingsFor(p: { allowed_ratings?: string[] | null; max_ra
   if (!p.max_rating) return null;
   const ceiling = MATURITY_BY_RATING[p.max_rating.trim().toUpperCase()];
   if (ceiling === undefined) return new Set();               // unknown cap: allow nothing
+  // A cap at the top of the ladder was never a restriction -- filterRailsByMaturity
+  // short-circuited on it and showed everything. Expanding it into "TV ratings
+  // only" would quietly strip every film from profiles that had no limit.
+  if (ceiling >= 5) return null;
   const out = new Set<string>();
   for (const [rating, m] of Object.entries(TV_MATURITY)) if (m <= ceiling) out.add(rating);
   return out;
