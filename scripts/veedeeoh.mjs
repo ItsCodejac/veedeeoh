@@ -260,7 +260,10 @@ async function updateFeedback({ id, status, notes }) {
 const TIERS = {
   little: { name: "Little Kids Approved", min_age: 0 },
   older:  { name: "Older Kids Approved",  min_age: 1 },
-  no:     { name: "Not for kids",         min_age: null },
+  // Third answer is "not sure", not "never". With TV ratings gating
+  // automatically, what reaches this queue is film-rated titles the operator may
+  // simply not know. Parking one is a deferral, and the bucket stays reviewable.
+  no:     { name: "Unsure / not approved", min_age: null },
 };
 
 const _collCache = {};
@@ -309,13 +312,21 @@ async function curateQueue() {
       seen.add(it.id);
       const rating = (it.rating || "").toUpperCase();
       if (TV_RATINGS.has(rating)) continue;                    // already auto-admitted or auto-excluded
-      const plausible = rating === "G" || /kids|famil|animation|anime/i.test(it.genre || "");
-      if (!plausible) continue;                                 // R-rated thrillers are not candidates
+      // Only ratings a child might plausibly be allowed to watch: PG-13 and R are
+      // not judgement calls. Every G is worth a look, since G is the strongest
+      // signal we have and also the one that drifted (The Ten Commandments is G).
+      // PG and unrated need a genre hint as well, or the queue fills with 371
+      // adult dramas that happen to predate PG-13.
+      if (!["G", "PG", "NOT RATED", ""].includes(rating)) continue;
+      const kidGenre = /kids|famil|animation|anime|cartoon/i.test(it.genre || "");
+      if (rating !== "G" && !kidGenre) continue;
       pool.push(it);
     }
   }
-  pool.sort((a, b) => (a.rating === "G" ? -1 : 0) - (b.rating === "G" ? -1 : 0));
+  const order = { G: 0, PG: 1 };
+  pool.sort((a, b) => (order[(a.rating || "").toUpperCase()] ?? 2) - (order[(b.rating || "").toUpperCase()] ?? 2));
   const decided = await decidedIds();
+  const showUnsure = false;
   const link = (it) => {
     const id = String(it.id || "");
     if (id.startsWith("tubi:")) return `https://tubitv.com/${it.series_id ? "series" : "movies"}/${id.replace("tubi:", "")}`;
@@ -325,6 +336,13 @@ async function curateQueue() {
   return {
     counts: Object.entries(TIERS).reduce((a, [k]) => ({ ...a, [k]: Object.values(decided).filter((v) => v === k).length }), {}),
     total: pool.length,
+    unsure: pool.filter((it) => decided[it.id] === "no").map((it) => ({
+      id: it.id, title: it.title, poster: it.poster, rating: it.rating,
+      provider: it.provider || (String(it.id).startsWith("tubi:") ? "Tubi" : "Pluto TV"),
+      summary: (it.summary || "").slice(0, 220),
+      kind: it.series_id ? "series" : "title",
+      watchUrl: link(it),
+    })),
     queue: pool.filter((it) => !decided[it.id]).map((it) => ({
       id: it.id, title: it.title, poster: it.poster, rating: it.rating,
       maturity: it.maturity, provider: it.provider || (String(it.id).startsWith("tubi:") ? "Tubi" : String(it.id).startsWith("archive:") ? "Internet Archive" : "Pluto TV"),

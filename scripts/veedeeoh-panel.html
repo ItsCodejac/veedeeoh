@@ -70,10 +70,9 @@
   <div class="card" style="grid-column:1/-1">
     <h2>Kids curation</h2>
     <div class="muted" style="margin-top:0">
-      These are titles a restricted profile <b>cannot see on its own</b>. TV-rated content is already
-      admitted automatically, so it is not here &mdash; what needs you is everything the rating system
-      cannot vouch for: MPAA letters, whose meaning moved when PG-13 was introduced in 1984, and
-      unrated titles. <i>The War of the Worlds</i> (1953) is rated G.
+      TV-rated content gates itself, so it is not here. What is left are the <b>G, PG and unrated
+      films</b> &mdash; the ones whose rating cannot be trusted, because PG-13 did not exist until 1984
+      and pre-1984 PG absorbed what would now be PG-13. <i>The War of the Worlds</i> (1953) is rated G.
       <div style="margin-top:10px;display:flex;gap:26px;flex-wrap:wrap">
         <span><b style="color:var(--accent)">Little</b> &mdash; the <b>TV-Y</b> bar, which the
           guidelines define as <i>ages 2&ndash;6, not expected to frighten younger children</i>.
@@ -83,14 +82,19 @@
           under 7</i>. The guideline sets no upper age. This tier also admits <b>TV-G</b>, which
           means <i>suitable for all ages</i> and explicitly <i>not designed specifically for
           children</i> &mdash; so general-audience material belongs here too, not only kids' shows.</span>
-        <span><b>No</b> &mdash; not for children. Leaves the queue for good.</span>
+        <span><b>Not sure</b> &mdash; park it. Nothing is approved, so a child never sees it, and you
+          can come back to the parked list whenever you like.</span>
       </div>
       <div style="margin-top:8px">Watch anything you are unsure about. Judging by title is how a
       denylist once certified racist wartime cartoons as TV-Y7.</div>
     </div>
     <div id="curStats" class="muted"></div>
     <div id="curGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;margin-top:14px"></div>
-    <div class="actions"><button class="ghost" id="curMore">Load more</button></div>
+    <div class="actions">
+      <button class="ghost" id="curMore">Load more</button>
+      <button class="ghost" id="curUnsure">Review parked</button>
+    </div>
+    <div id="curUnsureGrid" style="display:none;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;margin-top:14px"></div>
   </div>
 
   <div class="card" style="grid-column:1/-1">
@@ -282,7 +286,7 @@ function renderCurate() {
         <div style="display:flex;gap:5px;margin-top:auto;padding-top:8px">
           <button onclick="decide('${escapeHtml(c.id)}','little','${c.kind}')" style="flex:1;padding:6px 4px;font-size:11px;border-radius:7px">Little<div style="font-weight:500;font-size:9.5px;opacity:.7">2&ndash;6</div></button>
           <button onclick="decide('${escapeHtml(c.id)}','older','${c.kind}')" style="flex:1;padding:6px 4px;font-size:11px;border-radius:7px">Older<div style="font-weight:500;font-size:9.5px;opacity:.7">7+</div></button>
-          <button class="ghost" onclick="decide('${escapeHtml(c.id)}','no','${c.kind}')" style="flex:1;padding:6px 4px;font-size:11px;border-radius:7px">No</button>
+          <button class="ghost" onclick="decide('${escapeHtml(c.id)}','no','${c.kind}')" style="flex:1;padding:6px 4px;font-size:11px;border-radius:7px">Not sure</button>
         </div>
       </div>
     </div>`).join(''));
@@ -303,6 +307,30 @@ window.decide = async (id, decision, kind) => {
      · ${done}/${r.total} decided`;
 };
 $('curMore').onclick = renderCurate;
+
+let unsureOpen = false;
+$('curUnsure').onclick = async () => {
+  unsureOpen = !unsureOpen;
+  const grid = $('curUnsureGrid');
+  grid.style.display = unsureOpen ? 'grid' : 'none';
+  $('curUnsure').textContent = unsureOpen ? 'Hide parked' : 'Review parked';
+  if (!unsureOpen) return;
+  const r = await j('/api/curate');
+  const list = r.unsure || [];
+  grid.innerHTML = list.length ? list.map(c => `
+    <div class="curCard" data-id="${escapeHtml(c.id)}" style="background:#080a10;border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;opacity:.85">
+      ${c.poster ? `<img src="${escapeHtml(c.poster)}" alt="" style="width:100%;aspect-ratio:347/500;object-fit:cover;background:#111">` : ''}
+      <div style="padding:11px;display:flex;flex-direction:column;gap:6px;flex:1">
+        <div style="font-weight:800;font-size:13.5px;line-height:1.3">${escapeHtml(c.title)}</div>
+        <div class="dim" style="font-size:11.5px">${escapeHtml(c.rating || '?')} · ${escapeHtml(c.provider)}</div>
+        <a href="${escapeHtml(c.watchUrl)}" target="_blank" rel="noreferrer" style="font-size:11.5px;color:var(--accent);text-decoration:none">Watch &rarr;</a>
+        <div style="display:flex;gap:5px;margin-top:auto;padding-top:8px">
+          <button onclick="decide('${escapeHtml(c.id)}','little','${c.kind}')" style="flex:1;padding:6px 4px;font-size:11px;border-radius:7px">Little</button>
+          <button onclick="decide('${escapeHtml(c.id)}','older','${c.kind}')" style="flex:1;padding:6px 4px;font-size:11px;border-radius:7px">Older</button>
+        </div>
+      </div>
+    </div>`).join('') : '<div class="muted">Nothing parked.</div>';
+};
 
 loadCatalog(); loadInvites(); loadFeedback(); loadCurate();
 </script></body></html>
