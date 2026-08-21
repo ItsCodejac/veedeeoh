@@ -272,6 +272,14 @@ export function openProfileSwitcher(onSelectProfile?: (p: HouseholdProfile) => v
   const profiles = getStoredProfiles();
   const active = getActiveProfile();
 
+  // A restricted profile with no adult PIN anywhere is an unlocked lock: the exit
+  // gate in the click handler below falls open. Setting a PIN is the parent's
+  // choice, so this is a reminder rather than a block — but it has to stay easy
+  // to find after declining the prompt at profile creation.
+  const kidsProfileExists = profiles.some((p) => p.is_kids);
+  const adultPinIsSet = profiles.some((p) => !p.is_kids && p.pin);
+  const showLockWarning = kidsProfileExists && !adultPinIsSet;
+
   const modal = document.createElement('div');
   modal.id = 'profileSwitcherModal';
   modal.style.cssText = `
@@ -314,6 +322,16 @@ export function openProfileSwitcher(onSelectProfile?: (p: HouseholdProfile) => v
           <span style="font-size: 16px; font-weight: 600; color: #9aa5b5;">Add Profile</span>
         </button>
       </div>
+
+      ${showLockWarning ? `
+      <div style="display:flex;align-items:center;gap:14px;text-align:left;max-width:520px;margin:0 auto 22px;padding:14px 18px;border-radius:14px;background:rgba(197,240,78,0.07);border:1px solid rgba(197,240,78,0.28);">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c5f04e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:800;margin-bottom:2px;">Kids mode isn't locked</div>
+          <div style="font-size:12.5px;line-height:1.5;color:#9aa5b5;">Without a PIN on an adult profile, anyone can switch out of a restricted profile.</div>
+        </div>
+        <button id="setAdultPinBtn" style="flex:none;background:#c5f04e;border:none;color:#06070a;padding:9px 16px;border-radius:9px;font-size:13px;font-weight:800;cursor:pointer;">Set PIN</button>
+      </div>` : ''}
 
       <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
         <button id="manageProfilesBtn" style="
@@ -368,6 +386,16 @@ export function openProfileSwitcher(onSelectProfile?: (p: HouseholdProfile) => v
       if (onSelectProfile) onSelectProfile(target);
     });
   });
+
+  const setPinBtn = modal.querySelector('#setAdultPinBtn');
+  if (setPinBtn) {
+    setPinBtn.addEventListener('click', async () => {
+      await ensureAdultPinExists();
+      // Re-open so the banner reflects the new state (and clears on success).
+      modal.remove();
+      openProfileSwitcher(onSelectProfile);
+    });
+  }
 
   const requireAdultAuth = async (): Promise<boolean> => {
     if (!active.is_kids) return true;
