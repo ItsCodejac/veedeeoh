@@ -150,6 +150,9 @@ export function disconnect(): void {
 
 export function activePartyCode(): string | null { return currentCode; }
 
+/** Whether this deployment has a sync worker configured at all. */
+export function partyEnabled(): boolean { return !!WORKER_URL; }
+
 /** Start hosting for a title already open in the player. */
 export function hostExisting(joinCode: string, seatLimit?: number | null): void {
   connect(joinCode, true, seatLimit);

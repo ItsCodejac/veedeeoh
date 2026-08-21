@@ -76,6 +76,10 @@ function applyProfileChrome(profile: { name?: string; avatar_color?: string; is_
   // The kids shortcut is a parent-only convenience.
   const kidsTab = document.getElementById("tabKids");
   if (kidsTab) { if (isKids) kidsTab.setAttribute("hidden", ""); else kidsTab.removeAttribute("hidden"); }
+  // Hosting and joining are account-level, never a kids profile: a party link
+  // handed to a child would otherwise play whatever the host is playing.
+  const partyTab = document.getElementById("tabParty");
+  if (partyTab) { if (isKids) partyTab.setAttribute("hidden", ""); else partyTab.removeAttribute("hidden"); }
 
   const av = document.getElementById("sidebarAvatar");
   if (av && profile.name) { av.textContent = profile.name.charAt(0).toUpperCase(); if (profile.avatar_color) (av as HTMLElement).style.background = profile.avatar_color; }
@@ -257,13 +261,13 @@ async function boot(): Promise<void> {
 }
 
 function wireSidebar(): void {
-  const tabs = ["tabHome", "tabShows", "tabMovies", "tabFavs", "tabKids"];
+  const tabs = ["tabHome", "tabShows", "tabMovies", "tabFavs", "tabParty", "tabKids"];
 
   // Section tabs are created at runtime, so their active state is managed
   // alongside the fixed ones rather than inside the tabs array.
   const clearSectionActive = () =>
     document.querySelectorAll<HTMLElement>("[data-section-id]").forEach((b) => b.classList.remove("active"));
-  const views = ["homeView", "showsView", "moviesView", "kidsView"];
+  const views = ["homeView", "showsView", "moviesView", "partyView", "kidsView"];
 
   function switchView(activeTabId: string) {
 
@@ -327,6 +331,9 @@ function wireSidebar(): void {
     } else if (activeTabId === "tabFavs") {
       $("homeView").removeAttribute("hidden");
       import("./vod").then(vod => vod.renderFavorites());
+    } else if (activeTabId === "tabParty") {
+      $("partyView").removeAttribute("hidden");
+      import("./partyview").then((pv) => pv.renderParty($("partyPanel")));
     } else if (activeTabId === "tabKids") {
       $("kidsView").removeAttribute("hidden");
       import("./vod").then(vod => vod.renderKids($("kidsRails")));
@@ -410,6 +417,7 @@ function wireSidebar(): void {
 
     const ICON = {
       kids: `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>`,
+      party: `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
       folder: `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h6l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>`,
       user: `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
       chat: `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
@@ -426,6 +434,8 @@ function wireSidebar(): void {
     }
 
     head("Browse");
+    const party = document.getElementById("tabParty");
+    if (party && !party.hasAttribute("hidden")) item("veedeeoh.party", ICON.party, () => party.click());
     const kids = document.getElementById("tabKids");
     if (kids && !kids.hasAttribute("hidden")) item("veedeeoh.kids", ICON.kids, () => kids.click());
 

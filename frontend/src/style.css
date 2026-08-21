@@ -3784,3 +3784,38 @@ body.kids-mode { --brand-accent: #ff9f1c; }
 #mobileSheetPanel button.sheetItem:active { background: rgba(255,255,255,.09); }
 #mobileSheetPanel button.sheetItem.danger { color: #ff3b30; }
 #mobileSheetPanel button.sheetItem svg { flex: none; opacity: .85; }
+
+/* ---- veedeeoh.party -------------------------------------------------- */
+.partyWrap { max-width: 720px; margin: 0 auto; padding: 32px 20px 64px; }
+.partyHero h1 { font-size: 2rem; font-weight: 800; margin: 0 0 6px; }
+.partyHero p { color: rgba(255,255,255,0.62); margin: 0 0 28px; line-height: 1.5; }
+.partyCard {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 14px;
+  padding: 20px 22px;
+  margin-bottom: 18px;
+}
+.partyCard.partyActive { border-color: rgba(197,240,78,0.45); background: rgba(197,240,78,0.06); }
+.partyCard h2 { font-size: 1.05rem; font-weight: 700; margin: 0 0 6px; }
+.partyHint { color: rgba(255,255,255,0.58); font-size: 0.9rem; margin: 0 0 14px; line-height: 1.5; }
+.partyRow { display: flex; flex-wrap: wrap; gap: 10px; }
+.partyInput {
+  flex: 1 1 150px; min-width: 0;
+  background: rgba(0,0,0,0.35);
+  border: 1px solid rgba(255,255,255,0.16);
+  border-radius: 9px;
+  color: #fff; padding: 11px 13px; font: inherit;
+}
+#partyCodeInput { flex: 0 0 8ch; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 700; }
+.partyInput:focus { outline: none; border-color: #c5f04e; }
+.partyBtn {
+  border-radius: 9px; padding: 11px 18px; font: inherit; font-weight: 600;
+  cursor: pointer; border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.08); color: #fff;
+}
+.partyBtn:hover { background: rgba(255,255,255,0.14); }
+.partyBtn.primary { background: #c5f04e; border-color: #c5f04e; color: #0b0b0b; }
+.partyBtn.danger { border-color: rgba(255,107,107,0.45); color: #ff8f8f; }
+.partyCodeBig { font-size: 2.1rem; font-weight: 800; letter-spacing: 0.22em; margin: 6px 0 2px; }
+.partyWarn { color: #ffb84d; font-size: 0.9rem; }

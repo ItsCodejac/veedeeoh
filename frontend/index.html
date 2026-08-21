@@ -67,6 +67,15 @@
       </svg>
       <span>Favorites</span>
     </button>
+    <button id="tabParty" title="veedeeoh.party" class="navBtn" hidden>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c5f04e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+        <circle cx="9" cy="7" r="4"></circle>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+      </svg>
+      <span class="partyWordmark" style="white-space:nowrap;font-weight:800;">veedeeoh<span style="color:#c5f04e;">.</span><span style="color:#c5f04e;">party</span></span>
+    </button>
     <button id="tabKids" title="veedeeoh.kids" class="navBtn" hidden>
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c5f04e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="10"></circle>
@@ -165,6 +174,11 @@
       <!-- Panel 6: Ocean TV View Panel -->
       <div id="oceanView" class="viewPanel" hidden>
         <div id="oceanRails"></div>
+      </div>
+
+      <!-- veedeeoh.party: join a party by code, and manage the one you host -->
+      <div id="partyView" class="viewPanel" hidden>
+        <div id="partyPanel"></div>
       </div>
 
       <!-- Panel 7: veedeeoh.kids (parent shortcut to a kid-safe browse) -->
