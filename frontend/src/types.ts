@@ -69,6 +69,8 @@ export interface HouseholdProfile {
   role?: 'owner' | 'adult';
   is_kids?: boolean;
   max_rating?: string | null; // e.g. 'TV-G'; null/undefined = no cap (adult)
+  /** Explicit permitted ratings; null means unrestricted. Supersedes max_rating. */
+  allowed_ratings?: string[] | null;
   pin?: string | null;        // parental lock to leave a kids profile
 }
 

@@ -171,7 +171,11 @@ export interface HouseholdProfile {
   avatar_color: string;
   avatar_url?: string | null;
   is_kids: boolean;
+  /** Legacy single ceiling. Superseded by allowed_ratings; kept so existing
+   *  profiles keep working until a parent edits them. */
   max_rating: string | null;
+  /** Explicit permitted ratings. null means unrestricted. */
+  allowed_ratings?: string[] | null;
   pin: string | null;
 }
 
@@ -191,6 +195,7 @@ export async function createProfile(fields: {
   avatar_url?: string | null;
   is_kids?: boolean;
   max_rating?: string;
+  allowed_ratings?: string[] | null;
   pin?: string | null;
 }): Promise<HouseholdProfile> {
   const sb = getSupabase();
@@ -494,7 +499,7 @@ export function tvMaturity(rating?: string | null): number | null {
  *  that is the point of them, and how a G-rated film a parent trusts gets in. */
 export function filterRailsForGatedProfile<T extends { items: any[] }>(
   rails: T[],
-  ceiling: number,
+  allowed: Set<string>,
   approved: Set<string>,
 ): T[] {
   return rails
@@ -502,9 +507,50 @@ export function filterRailsForGatedProfile<T extends { items: any[] }>(
       ...r,
       items: r.items.filter((i: any) => {
         if (approved.has(String(i.id))) return true;
-        const m = tvMaturity(i.rating);
-        return m !== null && m <= ceiling;
+        const r0 = (i.rating || "").trim().toUpperCase();
+        return !!r0 && allowed.has(r0);
       }),
     }))
     .filter((r) => r.items.length > 0);
 }
+
+/** Every rating a profile permits. Prefers the explicit set; falls back to
+ *  expanding the legacy ceiling so a profile saved before the change keeps
+ *  behaving identically. Returns null for an unrestricted profile. */
+export function allowedRatingsFor(p: { allowed_ratings?: string[] | null; max_rating?: string | null }): Set<string> | null {
+  if (p.allowed_ratings?.length) return new Set(p.allowed_ratings.map((r) => r.trim().toUpperCase()));
+  if (!p.max_rating) return null;
+  const ceiling = MATURITY_BY_RATING[p.max_rating.trim().toUpperCase()];
+  if (ceiling === undefined) return new Set();               // unknown cap: allow nothing
+  const out = new Set<string>();
+  for (const [rating, m] of Object.entries(TV_MATURITY)) if (m <= ceiling) out.add(rating);
+  return out;
+}
+
+/** Ratings offered when building a profile, grouped by the system they come
+ *  from. Kept in one place so the editor and the gate cannot drift apart. */
+export const RATING_GROUPS: { system: string; note: string; ratings: { code: string; label: string }[] }[] = [
+  {
+    system: "TV Parental Guidelines",
+    note: "Introduced 1997, so these have not drifted.",
+    ratings: [
+      { code: "TV-Y", label: "TV-Y · all children, ages 2-6" },
+      { code: "TV-Y7", label: "TV-Y7 · age 7+, mild fantasy violence" },
+      { code: "TV-G", label: "TV-G · all ages, not made for children" },
+      { code: "TV-PG", label: "TV-PG · parental guidance suggested" },
+      { code: "TV-14", label: "TV-14 · unsuitable under 14" },
+      { code: "TV-MA", label: "TV-MA · adults only" },
+    ],
+  },
+  {
+    system: "MPAA film ratings",
+    note: "Meanings changed over time. Older films carry ratings that would be stricter today.",
+    ratings: [
+      { code: "G", label: "G · general audiences" },
+      { code: "PG", label: "PG · parental guidance" },
+      { code: "PG-13", label: "PG-13 · unsuitable under 13" },
+      { code: "R", label: "R · restricted" },
+      { code: "NC-17", label: "NC-17 · adults only" },
+    ],
+  },
+];

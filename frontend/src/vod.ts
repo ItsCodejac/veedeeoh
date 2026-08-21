@@ -3,7 +3,7 @@ import { state } from "./state";
 import type { Stream, VodItem, VodEpisode, VodRail } from "./types";
 import { escapeHtml, $, setupHorizontalScroll, buildBrandLoader, buildRailSkeleton, showToast } from "./util";
 import { getActiveProfile, getStoredProfiles } from "./profiles";
-import { maturityCeiling, addFavorite, removeFavorite, getWatchHistory, listExclusions, listApprovedContent, filterRailsForGatedProfile, tvMaturity, allowForAge, excludeFromProfile, unexcludeFromProfile } from "./db";
+import { maturityCeiling, allowedRatingsFor, addFavorite, removeFavorite, getWatchHistory, listExclusions, listApprovedContent, filterRailsForGatedProfile, tvMaturity, allowForAge, excludeFromProfile, unexcludeFromProfile } from "./db";
 import { openVodPlayer } from "./vodplayer";
 
 // The active profile's real Supabase id (null for local/unsynced placeholders).
@@ -178,9 +178,10 @@ export async function getVodRails(): Promise<VodRail[]> {
   // This replaces the genre gate entirely. KIDS_SIGNAL_RE tested the RAIL NAME
   // as well as the item, so its verdict was constant across a rail and Tubi's
   // "Adult Animation" rail matched /animat/. The rating does the work now.
-  if (p.max_rating) {
+  const allowed = allowedRatingsFor(p);
+  if (allowed) {
     const approved = await approvedFor(ceiling);
-    return applyExclusions(filterRailsForGatedProfile(full, ceiling, approved), excluded) as VodRail[];
+    return applyExclusions(filterRailsForGatedProfile(full, allowed, approved), excluded) as VodRail[];
   }
 
   // Ungated (adult) profile: everything, minus anything the household removed.
@@ -1153,8 +1154,14 @@ export async function renderKids(container: HTMLElement): Promise<void> {
     const kidsCeiling = Math.min(2, kp.max_rating ? maturityCeiling(kp.max_rating) : 2);
     const kidsApproved = await approvedFor(kidsCeiling);
     const kidsExcluded = await exclusionsFor(kp.id);
+    // The kids view never shows more than TV-G, whoever is browsing it.
+    const KID_RATINGS = new Set(["TV-Y", "TV-Y7", "TV-Y7-FV", "TV-G"]);
+    const profileAllows = allowedRatingsFor(kp);
+    const kidsAllowed = profileAllows
+      ? new Set([...KID_RATINGS].filter((r) => profileAllows.has(r)))
+      : KID_RATINGS;
     const kidsRails = sortRailsByTaste(
-      applyExclusions(filterRailsForGatedProfile(cachedVodRails || [], kidsCeiling, kidsApproved), kidsExcluded),
+      applyExclusions(filterRailsForGatedProfile(cachedVodRails || [], kidsAllowed, kidsApproved), kidsExcluded),
     );
     loading.remove();
 
@@ -1262,16 +1269,17 @@ export async function renderHome(): Promise<void> {
     // item under vodItem, so the TV rating is available; a row with no usable
     // rating fails closed on a gated profile rather than being shown.
     const rp = getActiveProfile();
-    if (rp.max_rating) {
+    if (allowedRatingsFor(rp)) {
       const rCeiling = maturityCeiling(rp.max_rating);
+      const rAllowed = allowedRatingsFor(rp);
       const rApproved = await approvedFor(rCeiling);
       const rExcluded = await exclusionsFor(rp.id);
       resumeHistory = resumeHistory.filter((x: any) => {
         const id = String(x.id ?? x.itemId ?? "");
         if (rExcluded.has(id)) return false;
         if (rApproved.has(id)) return true;
-        const m = tvMaturity(x.vodItem?.rating ?? x.rating);
-        return m !== null && m <= rCeiling;
+        const r0 = String(x.vodItem?.rating ?? x.rating ?? "").trim().toUpperCase();
+        return !!r0 && (rAllowed?.has(r0) ?? false);
       });
     }
 

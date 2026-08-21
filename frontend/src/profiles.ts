@@ -1,6 +1,7 @@
 import { HouseholdProfile } from './types';
 import * as db from './db';
 import { getSession, signOut } from './auth';
+import { RATING_GROUPS, allowedRatingsFor } from './db';
 
 const ACTIVE_PROFILE_KEY = 'veedeeoh_active_profile';
 
@@ -111,7 +112,8 @@ export async function hydrateProfilesFromCloud(): Promise<void> {
 
 /** Create a profile in Supabase (when signed in) + local cache. */
 export async function createProfileEverywhere(fields: {
-  name: string; avatar_color: string; is_kids?: boolean; max_rating?: string | null; pin?: string | null;
+  name: string; avatar_color: string; is_kids?: boolean; max_rating?: string | null;
+  allowed_ratings?: string[] | null; pin?: string | null;
 }): Promise<void> {
   const local = getStoredProfiles().filter((p) => p.id !== 'default_main');
   if (cloudEnabled()) {
@@ -121,10 +123,12 @@ export async function createProfileEverywhere(fields: {
         avatar_color: fields.avatar_color,
         is_kids: fields.is_kids,
         max_rating: fields.max_rating ?? undefined,
+        allowed_ratings: fields.allowed_ratings ?? null,
         pin: fields.pin ?? null,
       });
       local.push({ id: row.id, name: row.name, avatar_color: row.avatar_color,
-        is_kids: row.is_kids, max_rating: row.max_rating, pin: row.pin });
+        is_kids: row.is_kids, max_rating: row.max_rating,
+        allowed_ratings: row.allowed_ratings ?? null, pin: row.pin });
       saveProfiles(local);
       return;
     } catch { /* fall through to local-only */ }
@@ -136,6 +140,58 @@ export async function createProfileEverywhere(fields: {
 /** Update a profile in Supabase (when signed in) + local cache. */
 /** Ask the parent to set a 4-digit PIN on an adult profile. Returns the raw PIN,
  *  or null if they decline. Distinct from promptForPin(), which VERIFIES one. */
+const TV_CODES = new Set(['TV-Y', 'TV-Y7', 'TV-Y7-FV', 'TV-G', 'TV-PG', 'TV-14', 'TV-MA']);
+function r_isTv(code: string): boolean { return TV_CODES.has(code.toUpperCase()); }
+
+/** Shown once when an MPAA letter is added to an otherwise kid-rated profile.
+ *  Resolves true if the parent accepts. "Don't show again" is remembered. */
+function mpaaWarning(code: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const m = document.createElement('div');
+    m.style.cssText = "position:fixed;inset:0;z-index:10070;background:rgba(6,7,10,.94);backdrop-filter:blur(18px);display:flex;align-items:center;justify-content:center;padding:20px;color:#fff;font-family:'Space Grotesk',sans-serif;";
+    m.innerHTML = `
+      <div style="background:#10141e;border:1px solid rgba(255,193,7,.35);border-radius:18px;max-width:440px;width:100%;padding:26px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+          <h3 style="margin:0;font-size:18px;font-weight:800;">About the ${escapeHtml(code)} rating</h3>
+        </div>
+        <p style="margin:0 0 12px;font-size:13.5px;line-height:1.6;color:#c9d1d9;">
+          Film ratings have not meant the same thing over time. <strong>PG-13 did not exist until 1984</strong>,
+          so films released before then were rated PG even when they contain material that would be
+          PG-13 or higher today.
+        </p>
+        <p style="margin:0 0 12px;font-size:13.5px;line-height:1.6;color:#c9d1d9;">
+          <em>Airplane!</em> (1980) is rated PG and contains nudity. Older G-rated films drifted the
+          same way. We cannot correct for this automatically, because most of the catalogue does not
+          tell us a release year.
+        </p>
+        <p style="margin:0 0 18px;font-size:13.5px;line-height:1.6;color:#c9d1d9;">
+          TV ratings are not affected &mdash; they were introduced in 1997. If this profile is for a
+          child, consider leaving film ratings unticked and allowing individual films instead, using
+          <strong>Kids access</strong> on any title.
+        </p>
+        <label style="display:flex;align-items:center;gap:9px;font-size:12.5px;color:#9aa5b5;cursor:pointer;margin-bottom:16px;">
+          <input type="checkbox" id="mpaaAck" style="accent-color:#c5f04e;width:15px;height:15px;cursor:pointer;" />
+          Don't show this again
+        </label>
+        <div style="display:flex;gap:10px;">
+          <button id="mpaaCancel" style="flex:1;padding:11px;border-radius:10px;background:rgba(255,255,255,.08);border:none;color:#9aa5b5;font-weight:700;cursor:pointer;">Cancel</button>
+          <button id="mpaaOk" style="flex:1;padding:11px;border-radius:10px;background:#c5f04e;border:none;color:#06070a;font-weight:800;cursor:pointer;">Allow ${escapeHtml(code)}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(m);
+    const done = (v: boolean) => {
+      if (v && (m.querySelector('#mpaaAck') as HTMLInputElement)?.checked) {
+        localStorage.setItem('veedeeoh_mpaa_warning_ack', '1');
+      }
+      m.remove();
+      resolve(v);
+    };
+    (m.querySelector('#mpaaCancel') as HTMLElement).onclick = () => done(false);
+    (m.querySelector('#mpaaOk') as HTMLElement).onclick = () => done(true);
+  });
+}
+
 export function promptToSetPin(profile: HouseholdProfile): Promise<string | null> {
   return new Promise((resolve) => {
     const modal = document.createElement("div");
@@ -204,7 +260,8 @@ export async function ensureAdultPinExists(excludeId?: string): Promise<void> {
 }
 
 export async function updateProfileEverywhere(id: string, fields: {
-  name: string; avatar_color: string; avatar_url?: string | null; is_kids?: boolean; max_rating?: string | null; pin?: string | null;
+  name: string; avatar_color: string; avatar_url?: string | null; is_kids?: boolean;
+  max_rating?: string | null; allowed_ratings?: string[] | null; pin?: string | null;
 }): Promise<void> {
   const list = getStoredProfiles().map((p) => (p.id === id ? { ...p, ...fields } : p));
   saveProfiles(list);
@@ -215,6 +272,7 @@ export async function updateProfileEverywhere(id: string, fields: {
       // avatar_url was reaching localStorage but never the DB, so a chosen avatar
       // vanished on the next hydrate from cloud.
       if (fields.avatar_url !== undefined) patch.avatar_url = fields.avatar_url;
+      if (fields.allowed_ratings !== undefined) patch.allowed_ratings = fields.allowed_ratings;
       if (fields.pin !== undefined) patch.pin = fields.pin; // only touch pin when set/cleared
       await db.updateProfile(id, patch);
     } catch { /* cache already updated */ }
@@ -528,15 +586,12 @@ export function openProfileEditor(editingProfile?: HouseholdProfile, onClose?: (
       </div>
 
       <div style="margin-bottom: 24px; background:#080a10; border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:16px;">
-        <label style="display:block; font-size:13px; color:#9aa5b5; margin-bottom:12px; font-weight:700;">MATURITY CAP</label>
-        <div style="display: flex; justify-content: space-between; font-size: 11px; color: #9aa5b5; margin-bottom: 8px; font-weight: 700;">
-          <span>Little Kids</span>
-          <span>Older Kids</span>
-          <span>Teen</span>
-          <span>Adult</span>
+        <label style="display:block; font-size:13px; color:#9aa5b5; margin-bottom:4px; font-weight:700;">ALLOWED RATINGS</label>
+        <div style="font-size:11.5px; color:#7C828C; line-height:1.5; margin-bottom:12px;">
+          Pick exactly what this profile may watch. Leave everything unticked for no restriction.
         </div>
-        <input type="range" id="editMaturitySlider" min="0" max="3" step="1" style="width: 100%; accent-color: #c5f04e; cursor: pointer;" />
-        <div id="maturityDesc" style="font-size:13px; color:#c5f04e; margin-top:14px; font-weight: 800; text-align: center;"></div>
+        <div id="ratingGroups"></div>
+        <div id="ratingSummary" style="font-size:12px; color:#c5f04e; margin-top:12px; font-weight:700;"></div>
       </div>
 
       <div id="pinFieldWrap" style="margin-bottom: 24px; background:#080a10; border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:16px; ${pKids ? 'display:none;' : ''}">
@@ -575,39 +630,63 @@ export function openProfileEditor(editingProfile?: HouseholdProfile, onClose?: (
     });
   });
 
-  const slider = modal.querySelector('#editMaturitySlider') as HTMLInputElement | null;
-  const matDesc = modal.querySelector('#maturityDesc') as HTMLElement | null;
+  const ratingGroups = modal.querySelector('#ratingGroups') as HTMLElement | null;
+  const ratingSummary = modal.querySelector('#ratingSummary') as HTMLElement | null;
   const pinWrap = modal.querySelector('#pinFieldWrap') as HTMLElement | null;
 
-  // Tiers are expressed in TV Parental Guidelines ratings only, because those
-  // are what actually gate (see filterRailsForGatedProfile in db.ts). The old
-  // labels promised MPAA levels the gate never delivered: "Older Kids (PG)"
-  // could not show PG because a hard cap clamped every kids profile to TV-G,
-  // and "Teen (TV-14)" was clamped to the same place, making it identical to
-  // Older Kids. Anything MPAA-rated is now opt-in per title instead.
-  const RATING_MAP = ['TV-Y', 'TV-G', 'TV-14', ''];
-  const DESC_MAP = [
-    'Little Kids (TV-Y · ages 2-6)',
-    'Older Kids (TV-Y7 / TV-G · ages 7+)',
-    'Teen (TV-PG / TV-14 · ages 14+)',
-    'Adult (No Limit)',
-  ];
 
-  if (slider && matDesc) {
-    if (pRating === 'TV-Y' || pRating === 'TV-Y7' || pRating === 'TV-G' || pRating === 'G') slider.value = '0';
-    else if (pRating === 'PG' || pRating === 'TV-PG') slider.value = '1';
-    else if (pRating === 'TV-14' || pRating === 'PG-13') slider.value = '2';
-    else slider.value = '3';
-    if (pKids && !pRating) slider.value = '0'; // default kids
+  // Selected ratings, seeded from the profile's explicit set or, for a profile
+  // saved before the change, by expanding its old ceiling.
+  const selected = new Set<string>(allowedRatingsFor(editingProfile ?? { max_rating: pRating }) ?? []);
+  if (!editingProfile && pKids && !selected.size) selected.add('TV-Y');
 
-    const updateSlider = () => {
-      const val = parseInt(slider.value, 10);
-      matDesc.textContent = DESC_MAP[val] || '';
-      matDesc.style.color = val === 3 ? '#ff6b6b' : '#c5f04e';
-      if (pinWrap) pinWrap.style.display = val < 3 ? 'none' : '';
+  const KID_ONLY = new Set(['TV-Y', 'TV-Y7', 'TV-Y7-FV', 'TV-G', 'TV-PG']);
+
+  if (ratingGroups && ratingSummary) {
+    ratingGroups.innerHTML = RATING_GROUPS.map((g) => `
+      <div style="margin-bottom:14px;">
+        <div style="font-size:11px;font-weight:800;color:#9aa5b5;letter-spacing:.06em;text-transform:uppercase;">${escapeHtml(g.system)}</div>
+        <div style="font-size:11px;color:#7C828C;margin:2px 0 8px;line-height:1.45;">${escapeHtml(g.note)}</div>
+        ${g.ratings.map((r) => `
+          <label style="display:flex;align-items:center;gap:9px;padding:6px 4px;cursor:pointer;font-size:12.5px;">
+            <input type="checkbox" data-rating="${r.code}" style="accent-color:#c5f04e;width:15px;height:15px;cursor:pointer;" />
+            <span>${escapeHtml(r.label)}</span>
+          </label>`).join('')}
+      </div>`).join('');
+
+    const boxes = Array.from(ratingGroups.querySelectorAll<HTMLInputElement>('input[data-rating]'));
+    const paint = () => {
+      for (const b of boxes) b.checked = selected.has(b.dataset.rating!);
+      const n = selected.size;
+      ratingSummary.textContent = n === 0
+        ? 'No restriction — this profile can watch everything.'
+        : `${n} rating${n === 1 ? '' : 's'} allowed`;
+      ratingSummary.style.color = n === 0 ? '#ff6b6b' : '#c5f04e';
+      if (pinWrap) pinWrap.style.display = n === 0 ? '' : 'none';
     };
-    slider.addEventListener('input', updateSlider);
-    updateSlider();
+
+    for (const b of boxes) {
+      b.addEventListener('change', async () => {
+        const code = b.dataset.rating!;
+        if (!b.checked) { selected.delete(code); paint(); return; }
+
+        // Warn once when an MPAA letter is added to an otherwise kid-rated
+        // profile. The letters are not interchangeable with the TV ones: PG-13
+        // did not exist until 1984, so pre-1984 PG absorbed what would now be
+        // PG-13, and we hold no release year for most of the catalog.
+        const kidProfile = [...selected].every((r) => KID_ONLY.has(r)) && selected.size > 0;
+        const isMpaa = !r_isTv(code);
+        if (isMpaa && kidProfile && !localStorage.getItem('veedeeoh_mpaa_warning_ack')) {
+          b.checked = false;
+          const ok = await mpaaWarning(code);
+          if (!ok) { paint(); return; }
+          b.checked = true;
+        }
+        selected.add(code);
+        paint();
+      });
+    }
+    paint();
   }
 
   let clearPinRequested = false;
@@ -656,12 +735,14 @@ export function openProfileEditor(editingProfile?: HouseholdProfile, onClose?: (
         return;
       }
 
-      const val = parseInt((modal.querySelector('#editMaturitySlider') as HTMLInputElement).value, 10);
       // is_kids drives the kids CHROME (bright theme, stripped sidebar), not the
-      // content gate -- that is max_rating now. A teen should not get the
-      // preschool skin, so only the first two tiers count as kids.
-      const isKids = val < 2;
-      const maxRating = RATING_MAP[val] || null;
+      // content gate -- allowed_ratings does that. A profile limited to the two
+      // youngest TV ratings gets the kids skin; anything broader does not.
+      const allowedList = [...selected];
+      const isKids = allowedList.length > 0 && allowedList.every((r) => r === 'TV-Y' || r === 'TV-Y7' || r === 'TV-Y7-FV');
+      // max_rating is kept in sync as a coarse legacy value for anything still
+      // reading it; allowed_ratings is the source of truth.
+      const maxRating = allowedList.length ? (allowedList.includes('TV-14') ? 'TV-14' : allowedList.includes('TV-G') || allowedList.includes('TV-PG') ? 'TV-G' : 'TV-Y') : null;
 
       const rawPin = ((modal.querySelector('#editPin') as HTMLInputElement | null)?.value || '').trim();
       let pin: string | null | undefined = undefined;
@@ -684,8 +765,8 @@ export function openProfileEditor(editingProfile?: HouseholdProfile, onClose?: (
         pin = await hashPin(rawPin);
       }
 
-      const fields: { name: string; avatar_color: string; avatar_url: string | null; is_kids: boolean; max_rating: string | null; pin?: string | null } =
-        { name: nameInput, avatar_color: selectedColor, avatar_url: selectedAvatarUrl || null, is_kids: isKids, max_rating: maxRating };
+      const fields: { name: string; avatar_color: string; avatar_url: string | null; is_kids: boolean; max_rating: string | null; allowed_ratings: string[] | null; pin?: string | null } =
+        { name: nameInput, avatar_color: selectedColor, avatar_url: selectedAvatarUrl || null, is_kids: isKids, max_rating: maxRating, allowed_ratings: allowedList.length ? allowedList : null };
       if (pin !== undefined) fields.pin = pin;
 
       (saveBtn as HTMLButtonElement).disabled = true;
