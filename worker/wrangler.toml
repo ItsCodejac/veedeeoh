@@ -1,0 +1,12 @@
+name = "veedeeoh-party"
+main = "party.ts"
+compatibility_date = "2026-08-01"
+
+# Durable Objects require the paid Workers plan. Nothing else here does.
+[[durable_objects.bindings]]
+name = "PARTY"
+class_name = "Party"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["Party"]

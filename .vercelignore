@@ -17,3 +17,6 @@ frontend/vercel.json
 # Local secrets. Vercel injects its own env vars; this should never be uploaded.
 .env
 *.env
+
+# Cloudflare Worker: deployed with wrangler, not Vercel.
+worker/

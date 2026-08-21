@@ -9,8 +9,19 @@ import Stripe from "stripe";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 let _stripe: Stripe | null = null;
+// Pin the API version. Unpinned, the SDK follows the account default -- so
+// Stripe upgrading that default silently changes payload shapes with no deploy
+// on our side. current_period_end already moved onto subscription items once;
+// the next such move should be a deliberate upgrade, not a surprise. Bump this
+// intentionally after reading the changelog.
+const STRIPE_API_VERSION = "2026-06-24.dahlia";
+
 export function getStripe(): Stripe {
-  if (!_stripe) _stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
+  if (!_stripe) {
+    _stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
+      apiVersion: STRIPE_API_VERSION as Stripe.LatestApiVersion,
+    });
+  }
   return _stripe;
 }
 
