@@ -6,7 +6,8 @@
     "build": "cd frontend && npm install && npm run build",
     "deploy": "vercel --prod",
     "warm": "node scripts/warm.mjs",
-    "veedeeoh": "node scripts/veedeeoh.mjs"
+    "veedeeoh": "node scripts/veedeeoh.mjs",
+    "stripe:sync": "bash scripts/sync-stripe-env.sh"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",
