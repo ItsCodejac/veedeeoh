@@ -289,20 +289,32 @@ async function decidedIds() {
   return map;
 }
 
-/** Candidates are whatever the current automatic filter surfaces for Kids. It is
- *  a reasonable pool because it is already maturity-gated -- but it decides
- *  nothing. The thing that was wrong as a GATE is fine as a SUGGESTION. */
+const TV_RATINGS = new Set(["TV-Y", "TV-Y7", "TV-Y7-FV", "TV-G", "TV-PG", "TV-14", "TV-MA"]);
+
+/** The queue is the OPT-IN pool: titles a restricted profile cannot see on its
+ *  own. TV-rated content within a tier's ceiling is already admitted
+ *  automatically, so approving it would be busywork -- Bluey is in whether or
+ *  not anyone clicks. What needs a human is everything the rating system cannot
+ *  vouch for: MPAA letters, whose meaning moved when PG-13 arrived in 1984, and
+ *  unrated titles.
+ *
+ *  Narrowed to titles that could plausibly be for children, by rating or genre,
+ *  so the queue is a few hundred rather than two thousand. */
 async function curateQueue() {
   const j = await (await fetch(`${SITE}/api/vod`)).json();
-  const rails = (j.rails || []).filter((r) => /kid|famil/i.test(r.name || ""));
   const seen = new Set(), pool = [];
-  for (const rail of rails) {
+  for (const rail of j.rails || []) {
     for (const it of rail.items || []) {
       if (seen.has(it.id)) continue;
       seen.add(it.id);
+      const rating = (it.rating || "").toUpperCase();
+      if (TV_RATINGS.has(rating)) continue;                    // already auto-admitted or auto-excluded
+      const plausible = rating === "G" || /kids|famil|animation|anime/i.test(it.genre || "");
+      if (!plausible) continue;                                 // R-rated thrillers are not candidates
       pool.push(it);
     }
   }
+  pool.sort((a, b) => (a.rating === "G" ? -1 : 0) - (b.rating === "G" ? -1 : 0));
   const decided = await decidedIds();
   const link = (it) => {
     const id = String(it.id || "");

@@ -70,9 +70,19 @@
   <div class="card" style="grid-column:1/-1">
     <h2>Kids curation</h2>
     <div class="muted" style="margin-top:0">
-      Nothing reaches a restricted profile unless it is approved here. Judge the title, not the
-      string: watch it if you are unsure. Candidates come from the automatic filter, which is a
-      reasonable suggestion and a terrible gate.
+      These are titles a restricted profile <b>cannot see on its own</b>. TV-rated content is already
+      admitted automatically, so it is not here &mdash; what needs you is everything the rating system
+      cannot vouch for: MPAA letters, whose meaning moved when PG-13 was introduced in 1984, and
+      unrated titles. <i>The War of the Worlds</i> (1953) is rated G.
+      <div style="margin-top:10px;display:flex;gap:26px;flex-wrap:wrap">
+        <span><b style="color:var(--accent)">Little</b> &mdash; ages 2&ndash;6. Nothing frightening.
+          The TV-Y bar: appropriate for all children, not expected to scare a toddler.</span>
+        <span><b style="color:var(--accent)">Older</b> &mdash; ages 7&ndash;12. The TV-Y7 bar:
+          mild fantasy or comedic violence is fine, real menace is not.</span>
+        <span><b>No</b> &mdash; not for children. Leaves the queue for good.</span>
+      </div>
+      <div style="margin-top:8px">Watch anything you are unsure about. Judging by title is how a
+      denylist once certified racist wartime cartoons as TV-Y7.</div>
     </div>
     <div id="curStats" class="muted"></div>
     <div id="curGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;margin-top:14px"></div>
@@ -266,8 +276,8 @@ function renderCurate() {
         <a href="${escapeHtml(c.watchUrl)}" target="_blank" rel="noreferrer"
            style="font-size:11.5px;color:var(--accent);text-decoration:none">Watch before deciding &rarr;</a>
         <div style="display:flex;gap:5px;margin-top:auto;padding-top:8px">
-          <button onclick="decide('${escapeHtml(c.id)}','little','${c.kind}')" style="flex:1;padding:6px 4px;font-size:11px;border-radius:7px">Little</button>
-          <button onclick="decide('${escapeHtml(c.id)}','older','${c.kind}')" style="flex:1;padding:6px 4px;font-size:11px;border-radius:7px">Older</button>
+          <button onclick="decide('${escapeHtml(c.id)}','little','${c.kind}')" style="flex:1;padding:6px 4px;font-size:11px;border-radius:7px">Little<div style="font-weight:500;font-size:9.5px;opacity:.7">2&ndash;6</div></button>
+          <button onclick="decide('${escapeHtml(c.id)}','older','${c.kind}')" style="flex:1;padding:6px 4px;font-size:11px;border-radius:7px">Older<div style="font-weight:500;font-size:9.5px;opacity:.7">7&ndash;12</div></button>
           <button class="ghost" onclick="decide('${escapeHtml(c.id)}','no','${c.kind}')" style="flex:1;padding:6px 4px;font-size:11px;border-radius:7px">No</button>
         </div>
       </div>

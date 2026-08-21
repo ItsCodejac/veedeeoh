@@ -3,7 +3,7 @@ import { state } from "./state";
 import type { Stream, VodItem, VodEpisode, VodRail } from "./types";
 import { escapeHtml, $, setupHorizontalScroll, buildBrandLoader, buildRailSkeleton, showToast } from "./util";
 import { getActiveProfile, getStoredProfiles } from "./profiles";
-import { maturityCeiling, filterRailsByMaturity, filterRailsForKids, isKidsSafeItem, addFavorite, removeFavorite, getWatchHistory, listExclusions, listApprovedContent, filterRailsForGatedProfile, allowForAge, excludeFromProfile, unexcludeFromProfile } from "./db";
+import { maturityCeiling, addFavorite, removeFavorite, getWatchHistory, listExclusions, listApprovedContent, filterRailsForGatedProfile, tvMaturity, allowForAge, excludeFromProfile, unexcludeFromProfile } from "./db";
 import { openVodPlayer } from "./vodplayer";
 
 // The active profile's real Supabase id (null for local/unsynced placeholders).
@@ -1145,7 +1145,17 @@ export async function renderKids(container: HTMLElement): Promise<void> {
       const res = await fetchVod();
       if (res.rails?.length) cachedVodRails = res.rails;
     }
-    const kidsRails = sortRailsByTaste(filterRailsForKids(cachedVodRails || []));
+    // The kids view must go through the SAME gate as everything else. It used to
+    // filter the raw cache with the genre matcher, which skipped the TV-rating
+    // ceiling, the household's approvals and its exclusions -- a gate bypassed by
+    // the one route built specifically for children.
+    const kp = getActiveProfile();
+    const kidsCeiling = Math.min(2, kp.max_rating ? maturityCeiling(kp.max_rating) : 2);
+    const kidsApproved = await approvedFor(kidsCeiling);
+    const kidsExcluded = await exclusionsFor(kp.id);
+    const kidsRails = sortRailsByTaste(
+      applyExclusions(filterRailsForGatedProfile(cachedVodRails || [], kidsCeiling, kidsApproved), kidsExcluded),
+    );
     loading.remove();
 
     const title = document.createElement("div");
@@ -1248,9 +1258,21 @@ export async function renderHome(): Promise<void> {
       }
     }
 
-    // Belt-and-suspenders: a kids profile only ever sees kid-safe resume cards.
-    if (getActiveProfile().is_kids) {
-      resumeHistory = resumeHistory.filter((x: any) => isKidsSafeItem(x));
+    // Resume cards go through the same gate as the catalog. Rows carry the full
+    // item under vodItem, so the TV rating is available; a row with no usable
+    // rating fails closed on a gated profile rather than being shown.
+    const rp = getActiveProfile();
+    if (rp.max_rating) {
+      const rCeiling = maturityCeiling(rp.max_rating);
+      const rApproved = await approvedFor(rCeiling);
+      const rExcluded = await exclusionsFor(rp.id);
+      resumeHistory = resumeHistory.filter((x: any) => {
+        const id = String(x.id ?? x.itemId ?? "");
+        if (rExcluded.has(id)) return false;
+        if (rApproved.has(id)) return true;
+        const m = tvMaturity(x.vodItem?.rating ?? x.rating);
+        return m !== null && m <= rCeiling;
+      });
     }
 
     if (resumeHistory.length > 0) {
