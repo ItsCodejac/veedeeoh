@@ -364,6 +364,56 @@ function setupParentControls(item: VodItem): void {
   };
 }
 
+// Watch Party: host a title for other people. Account-level, so it is absent on
+// kids profiles rather than merely hidden -- and the server checks again.
+async function setupWatchPartyButton(item: VodItem): Promise<void> {
+  document.getElementById("vdPartyBtn")?.remove();
+  const party = await import("./party");
+  if (!(await party.canHost())) return;
+
+  const anchorBtn = document.getElementById("vdParentBtn")
+    || document.getElementById("vdMyListBtn")
+    || document.getElementById("vdPlayBtn");
+  if (!anchorBtn?.parentElement) return;
+
+  const btn = document.createElement("button");
+  btn.id = "vdPartyBtn";
+  btn.className = anchorBtn.className;
+  btn.style.cssText = "background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);color:#fff;display:inline-flex;align-items:center;gap:8px;";
+  btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>Watch Party`;
+  anchorBtn.parentElement.insertBefore(btn, anchorBtn.nextSibling);
+
+  btn.onclick = async () => {
+    btn.disabled = true;
+    try {
+      const seatsRaw = prompt("How many people can join? Leave blank for no limit.");
+      if (seatsRaw === null) return;
+      const seatLimit = seatsRaw.trim() ? Math.max(1, parseInt(seatsRaw, 10) || 0) : null;
+      const password = prompt("Password to join? Leave blank for none.")?.trim() || null;
+
+      const { joinCode, link } = await party.createParty({
+        contentId: String(item.id),
+        streamIdx: 0,
+        title: item.title,
+        seatLimit,
+        password,
+      });
+
+      // Open the title, then take the host seat on the sync channel.
+      const streams = (item as any).streams || (item.url ? [{ url: item.url, quality: null, source: item.genre || "Party" }] : []);
+      await openVodPlayer(asChannel(item, streams as any), 0);
+      party.hostExisting(joinCode, seatLimit);
+
+      try { await navigator.clipboard.writeText(link); showToast("Party link copied — share it"); }
+      catch { showToast(`Party code ${joinCode}`); }
+    } catch (e: any) {
+      showToast(e?.message || "Couldn't start the party");
+    } finally {
+      btn.disabled = false;
+    }
+  };
+}
+
 // "My List" toggle in the detail view — injected next to the Play button so it
 // needs no index.html change. Optimistic UI + per-profile Supabase persistence.
 function setupMyListButton(item: VodItem): void {
@@ -483,6 +533,7 @@ export async function openVodDetails(item: VodItem): Promise<void> {
 
   setupMyListButton(item);
   setupParentControls(item);
+  void setupWatchPartyButton(item);
 
   const selectContainer = $("vdSelectorContainer");
   const select = $<HTMLSelectElement>("vdSeasonSelect");

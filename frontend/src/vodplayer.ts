@@ -150,6 +150,14 @@ class VodPlayer {
 
   pause(): void { try { this.player?.pause(); } catch {} }
 
+  /** Escape hatch for the party sync layer only. */
+  raw(): any { return this.player; }
+
+  private emitParty = (): void => {
+    if (!partyEmit || applyingRemote || !this.player) return;
+    partyEmit({ positionSecs: this.player.currentTime ?? 0, paused: !!this.player.paused });
+  };
+
   setMode(mode: "full" | "mini"): void {
     this.mode = mode;
     this.overlay.style.cssText = mode === "mini" ? MINI_CSS : FULL_CSS;
@@ -393,6 +401,15 @@ class VodPlayer {
       }
     });
 
+    // Host broadcasts on the events that actually change what others should see,
+    // plus a heartbeat so drift self-corrects and a late joiner is never more
+    // than five seconds stale.
+    on("play", this.emitParty);
+    on("pause", this.emitParty);
+    on("seeked", this.emitParty);
+    const beat = setInterval(this.emitParty, 5000);
+    this.ac.signal.addEventListener("abort", () => clearInterval(beat));
+
     on("ended", () => {
       markWatched(this.ch.streams?.[this.idx]?.id);
       if (this.idx + 1 < (this.ch.streams?.length || 0)) this.load(this.idx + 1);
@@ -448,6 +465,33 @@ class VodPlayer {
       }).catch(() => {});
     }
   }
+}
+
+// ---- Watch Party hooks ----------------------------------------------------
+// Kept as a narrow surface so party.ts never reaches into the player: the host
+// emits its position, a viewer applies one. Nothing else crosses the boundary.
+export interface PartyPlaybackState { positionSecs: number; paused: boolean }
+let partyEmit: ((s: PartyPlaybackState) => void) | null = null;
+let applyingRemote = false;
+
+/** Host side: called on play, pause, seek and every 5s while playing. */
+export function setPartyEmitter(fn: ((s: PartyPlaybackState) => void) | null): void {
+  partyEmit = fn;
+}
+
+/** Viewer side: reconcile against the host. Tolerates 2s of drift so ordinary
+ *  buffering does not cause a seek storm, and suppresses the echo so applying a
+ *  remote state never emits it straight back. */
+export function applyPartyState(s: PartyPlaybackState): void {
+  const p = current?.raw();
+  if (!p) return;
+  applyingRemote = true;
+  try {
+    if (Math.abs((p.currentTime ?? 0) - s.positionSecs) > 2) p.currentTime = s.positionSecs;
+    if (s.paused && !p.paused) p.pause();
+    else if (!s.paused && p.paused) void p.play()?.catch?.(() => {});
+  } catch { /* player torn down mid-apply */ }
+  applyingRemote = false;
 }
 
 let current: VodPlayer | null = null;

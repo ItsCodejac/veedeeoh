@@ -189,6 +189,16 @@ async function boot(): Promise<void> {
     hideBootSplash();
   }
 
+  // A party link lands here: ?party=CODE. Handled after the profile is resolved,
+  // so the joining profile's rating limits are known before anything plays.
+  const partyCode = new URLSearchParams(location.search).get("party");
+  if (partyCode) {
+    const { joinParty } = await import("./party");
+    const pw = new URLSearchParams(location.search).get("pw") || undefined;
+    void joinParty(partyCode.toUpperCase(), pw);
+    history.replaceState({}, "", location.pathname);
+  }
+
   // Stripe Checkout return
   const billingStatus = new URLSearchParams(window.location.search).get("billing");
   if (billingStatus === "success") {
