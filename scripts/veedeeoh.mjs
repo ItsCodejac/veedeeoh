@@ -375,7 +375,10 @@ const routes = {
   "POST /api/feedback/update": (u, b) => updateFeedback(b),
 };
 
-const UI = readFileSync(join(REPO, "scripts", "veedeeoh-panel.html"), "utf8");
+// Read per request, not once at startup: this is a local tool, the file is
+// ~15KB, and reading it once meant every edit to the panel needed a server
+// restart to show up.
+const uiPath = join(REPO, "scripts", "veedeeoh-panel.html");
 
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
@@ -398,10 +401,23 @@ const server = createServer(async (req, res) => {
     return;
   }
   res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-  res.end(UI.replace("__PAID_TIERS__", JSON.stringify(PAID)).replace("__SITE__", SITE));
+  res.end(readFileSync(uiPath, "utf8").replace("__PAID_TIERS__", JSON.stringify(PAID)).replace("__SITE__", JSON.stringify(SITE)));
 });
 
 const PORT = Number(process.env.VEEDEEOH_PORT) || 8787;
+
+// A second launch used to dump an unhandled EADDRINUSE stack trace. Say what is
+// actually going on instead.
+server.on("error", (err) => {
+  if (err.code === "EADDRINUSE") {
+    console.error(`\n  Port ${PORT} is already in use -- the control panel is probably already running.`);
+    console.error(`  Open http://localhost:${PORT}, or stop the other instance and re-run.`);
+    console.error(`  (VEEDEEOH_PORT=8788 veedeeoh starts a second one on another port.)\n`);
+  } else {
+    console.error("\n  Could not start the control panel:", err.message, "\n");
+  }
+  process.exit(1);
+});
 server.listen(PORT, "127.0.0.1", () => {
   const at = `http://localhost:${PORT}`;
   console.log(`\n  veedeeoh control panel  ${at}`);

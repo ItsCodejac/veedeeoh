@@ -97,7 +97,32 @@
 const PAID = __PAID_TIERS__;
 document.getElementById('target').textContent = __SITE__;
 const $ = (id) => document.getElementById(id);
-const j = (u, o) => fetch(u, o).then(r => r.json());
+// Never hang on a placeholder. If the local server is not running -- which
+// happens the moment you close the terminal that started it -- say so plainly
+// instead of leaving every panel stuck on "loading...".
+let offline = false;
+function showOffline(msg) {
+  if (offline) return;
+  offline = true;
+  const bar = document.createElement('div');
+  bar.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:999;background:#3a1d1d;border-bottom:1px solid #ff6b6b;color:#ffb4b4;padding:11px 18px;font:600 13px "Space Grotesk",sans-serif;';
+  bar.innerHTML = 'Control panel server is not responding &mdash; ' + msg +
+    '. Restart it with <code style="color:#fff">veedeeoh</code> in a terminal, then reload this page.';
+  document.body.prepend(bar);
+  document.querySelectorAll('.muted, .dim').forEach(el => {
+    if (/loading|checking/i.test(el.textContent || '')) el.textContent = 'unavailable';
+  });
+}
+const j = async (u, o) => {
+  try {
+    const r = await fetch(u, o);
+    if (!r.ok) { showOffline('HTTP ' + r.status + ' on ' + u); return { error: 'HTTP ' + r.status }; }
+    return await r.json();
+  } catch (e) {
+    showOffline(e.message || 'connection refused');
+    return { error: e.message || 'offline' };
+  }
+};
 const row = (k, v) => `<div class="row"><span class="dim">${k}</span><b>${v}</b></div>`;
 
 async function loadCatalog() {
