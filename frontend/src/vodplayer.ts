@@ -157,10 +157,34 @@ export async function openVodPlayer(ch: any, streamIdx: number, startTime = 0): 
     };
     overlay.appendChild(closeBtn);
 
+    // Native Picture-in-Picture: the OS-level window that floats above every
+    // other app. Distinct from our in-page mini-player, which is just a scaled
+    // overlay. Chrome only surfaces native PiP via a double right-click on the
+    // <video>, and this overlay's own chrome sits on top of it and swallows
+    // that, so expose an explicit button. Firefox injects its own toggle, which
+    // is why it appeared to work there and not here.
+    const pipBtn = document.createElement("button");
+    pipBtn.id = "vodNativePipBtn";
+    pipBtn.setAttribute("aria-label", "Pop out video");
+    pipBtn.title = "Pop out (Picture-in-Picture)";
+    pipBtn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><rect x="12" y="12" width="8" height="6" rx="1" fill="currentColor" stroke="none"></rect></svg>`;
+    pipBtn.style.cssText = "position:absolute;top:20px;right:20px;z-index:60;display:none;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;border:none;background:rgba(0,0,0,0.55);color:#fff;cursor:pointer;";
+    pipBtn.onclick = async (e) => {
+      e.stopPropagation();
+      try {
+        if (player?.state?.pictureInPicture) await player.exitPictureInPicture();
+        else await player?.enterPictureInPicture();
+      } catch (err) {
+        console.warn("[vodplayer] picture-in-picture request failed:", err);
+      }
+    };
+    overlay.appendChild(pipBtn);
+
     // Dynamic styling for PiP close button
     const style = document.createElement("style");
     style.innerHTML = `
       #vodPlayerOverlay.mini-player #vodPiPCloseBtn { display: flex !important; }
+      #vodPlayerOverlay.mini-player #vodNativePipBtn { display: none !important; }
       #vodPlayerOverlay.mini-player:hover { cursor: pointer; transform: scale(1.02); transition: transform 0.2s; }
     `;
     overlay.appendChild(style);
@@ -267,7 +291,12 @@ export async function openVodPlayer(ch: any, streamIdx: number, startTime = 0): 
   // Hide the loader only once media can actually play. provider-change fires
   // before a single byte is fetched, so hiding there made every load failure
   // look like a working player in front of a black screen.
-  const hideLoader = () => { loader.style.display = "none"; };
+  const hideLoader = () => {
+    loader.style.display = "none";
+    // canPictureInPicture is only meaningful once a provider is attached.
+    const pip = document.getElementById("vodNativePipBtn");
+    if (pip && player?.state?.canPictureInPicture) pip.style.display = "flex";
+  };
   player.addEventListener("can-play", hideLoader);
   player.addEventListener("playing", hideLoader);
 
