@@ -4009,3 +4009,50 @@ body.kids-mode { --brand-accent: #ff9f1c; }
 .inlineLoaderBounce span:nth-child(2) { background: #7e8792; animation-delay: 0.1s; }
 .inlineLoaderBounce span:nth-child(3) { background: #4a5058; animation-delay: 0.2s; }
 .inlineLoaderSpin { width: 32px; height: 32px; animation: vdSpin 0.9s linear infinite; }
+
+/* Install prompt: a quiet sidebar row above the profile, not an overlay banner.
+   Sits alongside .sidebar-user and borrows its shape so it reads as part of the
+   sidebar furniture rather than an interruption. */
+.sidebar-install {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(197,240,78,0.25);
+  background: rgba(197,240,78,0.06);
+  overflow: hidden;
+}
+.sidebar-install-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+  background: none;
+  border: none;
+  color: var(--accent, #c5f04e);
+  font: 600 13px/1.2 'Space Grotesk', sans-serif;
+  cursor: pointer;
+  text-align: left;
+}
+.sidebar-install-main span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar-install-main:hover { background: rgba(197,240,78,0.12); }
+.sidebar-install-dismiss {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  align-self: stretch;
+  background: none;
+  border: none;
+  color: #7C828C;
+  cursor: pointer;
+}
+.sidebar-install-dismiss:hover { color: #fff; background: rgba(255,255,255,0.08); }

@@ -9,77 +9,64 @@ export function initPWA(): void {
     return;
   }
 
+  // Chrome fires beforeinstallprompt; Firefox desktop never will, since it does
+  // not implement PWA install at all. iOS Safari does not either, hence the
+  // manual how-to modal below.
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
-    showPWABanner();
+    showInstallEntry();
   });
 
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-  const dismissed = localStorage.getItem('veedeeoh_pwa_dismissed');
-
-  if (!dismissed) {
-    setTimeout(() => {
-      if (isIOS || deferredPrompt) {
-        showPWABanner();
-      }
-    }, 2000);
-  }
+  if (isIOS) showInstallEntry();
 
   injectIOSModal();
 }
 
-export function showPWABanner(): void {
-  if (document.getElementById('pwaInstallBanner')) return;
+/** A quiet, persistent entry in the sidebar directly above the profile, rather
+ *  than a banner that covers content. It was interrupting on every load; an
+ *  install prompt is not urgent enough to earn that. Dismissing hides it for
+ *  good, and it never appears once the app is already installed. */
+export function showInstallEntry(): void {
+  if (document.getElementById('pwaInstallEntry')) return;
+  if (localStorage.getItem('veedeeoh_pwa_dismissed')) return;
+
+  const sidebarUser = document.getElementById('sidebarUser');
+  if (!sidebarUser || !sidebarUser.parentElement) return;
 
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
 
-  const banner = document.createElement('div');
-  banner.id = 'pwaInstallBanner';
-  banner.className = 'pwa-install-banner';
-  banner.innerHTML = `
-    <div class="pwa-banner-icon">
-      <img src="/icon-192.png" alt="veedeeoh.">
-    </div>
-    <div class="pwa-banner-text">
-      <strong>Install veedeeoh.</strong>
-      <span>Add to Home Screen for fast, full-screen playback</span>
-    </div>
-    <div class="pwa-banner-actions">
-      <button id="pwaInstallBtn" class="pwa-install-btn">${isIOS ? 'Add to Home' : 'Install'}</button>
-      <button id="pwaDismissBtn" class="pwa-dismiss-btn" title="Close">✕</button>
-    </div>
-  `;
+  const entry = document.createElement('div');
+  entry.id = 'pwaInstallEntry';
+  entry.className = 'sidebar-install';
+  entry.innerHTML = `
+    <button class="sidebar-install-main" id="pwaInstallBtn" title="Install veedeeoh. as an app">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+      <span>${isIOS ? 'Add to Home Screen' : 'Install app'}</span>
+    </button>
+    <button class="sidebar-install-dismiss" id="pwaDismissBtn" title="Don't show again" aria-label="Dismiss">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+    </button>`;
 
-  document.body.appendChild(banner);
+  sidebarUser.parentElement.insertBefore(entry, sidebarUser);
 
-  const installBtn = document.getElementById('pwaInstallBtn');
-  const dismissBtn = document.getElementById('pwaDismissBtn');
+  document.getElementById('pwaInstallBtn')?.addEventListener('click', () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then((choice: any) => {
+        if (choice.outcome === 'accepted') entry.remove();
+        deferredPrompt = null;
+      });
+    } else {
+      openIOSModal();
+    }
+  });
 
-  if (installBtn) {
-    installBtn.addEventListener('click', () => {
-      if (deferredPrompt) {
-        deferredPrompt.prompt();
-        deferredPrompt.userChoice.then((choice: any) => {
-          if (choice.outcome === 'accepted') {
-            banner.remove();
-          }
-          deferredPrompt = null;
-        });
-      } else if (isIOS) {
-        openIOSModal();
-      } else {
-        openIOSModal();
-      }
-    });
-  }
-
-  if (dismissBtn) {
-    dismissBtn.addEventListener('click', () => {
-      localStorage.setItem('veedeeoh_pwa_dismissed', '1');
-      banner.remove();
-    });
-  }
+  document.getElementById('pwaDismissBtn')?.addEventListener('click', () => {
+    localStorage.setItem('veedeeoh_pwa_dismissed', '1');
+    entry.remove();
+  });
 }
 
 function injectIOSModal(): void {
