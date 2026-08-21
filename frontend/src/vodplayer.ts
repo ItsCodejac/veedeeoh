@@ -34,6 +34,17 @@ const proxied = (u: string) => `/proxy?url=${encodeURIComponent(u)}`;
 // are unaffected and stay on the direct CDN path.
 const playable = (u: string) => (/(^|\.)pluto\.tv\//.test(u) ? proxied(u) : u);
 
+// Vidstack chooses its provider by sniffing the file extension
+// (HLS_VIDEO_EXTENSIONS = /\.(m3u8)($|\?)/i). Wrapping a URL in /proxy?url=...
+// percent-encodes the ".m3u8?" to ".m3u8%3F", so the sniff misses, Vidstack
+// falls back to a plain <video> source and the load fails with code 4
+// (MEDIA_ERR_SRC_NOT_SUPPORTED). Declaring the MIME type skips the sniff.
+// Non-HLS sources stay plain strings so their existing detection is untouched.
+function toSource(rawUrl: string): string | { src: string; type: "application/x-mpegurl" } {
+  const src = playable(rawUrl);
+  return /\.m3u8($|\?)/i.test(rawUrl) ? { src, type: "application/x-mpegurl" as const } : src;
+}
+
 // Continue Watching is stored PER PROFILE so a kids profile never sees an adult
 // profile's resume cards. This key must match the one vod.ts reads to render the rail.
 function resumeHistoryKey(): string {
@@ -202,7 +213,7 @@ export async function openVodPlayer(ch: any, streamIdx: number, startTime = 0): 
     if (!s) { closeVodPlayer(); return; }
     if (player) {
       player.title = s.source ? `${ch.name} · ${s.source}` : ch.name;
-      player.src = playable(s.url);
+      player.src = toSource(s.url);
     }
   };
 
@@ -210,7 +221,7 @@ export async function openVodPlayer(ch: any, streamIdx: number, startTime = 0): 
     player = await VidstackPlayer.create({
       target: playerContainer,
       title: first.source ? `${ch.name} · ${first.source}` : ch.name,
-      src: playable(first.url),
+      src: toSource(first.url),
       autoplay: true,
       currentTime: startTime,
       layout: new VidstackPlayerLayout(),
