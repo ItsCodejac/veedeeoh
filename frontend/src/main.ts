@@ -357,6 +357,81 @@ function wireSidebar(): void {
   window.addEventListener("veedeeoh:sections-changed", () => void mountSections());
   window.addEventListener("veedeeoh:profile-changed", () => void mountSections());
 
+  // ---- Mobile overflow sheet -------------------------------------------
+  // On phones the sidebar becomes a bottom bar where every .navBtn is flex:1,
+  // so each addition -- kids shortcut, custom sections, feedback, install --
+  // squeezes the rest. Four destinations stay in the bar; everything else opens
+  // from here. Entries forward to the real controls rather than duplicating
+  // their behaviour, so there is still one source of truth for each action.
+  const buildMobileSheet = () => {
+    document.getElementById("mobileSheet")?.remove();
+
+    const sheet = document.createElement("div");
+    sheet.id = "mobileSheet";
+    sheet.innerHTML = `<div id="mobileSheetPanel"><div class="grabber"></div></div>`;
+    const panel = sheet.querySelector("#mobileSheetPanel") as HTMLElement;
+    const close = () => sheet.classList.remove("open");
+    sheet.addEventListener("click", (e) => { if (e.target === sheet) close(); });
+
+    const head = (text: string) => {
+      const d = document.createElement("div");
+      d.className = "sheetHead";
+      d.textContent = text;
+      panel.appendChild(d);
+    };
+    const item = (label: string, icon: string, onClick: () => void, danger = false) => {
+      const b = document.createElement("button");
+      b.className = "sheetItem" + (danger ? " danger" : "");
+      b.innerHTML = `${icon}<span>${escapeHtml(label)}</span>`;
+      b.addEventListener("click", () => { close(); onClick(); });
+      panel.appendChild(b);
+    };
+    // Forward to the real sidebar control, so behaviour cannot drift.
+    const forward = (sel: string) => () => document.querySelector<HTMLElement>(sel)?.click();
+
+    const ICON = {
+      kids: `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>`,
+      folder: `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h6l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>`,
+      user: `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+      chat: `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
+      down: `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
+      out: `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`,
+    };
+
+    const sections = Array.from(document.querySelectorAll<HTMLElement>("aside [data-section-id]"));
+    if (sections.length) {
+      head("Your sections");
+      for (const sec of sections) {
+        item(sec.dataset.sectionName || "Section", ICON.folder, () => sec.click());
+      }
+    }
+
+    head("Browse");
+    const kids = document.getElementById("tabKids");
+    if (kids && !kids.hasAttribute("hidden")) item("veedeeoh.kids", ICON.kids, () => kids.click());
+
+    head("Account");
+    item("Switch profile", ICON.user, forward("#sidebarUser"));
+    if (document.getElementById("fbEntry")) item("Report something", ICON.chat, forward("#fbEntry"));
+    if (document.getElementById("pwaInstallEntry")) item("Install app", ICON.down, forward("#pwaInstallEntry .sidebar-install-main"));
+    item("Sign out", ICON.out, forward("#logoutBtn"), true);
+
+    document.body.appendChild(sheet);
+    return sheet;
+  };
+
+  // The "More" button lives in the bar itself, styled by the mobile query.
+  const moreBtn = document.createElement("button");
+  moreBtn.id = "mobileMore";
+  moreBtn.className = "navBtn";
+  moreBtn.title = "More";
+  moreBtn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg><span>More</span>`;
+  moreBtn.addEventListener("click", () => {
+    const sheet = buildMobileSheet();          // rebuilt each open, so new sections appear
+    requestAnimationFrame(() => sheet.classList.add("open"));
+  });
+  document.querySelector("aside")?.appendChild(moreBtn);
+
   const session = getSession();
   const sidebarUser = document.getElementById("sidebarUser");
   const sidebarEmail = document.getElementById("sidebarEmail");

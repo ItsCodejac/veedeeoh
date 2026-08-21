@@ -3719,3 +3719,68 @@ body.kids-mode { --brand-accent: #ff9f1c; }
 .vodQuickBtn:hover { background: var(--accent); color: #06070a; border-color: var(--accent); }
 .vodQuickBtn.on { background: var(--accent); color: #06070a; border-color: var(--accent); }
 @media (hover: none) { .vodQuick { opacity: 1; } }
+
+/* ---- Mobile: primary nav in the bar, everything else behind "More" ----
+   The bottom bar gives each .navBtn flex:1, so every item added -- the kids
+   shortcut, custom sections, feedback, install -- steals width from the rest.
+   Sections are created at runtime, so this only gets worse with use. Four fixed
+   destinations stay in the bar; the rest moves into a sheet. */
+@media (max-width: 600px) {
+  aside #tabKids,
+  aside [data-section-id],
+  aside #pwaInstallEntry,
+  aside #fbEntry,
+  aside .sidebar-install,
+  aside .sidebar-feedback,
+  aside .sidebar-logout { display: none !important; }
+
+  #mobileMore { display: flex !important; }
+}
+#mobileMore { display: none; }
+
+#mobileSheet {
+  position: fixed;
+  inset: 0;
+  z-index: 1600;
+  background: rgba(6, 7, 10, 0.6);
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s ease;
+}
+#mobileSheet.open { opacity: 1; pointer-events: auto; }
+
+#mobileSheetPanel {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  background: #10141e;
+  border-top: 1px solid rgba(255,255,255,.14);
+  border-radius: 18px 18px 0 0;
+  padding: 10px 12px calc(18px + env(safe-area-inset-bottom));
+  max-height: 76vh;
+  overflow-y: auto;
+  transform: translateY(100%);
+  transition: transform .22s cubic-bezier(.16,1,.3,1);
+}
+#mobileSheet.open #mobileSheetPanel { transform: translateY(0); }
+
+#mobileSheetPanel .grabber {
+  width: 38px; height: 4px; border-radius: 2px;
+  background: rgba(255,255,255,.22);
+  margin: 4px auto 12px;
+}
+#mobileSheetPanel .sheetHead {
+  font-size: 11px; font-weight: 800; letter-spacing: .07em;
+  text-transform: uppercase; color: #7C828C;
+  padding: 10px 10px 6px;
+}
+#mobileSheetPanel button.sheetItem {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; padding: 13px 10px;
+  background: none; border: none; border-radius: 10px;
+  color: #fff; font: 600 15px/1 'Space Grotesk', sans-serif;
+  text-align: left; cursor: pointer;
+}
+#mobileSheetPanel button.sheetItem:active { background: rgba(255,255,255,.09); }
+#mobileSheetPanel button.sheetItem.danger { color: #ff3b30; }
+#mobileSheetPanel button.sheetItem svg { flex: none; opacity: .85; }
