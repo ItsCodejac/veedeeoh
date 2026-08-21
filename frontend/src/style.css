@@ -1180,10 +1180,13 @@ select { max-width: 190px; }
 }
 .railAll:hover { color: var(--accent); }
 .railScroll {
+  /* overflow-x:auto makes the other axis compute to auto as well, so this clips
+     vertically. Cards scale 1.04 on hover, so the top padding has to cover half
+     that growth or the top edge of a hovered card is shaved off. */
   display: flex;
   gap: 12px;
   overflow-x: auto;
-  padding: 4px 18px 12px;
+  padding: 12px 18px 12px;
   scrollbar-width: thin;
   scrollbar-color: #2a2c34 transparent;
 }
@@ -1214,7 +1217,11 @@ select { max-width: 190px; }
   transition: transform .1s;
 }
 .vodCard:hover .vodPoster { transform: scale(1.04); outline: 1px solid var(--accent); }
-.vodPoster img { width: 100%; height: 100%; object-fit: cover; }
+/* Posters vary in aspect ratio, and `cover` in a fixed 347:500 frame crops the
+   overflow evenly top and bottom. On a movie poster that top strip is the
+   credits block and often the title, so anchor to the top and let any crop come
+   off the bottom instead. */
+.vodPoster img { width: 100%; height: 100%; object-fit: cover; object-position: center top; }
 .vodTitle {
   font-size: 12px;
   font-weight: 600;
