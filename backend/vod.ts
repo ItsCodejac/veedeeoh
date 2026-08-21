@@ -6,7 +6,21 @@ const SESSION_TTL = 5 * 60 * 1000;
 const CATALOG_TTL = 5 * 60 * 1000;
 
 const ANIME_RE = /anime|naruto|one piece|dragon ?ball|jojo|sailor moon|gundam|bleach|yu-gi-oh|shonen|ghibli|evangelion|cowboy bebop|akira|slayer/i;
-const AMBIENT_SLEEP_RE = /ambient|sleep|relaxation|naturescape|zenlife|white noise|rain sounds|binaural|meditation|lullaby|fireplace|soundscape|ocean waves|stingray/i;
+// Two tiers, because the signal genuinely lives in TITLES ("Relaxing White
+// Noise: Ocean Sounds") while the false positives did too ("Sleepy Hollow",
+// "Sleeping Beauty", "I'll Sleep When I'm Dead", and /stingray/ catching the
+// 1985 action series). Testing titles with a bare /sleep|stingray/ was the bug;
+// not testing titles at all emptied the rail entirely.
+//
+// STRONG: phrases that are essentially never a narrative film title, so they are
+// safe to match against the title itself.
+const AMBIENT_STRONG_RE = /white noise|rain sounds|ocean sounds|sleep sounds|sounds for sleep|nature sounds|binaural/i;
+// CONTEXT: broader terms, matched only against genre and rail name where a
+// narrative title cannot trip them. "ocean waves" lives here because it is also
+// a Studio Ghibli film.
+const AMBIENT_CONTEXT_RE = /ambient|relaxation|naturescape|zenlife|meditation|lullaby|fireplace|soundscape|ocean waves/i;
+const isAmbient = (title: string, genre: string, railName: string) =>
+  AMBIENT_STRONG_RE.test(title) || AMBIENT_CONTEXT_RE.test(`${genre} ${railName}`);
 
 // Deterministic maturity ladder from the provider-supplied rating. This is the
 // single source of truth for kids-safety — unknown/unrated maps to ADULT so
@@ -45,6 +59,12 @@ export function isKidsSafe(item: any, categoryName = ""): boolean {
 // grouping read consistently across sources.
 const GENRE_CANON: Array<[RegExp, string]> = [
   [/anime/i, "Anime"],
+  // Kids must be tested BEFORE action: "LooLoo Kids" is tagged
+  // ["Adventure","Animation","Kids & Family"] and was landing in Action.
+  [/child|famil|preschool|\bkid/i, "Kids & Family"],
+  // Animation AFTER kids, so kids cartoons stay in Kids and adult animation
+  // gets its own bucket instead of falling through unmapped.
+  [/animation|cartoon|toon/i, "Animation"],
   [/sci-?fi|science fiction|fantasy/i, "Sci-Fi & Fantasy"],
   [/action|adventure/i, "Action & Adventure"],
   [/thriller|suspense/i, "Thriller"],
@@ -53,7 +73,6 @@ const GENRE_CANON: Array<[RegExp, string]> = [
   [/comedy|sitcom/i, "Comedy"],
   [/crime/i, "Crime"],
   [/document|docuseries/i, "Documentary"],
-  [/child|famil|preschool|\bkid/i, "Kids & Family"],
   [/reality/i, "Reality"],
   [/western/i, "Western"],
   [/music|musical/i, "Music"],
@@ -66,10 +85,23 @@ const GENRE_CANON: Array<[RegExp, string]> = [
   [/game show|variety|talk show/i, "Entertainment"],
   [/drama/i, "Drama"],
 ];
+/** Highest-priority canon label matched by ANY of a provider's tags. Tubi's tag
+ *  order is arbitrary, so reading tags[0] alone filed "LooLoo Kids" (tags:
+ *  Adventure, Animation, Kids & Family) under Action & Adventure. */
+export function normalizeGenreFromTags(tags?: (string | null | undefined)[]): string | null {
+  const list = (tags || []).filter(Boolean) as string[];
+  if (!list.length) return null;
+  for (const [re, label] of GENRE_CANON) if (list.some((t) => re.test(t))) return label;
+  return null;
+}
+
 export function normalizeGenre(raw?: string | null): string | null {
   if (!raw) return raw ?? null;
   for (const [re, label] of GENRE_CANON) if (re.test(raw)) return label;
-  return raw;
+  // Returning the raw provider string minted a rail per unmapped vocabulary
+  // ("Animation Movies", "LGBT", "Foreign/International"). null instead sends
+  // the item to the existing "More Movies" bucket.
+  return null;
 }
 
 let _sessions: Record<string, any> = {};
@@ -235,7 +267,7 @@ export async function getCatalog(regionCode?: string): Promise<{ rails: any[]; s
         if (ANIME_RE.test(`${n.title} ${n.genre || ""}`)) {
           seenAnime[n.id] = n;
         }
-        if (AMBIENT_SLEEP_RE.test(`${n.title} ${n.genre || ""} ${cat.name || ""}`)) {
+        if (isAmbient(n.title || "", n.genre || "", cat.name || "")) {
           seenSleep[n.id] = n;
         }
         if (isKidsSafe(n, cat.name)) {
@@ -252,7 +284,7 @@ export async function getCatalog(regionCode?: string): Promise<{ rails: any[]; s
       if (ANIME_RE.test(`${item.title} ${item.genre || ""}`)) {
         seenAnime[item.id] = item;
       }
-      if (AMBIENT_SLEEP_RE.test(`${item.title} ${item.genre || ""} ${tr.name || ""}`)) {
+      if (isAmbient(item.title || "", item.genre || "", tr.name || "")) {
         seenSleep[item.id] = item;
       }
       if (isKidsSafe(item, tr.name)) {
@@ -295,7 +327,10 @@ export async function getCatalog(regionCode?: string): Promise<{ rails: any[]; s
   const mergedMap: Record<string, Map<string, any>> = {};
   for (const rail of rawRails) {
     let catName = rail.name;
-    if (/anime/i.test(catName) && !catName.includes("Español")) catName = "Anime";
+    // Canonicalise onto the exact names used by the constructed rails below, so
+    // mergedMap (keyed on name) folds provider rails into them instead of
+    // leaving "Anime en español" beside "Anime en Español".
+    if (/anime/i.test(catName)) catName = /español|espanol/i.test(catName) ? "Anime en Español" : "Anime";
     if (/sci-?fi/i.test(catName)) catName = "Sci-Fi & Fantasy";
 
     if (!mergedMap[catName]) mergedMap[catName] = new Map();

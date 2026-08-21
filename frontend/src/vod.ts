@@ -161,7 +161,9 @@ function railTasteRank(name: string, taste: string[]): number {
   const n = name.toLowerCase();
   for (let i = 0; i < taste.length; i++) {
     const g = taste[i];
-    if (g && n.includes(g.toLowerCase())) return i;
+    // Word boundary, not containment: taste genre "War" matched
+    // "Award-Winning Movies" (a-WAR-d) and promoted it to the top rail.
+    if (g && new RegExp(`\\b${g.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(n)) return i;
   }
   return 999;
 }
@@ -732,9 +734,13 @@ export function openCategoryView(titleName: string, items: VodItem[]): void {
 }
 
 function getRailPriorityScore(name: string): number {
-  const n = name.toLowerCase();
+  let n = name.toLowerCase();
   if (n.includes("trending") || n.includes("popular") || n.includes("hit") || n.includes("top") || n.includes("binge")) return 1;
-  if (n.includes("blockbuster") || n.includes("hollywood") || n.includes("feature")) return 2;
+  // Pluto names nearly every genre rail "Featured X", so matching "feature"
+  // here scored Horror, Comedy, Reality and DIY identically and made the
+  // genre ladder below unreachable. Strip the prefix before scoring.
+  n = n.replace(/^featured\s+/, "");
+  if (n.includes("blockbuster") || n.includes("hollywood")) return 2;
   if (n.includes("action") || n.includes("adventure")) return 3;
   if (n.includes("drama")) return 4;
   if (n.includes("comedy") || n.includes("standup")) return 5;

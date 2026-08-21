@@ -1,4 +1,4 @@
-import { maturityLevel, normalizeGenre } from "./vod";
+import { maturityLevel, normalizeGenreFromTags } from "./vod";
 
 const TUBI_BASE = "https://tubitv.com";
 const CATALOG_TTL = 10 * 60 * 1000; // 10 minutes cache
@@ -73,7 +73,9 @@ export async function fetchTubiCatalog(): Promise<any[]> {
           poster: poster,
           banner: banner,
           summary: v.description || "",
-          genre: normalizeGenre(v.tags?.[0]) || "Tubi",
+          // All tags, highest-priority canon label wins. "Tubi" as a fallback genre
+          // minted a rail literally headed "Tubi Movies".
+          genre: normalizeGenreFromTags(v.tags),
           rating: v.ratings?.[0]?.value || "TV-14",
           maturity: maturityLevel(v.ratings?.[0]?.value),
           duration: v.duration || 0,
