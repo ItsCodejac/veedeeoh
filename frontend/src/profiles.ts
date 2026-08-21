@@ -587,9 +587,9 @@ export function openProfileEditor(editingProfile?: HouseholdProfile, onClose?: (
   // Older Kids. Anything MPAA-rated is now opt-in per title instead.
   const RATING_MAP = ['TV-Y', 'TV-G', 'TV-14', ''];
   const DESC_MAP = [
-    'Little Kids (TV-Y)',
-    'Older Kids (up to TV-G)',
-    'Teen (up to TV-14)',
+    'Little Kids (TV-Y · ages 2-6)',
+    'Older Kids (TV-Y7 / TV-G · ages 7+)',
+    'Teen (TV-PG / TV-14 · ages 14+)',
     'Adult (No Limit)',
   ];
 
