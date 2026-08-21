@@ -5,7 +5,8 @@
   "scripts": {
     "build": "cd frontend && npm install && npm run build",
     "deploy": "vercel --prod",
-    "warm": "node scripts/warm.mjs"
+    "warm": "node scripts/warm.mjs",
+    "veedeeoh": "node scripts/veedeeoh.mjs"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",
@@ -17,5 +18,8 @@
   "devDependencies": {
     "@types/node": "^22.10.2",
     "typescript": "^5.7.2"
+  },
+  "bin": {
+    "veedeeoh": "./scripts/veedeeoh.mjs"
   }
 }

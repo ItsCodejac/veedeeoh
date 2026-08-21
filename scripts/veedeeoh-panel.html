@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>veedeeoh control</title>
+<style>
+  :root { --bg:#07080b; --card:#101318; --line:#1e232c; --dim:#7C828C; --accent:#c5f04e; --ok:#4ade80; --bad:#ff6b6b; --warn:#fbbf24; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:#fff; font:15px/1.5 'Space Grotesk',-apple-system,system-ui,sans-serif; padding:32px; }
+  header { display:flex; align-items:baseline; gap:14px; margin-bottom:26px; }
+  h1 { font-size:26px; font-weight:800; margin:0; letter-spacing:-.02em; }
+  h1 span { color:var(--accent); }
+  header small { color:var(--dim); font-size:13px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(370px,1fr)); gap:18px; align-items:start; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px; }
+  .card h2 { font-size:14px; font-weight:800; margin:0 0 14px; text-transform:uppercase; letter-spacing:.08em; color:var(--dim); }
+  .row { display:flex; justify-content:space-between; gap:12px; padding:7px 0; border-bottom:1px solid rgba(255,255,255,.05); font-size:14px; }
+  .row:last-child { border-bottom:none; }
+  .row b { font-weight:700; }
+  button { background:var(--accent); color:#06070a; border:none; padding:10px 16px; border-radius:9px; font:800 13px 'Space Grotesk',sans-serif; cursor:pointer; }
+  button.ghost { background:rgba(255,255,255,.08); color:#fff; }
+  button:disabled { opacity:.5; cursor:default; }
+  input, select { background:#080a10; border:1px solid var(--line); color:#fff; padding:9px 11px; border-radius:8px; font:14px 'Space Grotesk',sans-serif; }
+  input { flex:1; min-width:0; }
+  .actions { display:flex; gap:9px; margin-top:14px; flex-wrap:wrap; }
+  .ok{color:var(--ok)} .bad{color:var(--bad)} .warn{color:var(--warn)} .dim{color:var(--dim)}
+  .step { display:flex; justify-content:space-between; font-size:13px; padding:4px 0 4px 14px; color:var(--dim); }
+  .prov { border-bottom:1px solid rgba(255,255,255,.06); padding:10px 0; }
+  .prov:last-child { border-bottom:none; }
+  .prov-head { display:flex; justify-content:space-between; font-weight:700; font-size:14px; }
+  pre { background:#080a10; border:1px solid var(--line); border-radius:8px; padding:11px; font-size:12px; overflow:auto; margin:12px 0 0; color:var(--dim); }
+  .muted { color:var(--dim); font-size:12.5px; margin-top:10px; line-height:1.5; }
+</style></head><body>
+<header><h1>veedeeoh<span>.</span> control</h1><small id="target"></small></header>
+
+<div class="grid">
+  <div class="card">
+    <h2>Catalog health</h2>
+    <div id="cat" class="dim">checking…</div>
+    <div class="actions">
+      <button id="rebuild">Rebuild catalog</button>
+      <button class="ghost" id="refresh">Refresh</button>
+    </div>
+    <div class="muted">Backend changes to genres, durations or the kids allowlist do nothing until the catalog is rebuilt — <code>/api/vod</code> serves a cached payload.</div>
+    <pre id="warmOut" hidden></pre>
+  </div>
+
+  <div class="card">
+    <h2>Provider health</h2>
+    <div id="prov" class="dim">idle</div>
+    <div class="actions"><button id="check">Run checks</button></div>
+    <div class="muted">Sends a real CORS preflight, not just a GET. A GET-only check passes while the browser path is dead.</div>
+  </div>
+
+  <div class="card">
+    <h2>Users and tiers</h2>
+    <div class="actions" style="margin-top:0">
+      <input id="email" type="email" placeholder="email@example.com" />
+      <button id="lookup">Look up</button>
+    </div>
+    <div id="user" class="muted">No account loaded.</div>
+  </div>
+</div>
+
+<script>
+const PAID = __PAID_TIERS__;
+document.getElementById('target').textContent = __SITE__;
+const $ = (id) => document.getElementById(id);
+const j = (u, o) => fetch(u, o).then(r => r.json());
+const row = (k, v) => `<div class="row"><span class="dim">${k}</span><b>${v}</b></div>`;
+
+async function loadCatalog() {
+  $('cat').innerHTML = '<span class="dim">checking…</span>';
+  const s = await j('/api/status');
+  const age = s.ageHours == null ? '<span class="bad">unknown</span>'
+    : s.ageHours > 26 ? `<span class="bad">${s.ageHours.toFixed(1)}h old — stale</span>`
+    : `<span class="ok">${s.ageHours.toFixed(1)}h old</span>`;
+  const kids = s.archiveInKids === 0
+    ? '<span class="ok">clear</span>'
+    : `<span class="bad">${s.archiveInKids} unvetted</span>`;
+  $('cat').innerHTML =
+    row('Last built', age) +
+    row('Titles', s.titles.toLocaleString() + ' in ' + s.rails + ' rails') +
+    row('Pluto / Tubi / Archive', `${s.providers.pluto} / ${s.providers.tubi} / ${s.providers.archive}`) +
+    row('Payload', (s.bytes/1048576).toFixed(2) + ' MB in ' + (s.loadMs/1000).toFixed(1) + 's') +
+    row('Archive items in Kids', kids);
+}
+
+$('refresh').onclick = loadCatalog;
+$('rebuild').onclick = async () => {
+  const b = $('rebuild'); b.disabled = true; b.textContent = 'Rebuilding…';
+  const out = $('warmOut'); out.hidden = false; out.textContent = 'working…';
+  const r = await j('/api/warm', { method: 'POST' });
+  out.textContent = r.ok ? `ok — ${JSON.stringify(r.stats || {})}` : `FAILED (${r.status}) ${r.error || ''}`;
+  b.disabled = false; b.textContent = 'Rebuild catalog';
+  loadCatalog();
+};
+
+$('check').onclick = async () => {
+  const b = $('check'); b.disabled = true; $('prov').innerHTML = '<span class="dim">running…</span>';
+  const list = await j('/api/providers');
+  $('prov').innerHTML = list.map(p => `
+    <div class="prov">
+      <div class="prov-head"><span>${p.provider}</span><span class="${p.ok?'ok':'bad'}">${p.ok?'pass':'FAIL'}</span></div>
+      <div class="dim" style="font-size:12.5px">${p.title || ''}</div>
+      ${p.steps.map(s => `<div class="step"><span>${s.name}</span><span class="${s.ok?'ok':'bad'}">${s.detail}</span></div>`).join('')}
+    </div>`).join('');
+  b.disabled = false;
+};
+
+$('lookup').onclick = async () => {
+  const email = $('email').value.trim();
+  if (!email) return;
+  const u = await j('/api/user?email=' + encodeURIComponent(email));
+  if (!u || u.error) { $('user').innerHTML = '<span class="bad">No account found.</span>'; return; }
+  const expired = u.tier_expires && new Date(u.tier_expires) < new Date();
+  const access = PAID.includes(u.tier) && !expired;
+  $('user').innerHTML =
+    row('Email', u.email) +
+    row('Tier', `${u.tier || 'none'} ${access ? '<span class="ok">active</span>' : '<span class="bad">no access</span>'}`) +
+    row('Expires', u.tier_expires ? (expired ? `<span class="bad">${u.tier_expires}</span>` : u.tier_expires) : 'never') +
+    row('Seats', u.seats ?? '—') +
+    `<div class="actions">
+       <select id="tierSel">${PAID.map(t => `<option ${t===u.tier?'selected':''}>${t}</option>`).join('')}</select>
+       <button id="setTier">Set tier</button>
+     </div>`;
+  $('setTier').onclick = async () => {
+    const btn = $('setTier'); btn.disabled = true; btn.textContent = 'Saving…';
+    await j('/api/tier', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email, tier: $('tierSel').value }) });
+    $('lookup').click();
+  };
+};
+
+loadCatalog();
+</script></body></html>
