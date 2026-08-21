@@ -165,16 +165,28 @@ async function boot(): Promise<void> {
   // The switcher is the first thing the user sees, so hand the splash off to it.
   // The SAME enterAsProfile cycle runs here and on every later profile switch.
   const prof = await import("./profiles");
-  if (isCloudMode()) {
-    prof.openProfileSwitcher((sel) => { void enterAsProfile(sel, dataReady); });
+
+  // Resume the profile the user last chose rather than re-prompting. Showing the
+  // picker on every reload was also a parental-lock bypass: a child in a kids
+  // profile could reach an adult one just by refreshing, because from boot's
+  // point of view that is a fresh session and no exit gate is ever consulted.
+  // The picker now appears only on first run (or after sign-out), or when the
+  // user explicitly asks to switch — which IS gated. It also stops the ident
+  // bump replaying on every refresh, since that only runs on a real selection.
+  const resumed = prof.getPersistedActiveProfile();
+  if (resumed) {
+    prof.setActiveProfile(resumed); // re-applies kids-mode chrome + fires the change event
+    applyProfileChrome(resumed);
     hideBootSplash();
-  } else {
-    const active = prof.getActiveProfile();
-    applyProfileChrome(active);
-    hideBootSplash();
-    if (homeView) homeView.removeAttribute("hidden");
+    // goHome() rather than just unhiding homeView: it also hides the other views
+    // and marks the Home tab active, which is the state enterAsProfile leaves
+    // behind. Unhiding by hand leaves the sidebar with no active tab.
+    goHome();
     await dataReady;
     renderHome();
+  } else {
+    prof.openProfileSwitcher((sel) => { void enterAsProfile(sel, dataReady); });
+    hideBootSplash();
   }
 
   // Stripe Checkout return

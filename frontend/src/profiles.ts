@@ -161,6 +161,26 @@ export function getActiveProfile(): HouseholdProfile {
   return (list[0] || DEFAULT_PROFILES[0]) as HouseholdProfile;
 }
 
+/** The profile the user last explicitly chose on this device, or null if they
+ *  haven't chosen one yet. Unlike getActiveProfile() this does NOT fall back to
+ *  a default — boot has to tell "resume this session" apart from "show the
+ *  picker", and defaulting would silently drop a kids profile into an adult one.
+ *  Returns null if the stored profile no longer exists (deleted elsewhere). */
+export function getPersistedActiveProfile(): HouseholdProfile | null {
+  try {
+    const raw = localStorage.getItem(ACTIVE_PROFILE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.id) return null;
+    const list = getStoredProfiles();
+    // A profile deleted on another device must not resurrect a session here.
+    if (list.length > 0 && !list.some((p) => p.id === parsed.id)) return null;
+    return parsed as HouseholdProfile;
+  } catch {
+    return null;
+  }
+}
+
 export function setActiveProfile(profile: HouseholdProfile): void {
   localStorage.setItem(ACTIVE_PROFILE_KEY, JSON.stringify(profile));
   applyKidsMode(profile);
@@ -251,10 +271,24 @@ export function openProfileSwitcher(onSelectProfile?: (p: HouseholdProfile) => v
         return;
       }
 
-      // Optional parental lock: a PIN-protected profile requires the PIN to enter.
-      if (target.pin) {
-        const ok = await promptForPin(target);
+      // Parental lock, correctly oriented. Entering a kids profile is NEVER
+      // gated — a child has to be able to reach their own profile. What needs a
+      // PIN is LEAVING one. The previous check was `if (target.pin)`, which
+      // locked a child out of their own profile and let them walk out to any
+      // adult profile that happened to have no PIN of its own.
+      const leavingKids = !!active.is_kids && target.id !== active.id;
+      if (leavingKids) {
+        // Prefer the destination's own PIN when it has one (proves adult AND
+        // targets correctly); otherwise fall back to any adult PIN set up in
+        // the household. Only one prompt either way.
+        const ok = (!target.is_kids && target.pin)
+          ? await promptForPin(target)
+          : await requireAdultAuth();
         if (!ok) return; // stay on "Who's Watching"
+      } else if (!target.is_kids && target.pin && target.id !== active.id) {
+        // Adult -> a different, PIN-protected adult profile.
+        const ok = await promptForPin(target);
+        if (!ok) return;
       }
 
       setActiveProfile(target);
