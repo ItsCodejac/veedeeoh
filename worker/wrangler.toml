@@ -2,11 +2,17 @@ name = "veedeeoh-party"
 main = "party.ts"
 compatibility_date = "2026-08-01"
 
-# Durable Objects require the paid Workers plan. Nothing else here does.
+# Durable Objects ARE available on the Workers Free plan, but ONLY with the
+# SQLite storage backend -- the key-value backend is paid-only. Hence
+# new_sqlite_classes rather than new_classes; the latter fails on free.
+#
+# Free limits (reset 00:00 UTC): 100k requests/day, 13,000 GB-s/day, 5 GB SQLite.
+# This object keeps its state in memory and writes no storage, so only the
+# request and duration limits apply.
 [[durable_objects.bindings]]
 name = "PARTY"
 class_name = "Party"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["Party"]
+new_sqlite_classes = ["Party"]
