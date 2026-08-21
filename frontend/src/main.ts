@@ -108,7 +108,7 @@ async function showPaywall(): Promise<void> {
     <div style="max-width:440px;">
       <div style="font-family:'Bricolage Grotesque',sans-serif;font-size:40px;font-weight:800;margin-bottom:10px;">veedeeoh<span style="color:#c5f04e;">.</span></div>
       <h1 style="font-size:26px;font-weight:800;margin:0 0 10px;">Your free trial has ended</h1>
-      <p style="color:#9aa5b5;font-size:16px;line-height:1.6;margin:0 0 28px;">Subscribe to keep watching — every free service in one ad-free app, across your whole household.</p>
+      <p style="color:#9aa5b5;font-size:16px;line-height:1.6;margin:0 0 28px;">Subscribe to keep watching. Every free service in one app, across your whole household.</p>
       <button id="pwSub" style="width:100%;padding:15px;border-radius:12px;background:#c5f04e;color:#06070a;border:none;font-weight:800;font-size:16px;cursor:pointer;">Subscribe — $4/mo · 3 profiles</button>
       <button id="pwOut" style="margin-top:16px;background:none;border:none;color:#9aa5b5;font-size:13px;cursor:pointer;">Sign out</button>
     </div>`;

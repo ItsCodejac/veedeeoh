@@ -171,7 +171,7 @@ function inviteEmailHtml(code, tier) {
     <div style="margin-bottom:24px;"><span style="font-size:24px;font-weight:800;color:#ffffff;">veedeeoh</span><span style="color:#c5f04e;font-size:24px;font-weight:800;">.</span></div>
     <h1 style="font-size:22px;font-weight:700;margin-bottom:16px;color:#ffffff;">You're in.</h1>
     <p style="font-size:15px;line-height:1.6;color:#9ca3af;margin-bottom:20px;">
-      You've been invited to the veedeeoh beta. Thousands of free movies and TV shows in one ad-free app, with profiles and parental controls for the whole household.
+      You've been invited to the veedeeoh beta. Thousands of free movies and TV shows in one app, with profiles and parental controls for the whole household.
     </p>
     <p style="font-size:15px;line-height:1.6;color:#9ca3af;margin-bottom:24px;">
       Your invite includes <strong style="color:#ffffff;">${tier === "founder_vip" ? "founder access, free for as long as veedeeoh runs" : tier}</strong>. Create your account with this link and it is applied automatically.
