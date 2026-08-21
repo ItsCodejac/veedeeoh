@@ -134,8 +134,77 @@ export async function createProfileEverywhere(fields: {
 }
 
 /** Update a profile in Supabase (when signed in) + local cache. */
+/** Ask the parent to set a 4-digit PIN on an adult profile. Returns the raw PIN,
+ *  or null if they decline. Distinct from promptForPin(), which VERIFIES one. */
+export function promptToSetPin(profile: HouseholdProfile): Promise<string | null> {
+  return new Promise((resolve) => {
+    const modal = document.createElement("div");
+    modal.style.cssText = "position:fixed;inset:0;z-index:10002;background:rgba(6,7,10,0.94);backdrop-filter:blur(20px);display:flex;align-items:center;justify-content:center;padding:20px;color:#fff;font-family:'Space Grotesk',sans-serif;";
+    modal.innerHTML = `
+      <div style="background:#10141e;border:1px solid rgba(255,255,255,0.15);border-radius:20px;max-width:380px;width:100%;padding:28px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,0.9);">
+        <div style="width:52px;height:52px;border-radius:14px;background:rgba(197,240,78,0.14);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#c5f04e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+        </div>
+        <h3 style="margin:0 0 8px;font-size:19px;font-weight:800;">Protect kids mode</h3>
+        <p style="margin:0 0 18px;font-size:13px;line-height:1.6;color:#9aa5b5;">
+          Set a 4-digit PIN on <strong style="color:#fff;">${escapeHtml(profile.name)}</strong>.
+          Without one, anyone can leave a restricted profile and reach the full library.
+        </p>
+        <input id="setPin1" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="PIN"
+          style="width:170px;text-align:center;letter-spacing:14px;font-size:24px;padding:11px;border-radius:12px;border:1px solid rgba(255,255,255,0.2);background:#080a10;color:#fff;outline:none;" />
+        <input id="setPin2" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="Confirm"
+          style="width:170px;text-align:center;letter-spacing:14px;font-size:24px;padding:11px;border-radius:12px;border:1px solid rgba(255,255,255,0.2);background:#080a10;color:#fff;outline:none;margin-top:10px;" />
+        <div id="setPinError" style="height:16px;margin-top:8px;font-size:12px;color:#ff6b6b;"></div>
+        <div style="display:flex;gap:10px;margin-top:14px;">
+          <button id="setPinSkip" style="flex:1;padding:11px;border-radius:10px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);color:#9aa5b5;font-weight:700;cursor:pointer;">Not now</button>
+          <button id="setPinSave" style="flex:1;padding:11px;border-radius:10px;background:#c5f04e;border:none;color:#06070a;font-weight:800;cursor:pointer;">Set PIN</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    const a = modal.querySelector('#setPin1') as HTMLInputElement;
+    const b = modal.querySelector('#setPin2') as HTMLInputElement;
+    const err = modal.querySelector('#setPinError') as HTMLElement;
+    const done = (v: string | null) => { modal.remove(); resolve(v); };
+    (modal.querySelector('#setPinSkip') as HTMLElement).addEventListener('click', () => done(null));
+    (modal.querySelector('#setPinSave') as HTMLElement).addEventListener('click', () => {
+      if (!/^\d{4}$/.test(a.value)) { err.textContent = 'PIN must be exactly 4 digits.'; return; }
+      if (a.value !== b.value) { err.textContent = 'Those PINs do not match.'; return; }
+      done(a.value);
+    });
+    setTimeout(() => a.focus(), 50);
+  });
+}
+
+/** A restricted profile only restricts anything if some adult profile has a PIN —
+ *  the exit gate in openProfileSwitcher falls open otherwise. Call this whenever a
+ *  profile is saved as age-restricted. `excludeId` is the profile being saved, so
+ *  a profile turning INTO a kids profile is not counted as an available adult. */
+export async function ensureAdultPinExists(excludeId?: string): Promise<void> {
+  const adults = getStoredProfiles().filter((p) => !p.is_kids && p.id !== excludeId);
+  if (adults.some((p) => p.pin)) return; // already protected
+  if (adults.length === 0) {
+    alert('This household has no adult profile, so kids mode cannot be locked. Create an adult profile and set a PIN on it.');
+    return;
+  }
+  const target = adults.find((p) => (p as any).role === 'owner') || adults[0]!;
+  const raw = await promptToSetPin(target);
+  if (!raw) return; // declined — leave it open rather than block saving
+  try {
+    await updateProfileEverywhere(target.id, {
+      name: target.name,
+      avatar_color: target.avatar_color,
+      avatar_url: (target as any).avatar_url ?? undefined,
+      is_kids: target.is_kids,
+      max_rating: target.max_rating ?? null,
+      pin: await hashPin(raw),
+    });
+  } catch (e) {
+    console.warn('[profiles] could not set adult PIN', e);
+  }
+}
+
 export async function updateProfileEverywhere(id: string, fields: {
-  name: string; avatar_color: string; is_kids?: boolean; max_rating?: string | null; pin?: string | null;
+  name: string; avatar_color: string; avatar_url?: string | null; is_kids?: boolean; max_rating?: string | null; pin?: string | null;
 }): Promise<void> {
   const list = getStoredProfiles().map((p) => (p.id === id ? { ...p, ...fields } : p));
   saveProfiles(list);
@@ -143,6 +212,9 @@ export async function updateProfileEverywhere(id: string, fields: {
     try {
       const patch: any = { name: fields.name, avatar_color: fields.avatar_color,
         is_kids: fields.is_kids, max_rating: fields.max_rating };
+      // avatar_url was reaching localStorage but never the DB, so a chosen avatar
+      // vanished on the next hydrate from cloud.
+      if (fields.avatar_url !== undefined) patch.avatar_url = fields.avatar_url;
       if (fields.pin !== undefined) patch.pin = fields.pin; // only touch pin when set/cleared
       await db.updateProfile(id, patch);
     } catch { /* cache already updated */ }
@@ -581,6 +653,10 @@ export function openProfileEditor(editingProfile?: HouseholdProfile, onClose?: (
         } else {
           await createProfileEverywhere(fields);
         }
+        // A restricted profile is only a restriction if an adult PIN exists to
+        // gate the way out. Prompt for one now rather than leaving the lock
+        // silently open. Runs after the save so declining still keeps the profile.
+        if (isKids) await ensureAdultPinExists(isEdit ? editingProfile?.id : undefined);
       } catch (e) {
         console.warn('[profiles] save failed', e);
       }
