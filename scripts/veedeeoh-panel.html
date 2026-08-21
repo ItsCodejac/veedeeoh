@@ -68,6 +68,18 @@
   </div>
 
   <div class="card" style="grid-column:1/-1">
+    <h2>Kids curation</h2>
+    <div class="muted" style="margin-top:0">
+      Nothing reaches a restricted profile unless it is approved here. Judge the title, not the
+      string: watch it if you are unsure. Candidates come from the automatic filter, which is a
+      reasonable suggestion and a terrible gate.
+    </div>
+    <div id="curStats" class="muted"></div>
+    <div id="curGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;margin-top:14px"></div>
+    <div class="actions"><button class="ghost" id="curMore">Load more</button></div>
+  </div>
+
+  <div class="card" style="grid-column:1/-1">
     <h2>Feedback</h2>
     <div class="actions" style="margin-top:0">
       <select id="fbFilter">
@@ -198,5 +210,60 @@ window.setFb = async (id, status) => { await j('/api/feedback/update', { method:
 $('fbFilter').onchange = loadFeedback;
 $('fbRefresh').onclick = loadFeedback;
 
-loadCatalog(); loadInvites(); loadFeedback();
+// ---- kids curation ----
+let curAll = [], curShown = 0;
+const CUR_PAGE = 12;
+
+async function loadCurate(reset = true) {
+  const r = await j('/api/curate');
+  if (r.error) { $('curStats').innerHTML = '<span class="bad">' + r.error + '</span>'; return; }
+  curAll = r.queue;
+  if (reset) { curShown = 0; $('curGrid').innerHTML = ''; }
+  const done = r.counts.little + r.counts.older + r.counts.no;
+  $('curStats').innerHTML =
+    `<b>${r.queue.length}</b> awaiting review · approved <span class="ok">${r.counts.little} little</span>,
+     <span class="ok">${r.counts.older} older</span> · <span class="dim">${r.counts.no} not for kids</span>
+     · ${done}/${r.total} decided`;
+  renderCurate();
+}
+
+function renderCurate() {
+  const slice = curAll.slice(curShown, curShown + CUR_PAGE);
+  curShown += slice.length;
+  $('curGrid').insertAdjacentHTML('beforeend', slice.map(c => `
+    <div class="curCard" data-id="${escapeHtml(c.id)}" style="background:#080a10;border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column">
+      ${c.poster ? `<img src="${escapeHtml(c.poster)}" alt="" style="width:100%;aspect-ratio:347/500;object-fit:cover;background:#111">`
+                 : `<div style="width:100%;aspect-ratio:347/500;display:flex;align-items:center;justify-content:center;color:#555;font-size:12px">no poster</div>`}
+      <div style="padding:11px;display:flex;flex-direction:column;gap:6px;flex:1">
+        <div style="font-weight:800;font-size:13.5px;line-height:1.3">${escapeHtml(c.title)}</div>
+        <div class="dim" style="font-size:11.5px">${escapeHtml(c.rating || '?')} · ${escapeHtml(c.provider)}${c.kind === 'series' ? ' · series' : ''}</div>
+        ${c.summary ? `<div class="dim" style="font-size:11.5px;line-height:1.45">${escapeHtml(c.summary).slice(0,150)}</div>` : ''}
+        <a href="${escapeHtml(c.watchUrl)}" target="_blank" rel="noreferrer"
+           style="font-size:11.5px;color:var(--accent);text-decoration:none">Watch before deciding &rarr;</a>
+        <div style="display:flex;gap:5px;margin-top:auto;padding-top:8px">
+          <button onclick="decide('${escapeHtml(c.id)}','little','${c.kind}')" style="flex:1;padding:6px 4px;font-size:11px;border-radius:7px">Little</button>
+          <button onclick="decide('${escapeHtml(c.id)}','older','${c.kind}')" style="flex:1;padding:6px 4px;font-size:11px;border-radius:7px">Older</button>
+          <button class="ghost" onclick="decide('${escapeHtml(c.id)}','no','${c.kind}')" style="flex:1;padding:6px 4px;font-size:11px;border-radius:7px">No</button>
+        </div>
+      </div>
+    </div>`).join(''));
+  $('curMore').style.display = curShown >= curAll.length ? 'none' : 'inline-flex';
+}
+
+window.decide = async (id, decision, kind) => {
+  const card = document.querySelector(`.curCard[data-id="${CSS.escape(id)}"]`);
+  if (card) { card.style.opacity = '.35'; card.style.pointerEvents = 'none'; }
+  await j('/api/curate/decide', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ contentId: id, decision, kind }) });
+  if (card) card.remove();
+  const r = await j('/api/curate');
+  const done = r.counts.little + r.counts.older + r.counts.no;
+  $('curStats').innerHTML =
+    `<b>${r.queue.length}</b> awaiting review · approved <span class="ok">${r.counts.little} little</span>,
+     <span class="ok">${r.counts.older} older</span> · <span class="dim">${r.counts.no} not for kids</span>
+     · ${done}/${r.total} decided`;
+};
+$('curMore').onclick = renderCurate;
+
+loadCatalog(); loadInvites(); loadFeedback(); loadCurate();
 </script></body></html>

@@ -251,6 +251,95 @@ async function updateFeedback({ id, status, notes }) {
   return { ok: r.ok };
 }
 
+// --------------------------------------------------------------- curation ---
+// Kids content is approved by a human, one title or series at a time. The old
+// approach stamped TV-Y7 onto everything from an Archive query and "validated"
+// it against values we had just invented, which certified wartime and racial
+// caricature shorts as kid-safe. Nothing reaches a restricted profile now unless
+// it is in one of these collections.
+const TIERS = {
+  little: { name: "Little Kids Approved", min_age: 0 },
+  older:  { name: "Older Kids Approved",  min_age: 1 },
+  no:     { name: "Not for kids",         min_age: null },
+};
+
+const _collCache = {};
+async function ensureCollection(key) {
+  if (_collCache[key]) return _collCache[key];
+  const { name, min_age } = TIERS[key];
+  let r = await sb(`collections?select=id&scope=eq.platform&name=eq.${encodeURIComponent(name)}`);
+  let rows = await r.json();
+  if (Array.isArray(rows) && rows[0]) return (_collCache[key] = rows[0].id);
+  r = await sb("collections", {
+    method: "POST", headers: { Prefer: "return=representation" },
+    body: JSON.stringify({ scope: "platform", name, min_age, show_as_tab: false }),
+  });
+  rows = await r.json();
+  if (!r.ok) throw new Error(rows.message || "could not create collection");
+  return (_collCache[key] = rows[0].id);
+}
+
+async function decidedIds() {
+  const ids = await Promise.all(Object.keys(TIERS).map((k) => ensureCollection(k)));
+  const r = await sb(`collection_items?select=content_id,collection_id&collection_id=in.(${ids.join(",")})`);
+  const rows = await r.json();
+  const byColl = Object.fromEntries(ids.map((id, i) => [id, Object.keys(TIERS)[i]]));
+  const map = {};
+  for (const row of Array.isArray(rows) ? rows : []) map[row.content_id] = byColl[row.collection_id];
+  return map;
+}
+
+/** Candidates are whatever the current automatic filter surfaces for Kids. It is
+ *  a reasonable pool because it is already maturity-gated -- but it decides
+ *  nothing. The thing that was wrong as a GATE is fine as a SUGGESTION. */
+async function curateQueue() {
+  const j = await (await fetch(`${SITE}/api/vod`)).json();
+  const rails = (j.rails || []).filter((r) => /kid|famil/i.test(r.name || ""));
+  const seen = new Set(), pool = [];
+  for (const rail of rails) {
+    for (const it of rail.items || []) {
+      if (seen.has(it.id)) continue;
+      seen.add(it.id);
+      pool.push(it);
+    }
+  }
+  const decided = await decidedIds();
+  const link = (it) => {
+    const id = String(it.id || "");
+    if (id.startsWith("tubi:")) return `https://tubitv.com/${it.series_id ? "series" : "movies"}/${id.replace("tubi:", "")}`;
+    if (id.startsWith("archive:")) return `https://archive.org/details/${id.replace("archive:", "")}`;
+    return "https://pluto.tv/en/on-demand";
+  };
+  return {
+    counts: Object.entries(TIERS).reduce((a, [k]) => ({ ...a, [k]: Object.values(decided).filter((v) => v === k).length }), {}),
+    total: pool.length,
+    queue: pool.filter((it) => !decided[it.id]).map((it) => ({
+      id: it.id, title: it.title, poster: it.poster, rating: it.rating,
+      maturity: it.maturity, provider: it.provider || (String(it.id).startsWith("tubi:") ? "Tubi" : String(it.id).startsWith("archive:") ? "Internet Archive" : "Pluto TV"),
+      summary: (it.summary || "").slice(0, 220),
+      kind: it.series_id ? "series" : "title",
+      watchUrl: link(it),
+    })),
+  };
+}
+
+async function curateDecide({ contentId, decision, kind = "title" }) {
+  if (!TIERS[decision]) return { ok: false, error: "unknown decision" };
+  const collection_id = await ensureCollection(decision);
+  const r = await sb("collection_items", {
+    method: "POST", headers: { Prefer: "resolution=merge-duplicates" },
+    body: JSON.stringify({ collection_id, content_id: contentId, kind }),
+  });
+  if (!r.ok) return { ok: false, error: (await r.json().catch(() => ({}))).message || `HTTP ${r.status}` };
+  return { ok: true };
+}
+
+async function curateUndo({ contentId }) {
+  const ids = await Promise.all(Object.keys(TIERS).map((k) => ensureCollection(k)));
+  const r = await sb(`collection_items?content_id=eq.${encodeURIComponent(contentId)}&collection_id=in.(${ids.join(",")})`, { method: "DELETE" });
+  return { ok: r.ok };
+}
+
 // ------------------------------------------------------------------ users ---
 const PAID = ["founder_vip", "giveaway", "cloud_paid", "trial_7day", "trial_dollar_month"];
 
@@ -280,6 +369,9 @@ const routes = {
   "POST /api/invite": (u, b) => createInvite(b),
   "POST /api/invite/revoke": (u, b) => revokeInvite(b.code),
   "GET /api/feedback": (u) => listFeedback(u.searchParams.get("status") || "all"),
+  "GET /api/curate": () => curateQueue(),
+  "POST /api/curate/decide": (u, b) => curateDecide(b),
+  "POST /api/curate/undo": (u, b) => curateUndo(b),
   "POST /api/feedback/update": (u, b) => updateFeedback(b),
 };
 
