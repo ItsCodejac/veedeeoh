@@ -22,7 +22,16 @@ function playIdent(isKids: boolean, done: () => void): void {
   v.autoplay = true; v.setAttribute("playsinline", "");
   v.style.cssText = "width:100%;height:100%;object-fit:contain;";
   let finished = false;
-  const finish = () => { if (finished) return; finished = true; o.style.opacity = "0"; setTimeout(() => o.remove(), 500); done(); };
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    // Recorded so the player does not replay the bump back-to-back when a title
+    // is opened moments after entering a profile.
+    try { sessionStorage.setItem("veedeeoh_ident_at", String(Date.now())); } catch {}
+    o.style.opacity = "0";
+    setTimeout(() => o.remove(), 500);
+    done();
+  };
   v.onended = finish; v.onerror = finish; o.onclick = finish;
   o.appendChild(v);
   document.body.appendChild(o);

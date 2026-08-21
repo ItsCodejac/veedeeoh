@@ -133,6 +133,7 @@ class VodPlayer {
     this.player = created;
     this.style();
     this.wire();
+    this.showBump();
   }
 
   destroy(): void {
@@ -308,6 +309,53 @@ class VodPlayer {
       (this.player as any).fullscreenOrientation = "landscape";
       setTimeout(() => { if (!this.destroyed) el.focus(); }, 100);
     } catch {}
+  }
+
+  /** Plays the brand bump over the player while the stream buffers.
+   *
+   *  The first play of a session is the slow one: Vidstack lazy-loads hls.js
+   *  from a CDN before it can even fetch the manifest. Filling that with the
+   *  bump makes the wait feel like part of the product rather than a stall, and
+   *  the stream buffers behind it the whole time.
+   *
+   *  Skipped if the profile-entry ident played in the last 60s, so opening a
+   *  title straight after choosing a profile does not show it twice; and after
+   *  the first play of a session, when the pipeline is warm and it would only
+   *  add delay. Never blocks: it removes itself on end, error, click, or a 6s
+   *  timeout, exactly like playIdent. */
+  private showBump(): void {
+    try {
+      const last = Number(sessionStorage.getItem("veedeeoh_ident_at") || 0);
+      if (Date.now() - last < 60_000) return;                 // just saw it
+      if (sessionStorage.getItem("veedeeoh_bump_played")) return; // first play only
+      sessionStorage.setItem("veedeeoh_bump_played", "1");
+    } catch { return; }
+
+    const isKids = !!getActiveProfile()?.is_kids;
+    const wrap = document.createElement("div");
+    wrap.dataset.role = "bump";
+    wrap.style.cssText = "position:absolute;inset:0;z-index:50;background:#06070a;display:flex;align-items:center;justify-content:center;transition:opacity .45s ease;";
+    const v = document.createElement("video");
+    v.src = isKids ? "/kids-bump.mp4" : "/bump.mp4";
+    v.autoplay = true;
+    v.setAttribute("playsinline", "");
+    v.style.cssText = "width:100%;height:100%;object-fit:contain;";
+    wrap.appendChild(v);
+    this.root?.appendChild(wrap);
+
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      wrap.style.opacity = "0";
+      setTimeout(() => wrap.remove(), 450);
+    };
+    v.onended = finish;
+    v.onerror = finish;
+    wrap.addEventListener("click", (e) => { e.stopPropagation(); finish(); }, { signal: this.ac.signal });
+    setTimeout(finish, 6000);                                  // never trap the viewer
+    // Sound where the browser allows it; this follows a click, so it usually does.
+    v.play().catch(() => { v.muted = true; v.play().catch(finish); });
   }
 
   private hideLoader = (): void => {
