@@ -1,11 +1,27 @@
-// Vidstack-based VOD player. Replaces the hand-rolled controller — brings mobile
-// gestures (tap-to-toggle, double-tap seek), auto-hiding controls, proper
-// fullscreen + landscape orientation, captions, keyboard, and PiP for free.
+// Vidstack-based VOD player.
+//
+// One instance per open, owning every piece of state it touches. The previous
+// version kept a module-level `player` that was assigned only AFTER an await,
+// mutated by closures from earlier opens, and torn down by clearing innerHTML.
+// That combination produced the "open a second title and the first one starts
+// over" bug: VidstackPlayer.create() always sets `keep-alive`, and
+// disconnectedCallback explicitly skips auto-destroy when that attribute is
+// present, so removing the element from the DOM detaches it without stopping
+// it. The orphan kept playing and its listeners kept writing to the shared
+// singleton, retargeting the visible player's src.
+//
+// Rules that keep it fixed:
+//   1. All state lives on the instance. No module-level mutable player.
+//   2. destroy() is the ONLY teardown: explicit player.destroy(), then abort
+//      the listener signal, then remove the DOM. Never the reverse.
+//   3. Every open takes a token. Anything resolving after its token is stale
+//      destroys itself instead of assigning.
+//   4. Geometry is set inline by the instance, so the legacy `.mini-player`
+//      stylesheet (written for a player that no longer exists, and full of
+//      !important) can never apply.
 //
 // Self-contained on purpose: imports only from state/api/db/profiles (never
-// vod.ts) so there's no circular dependency. Preserves the app behaviors:
-// direct-CDN-first streaming with /proxy fallback, resume, per-profile progress
-// + "Continue Watching" localStorage, watched-marking, and next-episode advance.
+// vod.ts) so there is no circular dependency.
 
 import { VidstackPlayer, VidstackPlayerLayout } from "vidstack/global/player";
 import "vidstack/player/styles/default/theme.css";
@@ -16,83 +32,40 @@ import { saveProgress } from "./db";
 import { getActiveProfile } from "./profiles";
 
 const BRAND = "#c5f04e";
-let player: any = null;
-let lastSave = 0;
+
+const FULL_CSS = "position:fixed;inset:0;z-index:9998;display:block;background:#000;";
+const MINI_CSS =
+  "position:fixed;inset:auto 24px 24px auto;width:22rem;max-width:44vw;aspect-ratio:16/9;" +
+  "z-index:9998;display:block;background:#000;border-radius:14px;overflow:hidden;cursor:pointer;" +
+  "box-shadow:0 18px 50px rgba(0,0,0,0.6);border:1px solid rgba(197,240,78,0.5);";
+
+const proxied = (u: string) => `/proxy?url=${encodeURIComponent(u)}`;
+
+// Pluto's CDN answers with `access-control-allow-origin: http://pluto.tv`, so a
+// browser can never read its manifests cross-origin however fresh the token is.
+// Tubi (allow-origin: *) and Archive (progressive mp4) stay on the direct path.
+const playable = (u: string) => (/(^|\.)pluto\.tv\//.test(u) ? proxied(u) : u);
+
+// Vidstack picks its provider by sniffing the extension
+// (HLS_VIDEO_EXTENSIONS = /\.(m3u8)($|\?)/i). Wrapping a URL in /proxy?url=...
+// percent-encodes ".m3u8?" to ".m3u8%3F", the sniff misses, and playback fails
+// with code 4 (MEDIA_ERR_SRC_NOT_SUPPORTED). Declaring the type skips the sniff.
+function toSource(rawUrl: string): string | { src: string; type: "application/x-mpegurl" } {
+  const src = playable(rawUrl);
+  return /\.m3u8($|\?)/i.test(rawUrl) ? { src, type: "application/x-mpegurl" as const } : src;
+}
 
 function activeProfileUuid(): string | null {
   const id = getActiveProfile().id;
   return id && !id.startsWith("default_") && !id.startsWith("profile_") ? id : null;
 }
 
-const proxied = (u: string) => `/proxy?url=${encodeURIComponent(u)}`;
-
-// Pluto's CDN answers with `access-control-allow-origin: http://pluto.tv`, so a
-// browser can never read its manifests cross-origin no matter how fresh the token
-// is. hls.js fetches manifests over XHR, so every Pluto title fails the CORS check
-// on a direct load. Route Pluto through /proxy up front rather than waiting for an
-// error to trigger a fallback. Tubi (allow-origin: *) and Archive (progressive mp4)
-// are unaffected and stay on the direct CDN path.
-const playable = (u: string) => (/(^|\.)pluto\.tv\//.test(u) ? proxied(u) : u);
-
-// Vidstack chooses its provider by sniffing the file extension
-// (HLS_VIDEO_EXTENSIONS = /\.(m3u8)($|\?)/i). Wrapping a URL in /proxy?url=...
-// percent-encodes the ".m3u8?" to ".m3u8%3F", so the sniff misses, Vidstack
-// falls back to a plain <video> source and the load fails with code 4
-// (MEDIA_ERR_SRC_NOT_SUPPORTED). Declaring the MIME type skips the sniff.
-// Non-HLS sources stay plain strings so their existing detection is untouched.
-function toSource(rawUrl: string): string | { src: string; type: "application/x-mpegurl" } {
-  const src = playable(rawUrl);
-  return /\.m3u8($|\?)/i.test(rawUrl) ? { src, type: "application/x-mpegurl" as const } : src;
-}
-
-// Continue Watching is stored PER PROFILE so a kids profile never sees an adult
-// profile's resume cards. This key must match the one vod.ts reads to render the rail.
+// Continue Watching is stored PER PROFILE. This key must match the one vod.ts
+// reads to render the rail.
 function resumeHistoryKey(): string {
   let id = "default";
   try { id = getActiveProfile()?.id || "default"; } catch {}
   return `tvlc_resume_history_${id}`;
-}
-
-// Mirror progress to BOTH stores. The localStorage write is what makes a title
-// appear in Continue Watching at all; the Supabase row only refines the timecode
-// of an entry that already exists locally. Dropping the local write empties the rail.
-function saveResume(ch: any, idx: number, time: number, duration: number, pct: number): void {
-  if (Date.now() - lastSave < 5000) return; // limit to every 5s
-  lastSave = Date.now();
-  const itemId = String(ch.id || "").replace("vod:", "");
-  const stream = ch.streams?.[idx];
-  if (!stream) return;
-
-  const key = resumeHistoryKey();
-  let history: any[] = [];
-  try { history = JSON.parse(localStorage.getItem(key) || "[]"); } catch { history = []; }
-  history = history.filter((x: any) => x.itemId !== itemId);
-  if (pct < 95) {
-    history.unshift({
-      id: stream.id || `vod:${itemId}:${idx}`,
-      itemId,
-      title: ch.name,
-      episodeTitle: stream.source,
-      poster: ch.vodPoster,
-      banner: ch.vodBanner,
-      // Kept so the kids gate can be re-applied when rendering the resume rail.
-      maturity: ch.maturity ?? ch.vodItem?.maturity,
-      genre: ch.genre ?? ch.vodItem?.genre,
-      time,
-      duration,
-      percentage: pct,
-      streamIdx: idx,
-      streams: ch.streams,
-      vodItem: ch.vodItem,
-    });
-  }
-  if (history.length > 15) history = history.slice(0, 15);
-  try { localStorage.setItem(key, JSON.stringify(history)); } catch {}
-
-  const pid = activeProfileUuid();
-  if (pid) {
-    void saveProgress(pid, { content_id: itemId, title: ch.name, position_secs: time, duration_secs: duration }).catch(() => {});
-  }
 }
 
 function markWatched(epId?: string): void {
@@ -103,225 +76,339 @@ function markWatched(epId?: string): void {
   }
 }
 
+class VodPlayer {
+  private player: any = null;
+  private root: HTMLElement | null = null;
+  private stage: HTMLElement | null = null;
+  private loader: HTMLElement | null = null;
+  private pipBtn: HTMLElement | null = null;
+  private readonly ac = new AbortController();
+  private mode: "full" | "mini" = "full";
+  private lastSave = 0;
+  private destroyed = false;
+
+  constructor(
+    private readonly overlay: HTMLElement,
+    private readonly ch: any,
+    private idx: number,
+    private readonly startTime: number,
+    readonly token: number,
+  ) {}
+
+  async mount(): Promise<void> {
+    this.buildChrome();
+    if (this.destroyed) return;
+
+    const first = this.ch.streams?.[this.idx];
+    if (!first?.url) {
+      this.showPanel("This title isn't available to stream right now.", "Try another title — most of the catalog plays instantly.");
+      return;
+    }
+
+    let created: any;
+    try {
+      created = await VidstackPlayer.create({
+        target: this.stage!,
+        title: this.titleFor(first),
+        src: toSource(first.url),
+        autoplay: true,
+        currentTime: this.startTime,
+        layout: new VidstackPlayerLayout(),
+      });
+    } catch (e: any) {
+      console.error("[vodplayer] VidstackPlayer.create failed:", e);
+      if (!this.destroyed) this.showPanel("Player failed to load.", e?.message || "Unknown error");
+      return;
+    }
+
+    // A newer open may have destroyed us while create() was in flight. Because
+    // create() sets keep-alive, an orphan left here would keep playing audio
+    // forever, so it has to destroy itself rather than be abandoned.
+    if (this.destroyed) {
+      try { created.destroy(); } catch {}
+      return;
+    }
+
+    this.player = created;
+    this.style();
+    this.wire();
+  }
+
+  destroy(): void {
+    if (this.destroyed) return;
+    this.destroyed = true;
+    this.ac.abort();                                   // drops every listener at once
+    if (this.player) {
+      // Explicit destroy FIRST. Removing the DOM does not stop a keep-alive player.
+      try { this.player.destroy(); } catch {}
+      this.player = null;
+    }
+    this.root?.remove();
+    this.root = this.stage = this.loader = this.pipBtn = null;
+  }
+
+  pause(): void { try { this.player?.pause(); } catch {} }
+
+  setMode(mode: "full" | "mini"): void {
+    this.mode = mode;
+    this.overlay.style.cssText = mode === "mini" ? MINI_CSS : FULL_CSS;
+    if (this.root) this.root.dataset.mode = mode;
+    if (this.pipBtn) this.pipBtn.style.display = mode === "mini" ? "none" : this.pipBtn.dataset.ready ? "flex" : "none";
+    const close = this.root?.querySelector<HTMLElement>("[data-role=close]");
+    if (close) close.style.display = mode === "mini" ? "flex" : "none";
+  }
+
+  private titleFor(stream: any): string {
+    return stream?.source ? `${this.ch.name} · ${stream.source}` : this.ch.name;
+  }
+
+  private buildChrome(): void {
+    // Legacy overlay markup is inert but still present; keep it out of the way.
+    Array.from(this.overlay.children).forEach((c) => { (c as HTMLElement).style.display = "none"; });
+
+    const root = document.createElement("div");
+    root.className = "vodStage";
+    root.dataset.mode = "full";
+    root.style.cssText = "position:absolute;inset:0;width:100%;height:100%;background:#000;";
+
+    const stage = document.createElement("div");
+    stage.style.cssText = "width:100%;height:100%;";
+    root.appendChild(stage);
+
+    const loader = document.createElement("div");
+    loader.style.cssText = "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:40;background:#000;";
+    loader.innerHTML = `
+      <div style="display:flex;align-items:flex-end;gap:10px;height:40px">
+        <div style="width:14px;height:14px;border-radius:50%;background:#C6F53A;animation:vdBounce .72s ease-in-out infinite"></div>
+        <div style="width:14px;height:14px;border-radius:50%;background:#7E8792;animation:vdBounce .72s ease-in-out infinite;animation-delay:.1s"></div>
+        <div style="width:14px;height:14px;border-radius:50%;background:#4A5058;animation:vdBounce .72s ease-in-out infinite;animation-delay:.2s"></div>
+      </div>
+      <style>
+        @keyframes vdBounce { 0%,100% { transform: translateY(0) scale(1.14,.86); } 45% { transform: translateY(-22px) scale(.92,1.08); } }
+        .vodStage media-spinner { display: none !important; }
+      </style>`;
+    root.appendChild(loader);
+
+    root.appendChild(this.iconBtn("minimize", "Minimize player",
+      "position:absolute;top:20px;left:20px;z-index:60;",
+      `<polyline points="15 18 9 12 15 6"></polyline>`,
+      () => this.setMode("mini")));
+
+    this.pipBtn = this.iconBtn("pip", "Pop out (Picture-in-Picture)",
+      "position:absolute;top:20px;right:20px;z-index:60;display:none;",
+      `<rect x="2" y="4" width="20" height="16" rx="2"></rect><rect x="12" y="12" width="8" height="6" rx="1" fill="currentColor" stroke="none"></rect>`,
+      () => void this.togglePip());
+    root.appendChild(this.pipBtn);
+
+    root.appendChild(this.iconBtn("close", "Close player",
+      "position:absolute;top:8px;right:8px;z-index:70;display:none;width:32px;height:32px;background:#222;",
+      `<line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>`,
+      () => closeVodPlayer()));
+
+    // Clicking the mini box restores it. Scoped to mini so it never interferes
+    // with the control bar at full size.
+    root.addEventListener("click", () => { if (this.mode === "mini") this.setMode("full"); }, { signal: this.ac.signal });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !this.overlay.hasAttribute("hidden") && !document.fullscreenElement) closeVodPlayer();
+    }, { signal: this.ac.signal });
+
+    this.overlay.appendChild(root);
+    this.root = root;
+    this.stage = stage;
+    this.loader = loader;
+    this.setMode("full");
+  }
+
+  private iconBtn(role: string, label: string, extra: string, path: string, onClick: () => void): HTMLElement {
+    const b = document.createElement("button");
+    b.dataset.role = role;
+    b.setAttribute("aria-label", label);
+    b.title = label;
+    b.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
+    b.style.cssText =
+      "align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;border:none;" +
+      "background:rgba(0,0,0,0.55);color:#fff;cursor:pointer;display:flex;" + extra;
+    b.addEventListener("click", (e) => { e.stopPropagation(); onClick(); }, { signal: this.ac.signal });
+    return b;
+  }
+
+  private async togglePip(): Promise<void> {
+    try {
+      if (this.player?.state?.pictureInPicture) await this.player.exitPictureInPicture();
+      else await this.player?.enterPictureInPicture();
+    } catch (err) {
+      console.warn("[vodplayer] picture-in-picture request failed:", err);
+    }
+  }
+
+  private style(): void {
+    try {
+      const el = this.player as HTMLElement;
+      el.style.width = "100%";
+      el.style.height = "100%";
+      el.style.setProperty("--media-brand", BRAND);
+      (this.player as any).fullscreenOrientation = "landscape";
+      setTimeout(() => { if (!this.destroyed) el.focus(); }, 100);
+    } catch {}
+  }
+
+  private hideLoader = (): void => {
+    if (this.loader) this.loader.style.display = "none";
+    if (this.pipBtn && this.player?.state?.canPictureInPicture) {
+      this.pipBtn.dataset.ready = "1";
+      if (this.mode === "full") this.pipBtn.style.display = "flex";
+    }
+  };
+
+  private showPanel(title: string, detail: string): void {
+    if (this.loader) this.loader.style.display = "none";
+    const p = document.createElement("div");
+    p.style.cssText = "position:absolute;inset:0;z-index:45;display:flex;align-items:center;justify-content:center;background:#000;color:#fff;font:600 15px/1.6 'Space Grotesk',sans-serif;text-align:center;padding:40px;";
+    p.innerHTML = `<div>${title}<br><span style="color:#9aa5b5;font-weight:500;">${detail}</span></div>`;
+    this.root?.appendChild(p);
+  }
+
+  private load(i: number): void {
+    const s = this.ch.streams?.[i];
+    if (!s?.url) { closeVodPlayer(); return; }
+    this.idx = i;
+    if (this.player) {
+      this.player.title = this.titleFor(s);
+      this.player.src = toSource(s.url);
+    }
+  }
+
+  private wire(): void {
+    const on = (type: string, fn: (e: any) => void) =>
+      this.player.addEventListener(type, fn, { signal: this.ac.signal });
+
+    // hls.js loads asynchronously, so e.detail.instance is still null at
+    // provider-change. onInstance fires immediately if it already exists and
+    // waits otherwise, so it is correct either way.
+    on("provider-change", (e: any) => {
+      const p = e.detail;
+      if (p?.type !== "hls") return;
+      p.onInstance((hls: any) => {
+        hls.on("hlsError", (_ev: any, data: any) => {
+          if (data?.fatal && data?.type === "networkError") {
+            const cur = this.ch.streams?.[this.idx]?.url;
+            if (cur && !(hls.url || "").includes("/proxy")) { hls.loadSource(proxied(cur)); hls.startLoad(); }
+          }
+        });
+      });
+    });
+
+    // Hide the loader only once media can genuinely play. provider-change fires
+    // before a byte is fetched, which made every failure look like a black screen.
+    on("can-play", this.hideLoader);
+    on("playing", this.hideLoader);
+
+    on("error", (e: any) => {
+      console.error("[vodplayer] media error:", e?.detail ?? e);
+      this.showPanel("This title didn't load.", "Try another title, or come back in a bit.");
+    });
+
+    on("time-update", () => {
+      const t = this.player?.currentTime ?? 0;
+      const d = this.player?.duration ?? 0;
+      if (d > 0) {
+        this.saveResume(t, d, (t / d) * 100);
+        if (t / d > 0.9) markWatched(this.ch.streams?.[this.idx]?.id);
+      }
+    });
+
+    on("ended", () => {
+      markWatched(this.ch.streams?.[this.idx]?.id);
+      if (this.idx + 1 < (this.ch.streams?.length || 0)) this.load(this.idx + 1);
+      else closeVodPlayer();
+    });
+  }
+
+  // Mirrors progress to BOTH stores. The localStorage write is what makes a
+  // title appear in Continue Watching at all; the Supabase row only refines the
+  // timecode of an entry that already exists locally.
+  private saveResume(time: number, duration: number, pct: number): void {
+    if (Date.now() - this.lastSave < 5000) return;
+    this.lastSave = Date.now();
+
+    const ch = this.ch;
+    const itemId = String(ch.id || "").replace("vod:", "");
+    const stream = ch.streams?.[this.idx];
+    if (!stream) return;
+
+    const key = resumeHistoryKey();
+    let history: any[] = [];
+    try { history = JSON.parse(localStorage.getItem(key) || "[]"); } catch { history = []; }
+    history = history.filter((x: any) => x.itemId !== itemId);
+    if (pct < 95) {
+      history.unshift({
+        id: stream.id || `vod:${itemId}:${this.idx}`,
+        itemId,
+        title: ch.name,
+        episodeTitle: stream.source,
+        poster: ch.vodPoster,
+        banner: ch.vodBanner,
+        // Kept so the kids gate can be re-applied when rendering the resume rail.
+        maturity: ch.maturity ?? ch.vodItem?.maturity,
+        genre: ch.genre ?? ch.vodItem?.genre,
+        time,
+        duration,
+        percentage: pct,
+        streamIdx: this.idx,
+        streams: ch.streams,
+        vodItem: ch.vodItem,
+      });
+    }
+    if (history.length > 15) history = history.slice(0, 15);
+    try { localStorage.setItem(key, JSON.stringify(history)); } catch {}
+
+    const pid = activeProfileUuid();
+    if (pid) {
+      void saveProgress(pid, {
+        content_id: itemId,
+        title: ch.name,
+        position_secs: time,
+        duration_secs: duration,
+      }).catch(() => {});
+    }
+  }
+}
+
+let current: VodPlayer | null = null;
+let openToken = 0;
+
 export function closeVodPlayer(): void {
+  current?.destroy();
+  current = null;
   const overlay = document.getElementById("vodPlayerOverlay");
-  if (player) { try { player.pause(); } catch {} }
-  if (overlay) { overlay.setAttribute("hidden", ""); overlay.classList.remove("mini-player"); }
+  if (overlay) {
+    overlay.setAttribute("hidden", "");
+    overlay.style.cssText = FULL_CSS;
+  }
 }
 
 export async function openVodPlayer(ch: any, streamIdx: number, startTime = 0): Promise<void> {
   const overlay = document.getElementById("vodPlayerOverlay");
-  if (overlay) {
-    overlay.removeAttribute("hidden");
-    overlay.classList.remove("mini-player");
-    // Force a visible full-screen container regardless of legacy overlay CSS so
-    // the mounted <media-player> can never collapse to zero size.
-    overlay.style.cssText = "position:fixed;inset:0;z-index:9998;display:block;background:#000;";
+  if (!overlay) return;
+
+  const token = ++openToken;
+
+  // Tear the previous instance down completely before building the next one.
+  current?.destroy();
+  current = null;
+
+  overlay.removeAttribute("hidden");
+  overlay.style.cssText = FULL_CSS;
+
+  const inst = new VodPlayer(overlay, ch, streamIdx, startTime, token);
+  // Published BEFORE the await so an open that starts during mount can destroy
+  // this one; mount() re-checks and a late create() destroys itself.
+  current = inst;
+  await inst.mount();
+
+  if (token !== openToken) {
+    inst.destroy();
+    if (current === inst) current = null;
   }
-
-  // Teardown previous player instance
-  if (player) {
-    try { player.destroy(); } catch {}
-    player = null;
-  }
-
-  // First open: hide the legacy hand-rolled chrome and mount Vidstack full-bleed.
-  let mount = document.getElementById("vodPlayerMount");
-  if (!mount && overlay) {
-    Array.from(overlay.children).forEach((c) => { (c as HTMLElement).style.display = "none"; });
-    mount = document.createElement("div");
-    mount.id = "vodPlayerMount";
-    mount.style.cssText = "position:absolute;inset:0;width:100%;height:100%;background:#000;";
-    overlay.appendChild(mount);
-
-    // Minimize button
-    const backBtn = document.createElement("button");
-    backBtn.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>`;
-    backBtn.setAttribute("aria-label", "Minimize player");
-    backBtn.style.cssText = "position:absolute;top:20px;left:20px;z-index:60;display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;border:none;background:rgba(0,0,0,0.55);color:#fff;cursor:pointer;";
-    backBtn.onclick = (e) => {
-      e.stopPropagation();
-      overlay?.classList.add("mini-player");
-    };
-    overlay.appendChild(backBtn);
-
-    // Close button (for PiP mode)
-    const closeBtn = document.createElement("button");
-    closeBtn.id = "vodPiPCloseBtn";
-    closeBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
-    closeBtn.setAttribute("aria-label", "Close player");
-    closeBtn.style.cssText = "position:absolute;top:8px;right:8px;z-index:70;display:none;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;border:none;background:#222;color:#fff;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.5);";
-    closeBtn.onclick = (e) => {
-      e.stopPropagation();
-      closeVodPlayer();
-    };
-    overlay.appendChild(closeBtn);
-
-    // Native Picture-in-Picture: the OS-level window that floats above every
-    // other app. Distinct from our in-page mini-player, which is just a scaled
-    // overlay. Chrome only surfaces native PiP via a double right-click on the
-    // <video>, and this overlay's own chrome sits on top of it and swallows
-    // that, so expose an explicit button. Firefox injects its own toggle, which
-    // is why it appeared to work there and not here.
-    const pipBtn = document.createElement("button");
-    pipBtn.id = "vodNativePipBtn";
-    pipBtn.setAttribute("aria-label", "Pop out video");
-    pipBtn.title = "Pop out (Picture-in-Picture)";
-    pipBtn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><rect x="12" y="12" width="8" height="6" rx="1" fill="currentColor" stroke="none"></rect></svg>`;
-    pipBtn.style.cssText = "position:absolute;top:20px;right:20px;z-index:60;display:none;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;border:none;background:rgba(0,0,0,0.55);color:#fff;cursor:pointer;";
-    pipBtn.onclick = async (e) => {
-      e.stopPropagation();
-      try {
-        if (player?.state?.pictureInPicture) await player.exitPictureInPicture();
-        else await player?.enterPictureInPicture();
-      } catch (err) {
-        console.warn("[vodplayer] picture-in-picture request failed:", err);
-      }
-    };
-    overlay.appendChild(pipBtn);
-
-    // Dynamic styling for PiP close button
-    const style = document.createElement("style");
-    style.innerHTML = `
-      #vodPlayerOverlay.mini-player #vodPiPCloseBtn { display: flex !important; }
-      #vodPlayerOverlay.mini-player #vodNativePipBtn { display: none !important; }
-      #vodPlayerOverlay.mini-player:hover { cursor: pointer; transform: scale(1.02); transition: transform 0.2s; }
-    `;
-    overlay.appendChild(style);
-
-    // Restore from PiP when clicking the mini-player
-    overlay.addEventListener("click", () => {
-      if (overlay.classList.contains("mini-player")) {
-        overlay.classList.remove("mini-player");
-      }
-    });
-
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && overlay && !overlay.hasAttribute("hidden") && !document.fullscreenElement) closeVodPlayer();
-    });
-  }
-  
-  if (mount) mount.innerHTML = "";
-
-  let idx = streamIdx;
-  const first = ch.streams?.[idx];
-  // No playable stream
-  if (!first || !first.url) {
-    if (mount) {
-      mount.innerHTML = `<div style="color:#fff;font:600 15px/1.6 'Space Grotesk',sans-serif;padding:40px;max-width:420px;margin:auto;text-align:center;">This title isn't available to stream right now.<br><span style="color:#9aa5b5;font-weight:500;">Try another title — most of the catalog plays instantly.</span></div>`;
-    }
-    return;
-  }
-
-  // Create Brand Loader (Bouncing Ball)
-  const loader = document.createElement("div");
-  loader.style.cssText = "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:40;background:#000;";
-  loader.innerHTML = `
-    <div style="display: flex; align-items: flex-end; gap: 10px; height: 40px">
-      <div style="width: 14px; height: 14px; border-radius: 50%; background: #C6F53A; animation: vdBounce 0.72s ease-in-out infinite"></div>
-      <div style="width: 14px; height: 14px; border-radius: 50%; background: #7E8792; animation: vdBounce 0.72s ease-in-out infinite; animation-delay: 0.1s"></div>
-      <div style="width: 14px; height: 14px; border-radius: 50%; background: #4A5058; animation: vdBounce 0.72s ease-in-out infinite; animation-delay: 0.2s"></div>
-    </div>
-    <style>@keyframes vdBounce { 0%, 100% { transform: translateY(0) scale(1.14, 0.86); } 45% { transform: translateY(-22px) scale(0.92, 1.08); } }</style>
-  `;
-  mount!.appendChild(loader);
-
-  // Player Container
-  const playerContainer = document.createElement("div");
-  playerContainer.style.cssText = "width:100%;height:100%;opacity:1;transition:opacity 0.3s ease;";
-  mount!.appendChild(playerContainer);
-
-  const load = (i: number) => {
-    idx = i;
-    const s = ch.streams?.[i];
-    if (!s) { closeVodPlayer(); return; }
-    if (player) {
-      player.title = s.source ? `${ch.name} · ${s.source}` : ch.name;
-      player.src = toSource(s.url);
-    }
-  };
-
-  try {
-    player = await VidstackPlayer.create({
-      target: playerContainer,
-      title: first.source ? `${ch.name} · ${first.source}` : ch.name,
-      src: toSource(first.url),
-      autoplay: true,
-      currentTime: startTime,
-      layout: new VidstackPlayerLayout(),
-    });
-    
-    // Hide Vidstack's default loading spinner to use our custom one
-    const style = document.createElement("style");
-    style.innerHTML = `media-spinner { display: none !important; }`;
-    playerContainer.appendChild(style);
-
-  } catch (e: any) {
-    console.error("[vodplayer] VidstackPlayer.create failed:", e);
-    const msg = (e && (e.message || String(e))) || "Unknown error";
-    mount!.innerHTML = `<div style="color:#fff;font:600 15px/1.5 sans-serif;padding:32px;max-width:520px">Player failed to load.<br><span style="color:#ff8a8a">${msg}</span></div>`;
-    return;
-  }
-  
-  try {
-    const el = player as HTMLElement;
-    el.style.width = "100%"; el.style.height = "100%";
-    el.style.setProperty("--media-brand", BRAND);
-    (player as any).fullscreenOrientation = "landscape";
-    setTimeout(() => el.focus(), 100);
-  } catch {}
-
-  // hls.js is fetched asynchronously, so `p.instance` is still null when
-  // provider-change fires — guarding on it silently skipped the /proxy fallback
-  // entirely. onInstance fires immediately if the instance already exists and
-  // waits for it otherwise, so it is correct regardless of load timing.
-  player.addEventListener("provider-change", (e: any) => {
-    const p = e.detail;
-    if (p?.type !== "hls") return;
-    p.onInstance((hls: any) => {
-      hls.on("hlsError", (_ev: any, data: any) => {
-        if (data?.fatal && data?.type === "networkError") {
-          const cur = ch.streams?.[idx]?.url;
-          if (cur && !(hls.url || "").includes("/proxy")) { hls.loadSource(proxied(cur)); hls.startLoad(); }
-        }
-      });
-    });
-  });
-
-  // Hide the loader only once media can actually play. provider-change fires
-  // before a single byte is fetched, so hiding there made every load failure
-  // look like a working player in front of a black screen.
-  const hideLoader = () => {
-    loader.style.display = "none";
-    // canPictureInPicture is only meaningful once a provider is attached.
-    const pip = document.getElementById("vodNativePipBtn");
-    if (pip && player?.state?.canPictureInPicture) pip.style.display = "flex";
-  };
-  player.addEventListener("can-play", hideLoader);
-  player.addEventListener("playing", hideLoader);
-
-  // Never fail silently. Without this a 401 or a CORS rejection is invisible.
-  player.addEventListener("error", (e: any) => {
-    console.error("[vodplayer] media error:", e?.detail ?? e);
-    hideLoader();
-    const err = document.createElement("div");
-    err.style.cssText = "position:absolute;inset:0;z-index:45;display:flex;align-items:center;justify-content:center;background:#000;color:#fff;font:600 15px/1.6 'Space Grotesk',sans-serif;text-align:center;padding:40px;";
-    err.innerHTML = `<div>This title didn't load.<br><span style="color:#9aa5b5;font-weight:500;">Try another title, or come back in a bit.</span></div>`;
-    mount!.appendChild(err);
-  });
-
-  player.addEventListener("time-update", () => {
-    const t = player.currentTime, d = player.duration;
-    if (d > 0) {
-      saveResume(ch, idx, t, d, (t / d) * 100);
-      if (t / d > 0.9) markWatched(ch.streams?.[idx]?.id);
-    }
-  });
-
-  player.addEventListener("ended", () => {
-    markWatched(ch.streams?.[idx]?.id);
-    if (idx + 1 < (ch.streams?.length || 0)) load(idx + 1);
-    else closeVodPlayer();
-  });
-
 }
