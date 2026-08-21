@@ -30,6 +30,7 @@ import { state } from "./state";
 import { toggleWatched } from "./api";
 import { saveProgress } from "./db";
 import { getActiveProfile } from "./profiles";
+import { reportPlaybackFailure } from "./feedback";
 
 const BRAND = "#c5f04e";
 
@@ -101,7 +102,7 @@ class VodPlayer {
 
     const first = this.ch.streams?.[this.idx];
     if (!first?.url) {
-      this.showPanel("This title isn't available to stream right now.", "Try another title — most of the catalog plays instantly.");
+      this.showPanel("This title isn't available to stream right now.", "Try another title — most of the catalog plays instantly.", true);
       return;
     }
 
@@ -309,11 +310,37 @@ class VodPlayer {
     }
   };
 
-  private showPanel(title: string, detail: string): void {
+  private showPanel(title: string, detail: string, reportable = false): void {
     if (this.loader) this.loader.style.display = "none";
     const p = document.createElement("div");
-    p.style.cssText = "position:absolute;inset:0;z-index:45;display:flex;align-items:center;justify-content:center;background:#000;color:#fff;font:600 15px/1.6 'Space Grotesk',sans-serif;text-align:center;padding:40px;";
+    p.style.cssText = "position:absolute;inset:0;z-index:45;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:#000;color:#fff;font:600 15px/1.6 'Space Grotesk',sans-serif;text-align:center;padding:40px;";
     p.innerHTML = `<div>${title}<br><span style="color:#9aa5b5;font-weight:500;">${detail}</span></div>`;
+
+    // One tap to tell us. A playback failure is the case where a written
+    // description adds least and the console tail matters most, so the report
+    // needs no typing at all.
+    if (reportable) {
+      const b = document.createElement("button");
+      b.textContent = "This didn't play — tell us";
+      b.style.cssText = "background:#c5f04e;border:none;color:#06070a;padding:10px 18px;border-radius:9px;font:800 13px 'Space Grotesk',sans-serif;cursor:pointer;";
+      b.onclick = async () => {
+        b.disabled = true;
+        b.textContent = "Sending…";
+        try {
+          await reportPlaybackFailure({
+            title: this.ch?.name,
+            contentId: String(this.ch?.id || ""),
+            provider: this.ch?.streams?.[this.idx]?.source,
+            detail,
+          });
+          b.textContent = "Sent — thank you";
+        } catch {
+          b.disabled = false;
+          b.textContent = "Couldn't send — retry";
+        }
+      };
+      p.appendChild(b);
+    }
     this.root?.appendChild(p);
   }
 
@@ -354,7 +381,7 @@ class VodPlayer {
 
     on("error", (e: any) => {
       console.error("[vodplayer] media error:", e?.detail ?? e);
-      this.showPanel("This title didn't load.", "Try another title, or come back in a bit.");
+      this.showPanel("This title didn't load.", "Try another title, or come back in a bit.", true);
     });
 
     on("time-update", () => {

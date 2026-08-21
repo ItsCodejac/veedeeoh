@@ -554,3 +554,30 @@ export const RATING_GROUPS: { system: string; note: string; ratings: { code: str
     ],
   },
 ];
+
+/** A household "section" is a collection that shows as a sidebar tab. Same
+ *  mechanism as the kids collections, different scope -- one concept, two uses. */
+export async function createSection(name: string): Promise<string> {
+  const sb = getSupabase();
+  const { data: user } = await sb.auth.getUser();
+  const owner = user.user?.id;
+  if (!owner) throw new Error("not signed in");
+  const { data, error } = await sb.from("collections")
+    .insert({ scope: "household", owner_id: owner, name, min_age: null, show_as_tab: true })
+    .select("id").single();
+  if (error) throw error;
+  return data.id as string;
+}
+
+export async function addToCollection(collectionId: string, contentId: string, isSeries = false): Promise<void> {
+  const { error } = await getSupabase().from("collection_items")
+    .upsert({ collection_id: collectionId, content_id: contentId, kind: isSeries ? "series" : "title" });
+  if (error) throw error;
+}
+
+export async function listCollectionItems(collectionId: string): Promise<string[]> {
+  const { data, error } = await getSupabase()
+    .from("collection_items").select("content_id").eq("collection_id", collectionId);
+  if (error) { console.warn("[db] listCollectionItems", error); return []; }
+  return (data ?? []).map((r: any) => r.content_id);
+}

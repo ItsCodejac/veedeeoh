@@ -3,7 +3,7 @@ import { state } from "./state";
 import type { Stream, VodItem, VodEpisode, VodRail } from "./types";
 import { escapeHtml, $, setupHorizontalScroll, buildBrandLoader, buildRailSkeleton, showToast } from "./util";
 import { getActiveProfile, getStoredProfiles } from "./profiles";
-import { maturityCeiling, allowedRatingsFor, addFavorite, removeFavorite, getWatchHistory, listExclusions, listApprovedContent, filterRailsForGatedProfile, tvMaturity, allowForAge, excludeFromProfile, unexcludeFromProfile } from "./db";
+import { maturityCeiling, allowedRatingsFor, addFavorite, removeFavorite, getWatchHistory, listExclusions, listApprovedContent, filterRailsForGatedProfile, tvMaturity, listCollections, createSection, addToCollection, allowForAge, excludeFromProfile, unexcludeFromProfile } from "./db";
 import { openVodPlayer } from "./vodplayer";
 
 // The active profile's real Supabase id (null for local/unsynced placeholders).
@@ -766,19 +766,111 @@ async function playVod(item: VodItem): Promise<void> {
   await openVodDetails(item);
 }
 
+const HEART = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21.2l7.8-7.7 1-1.1a5.5 5.5 0 0 0 0-7.8z"></path></svg>`;
+const PLUS  = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`;
+
 function vodCard(item: VodItem): HTMLElement {
   const el = document.createElement("button");
   el.className = "vodCard";
   el.title = item.summary || item.title;
   el.innerHTML = `
-    <span class="vodPoster">${item.poster ? `<img loading="lazy" alt="" src="${escapeHtml(item.poster)}">` : FILM_ICON}</span>
+    <span class="vodPoster">${item.poster ? `<img loading="lazy" alt="" src="${escapeHtml(item.poster)}">` : FILM_ICON}
+      <span class="vodQuick">
+        <span class="vodQuickBtn" data-act="fav" title="Add to My List">${HEART}</span>
+        <span class="vodQuickBtn" data-act="add" title="Add to a section">${PLUS}</span>
+      </span>
+    </span>
     <span class="vodTitle">${escapeHtml(item.title)}</span>
     <span class="vodMeta">${escapeHtml([item.genre, item.rating].filter(Boolean).join(" · "))}</span>`;
-  el.addEventListener("click", () => {
+
+  const fav = el.querySelector<HTMLElement>('[data-act="fav"]')!;
+  const paintFav = () => fav.classList.toggle("on", state.favorites.has(item.id));
+  paintFav();
+
+  // Quick actions live inside the card button, so their clicks must not fall
+  // through and open the details overlay.
+  el.addEventListener("click", (e) => {
+    const act = (e.target as HTMLElement)?.closest?.("[data-act]")?.getAttribute("data-act");
+    if (act) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (act === "fav") { void toggleFavorite(item).then(paintFav); }
+      else { openAddToMenu(item, e as MouseEvent); }
+      return;
+    }
     el.classList.add("loading");
     void playVod(item).finally(() => el.classList.remove("loading"));
   });
   return el;
+}
+
+/** Shared by the card heart and the detail view, so both stay in step. */
+async function toggleFavorite(item: VodItem): Promise<void> {
+  const nowIn = !state.favorites.has(item.id);
+  if (nowIn) state.favorites.add(item.id); else state.favorites.delete(item.id);
+  const pid = activeProfileUuid();
+  if (!pid) return;
+  try {
+    if (nowIn) await addFavorite(pid, { content_id: item.id, title: item.title, poster: item.poster ?? null });
+    else await removeFavorite(pid, item.id);
+  } catch { /* optimistic: the list is rebuilt from state on next render */ }
+}
+
+/** "Add to" menu: the household's own sidebar sections, plus a way to make one.
+ *  Sections are collections with show_as_tab set, so this is the same mechanism
+ *  as kids curation at a different scope. */
+async function openAddToMenu(item: VodItem, ev: MouseEvent): Promise<void> {
+  document.getElementById("vodAddMenu")?.remove();
+  const menu = document.createElement("div");
+  menu.id = "vodAddMenu";
+  menu.style.cssText = "position:fixed;z-index:10065;min-width:220px;max-height:320px;overflow:auto;background:#10141e;border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:7px;box-shadow:0 18px 44px rgba(0,0,0,.7);font-family:'Space Grotesk',sans-serif;";
+  menu.style.left = `${Math.min(ev.clientX, window.innerWidth - 240)}px`;
+  menu.style.top = `${Math.min(ev.clientY, window.innerHeight - 300)}px`;
+  menu.innerHTML = `<div style="padding:8px 10px;font-size:11px;font-weight:800;color:#7C828C;letter-spacing:.05em;">ADD TO SECTION</div><div id="vodAddRows" style="color:#9aa5b5;font-size:12.5px;padding:6px 10px;">loading…</div>`;
+  document.body.appendChild(menu);
+  setTimeout(() => document.addEventListener("click", function away() {
+    menu.remove(); document.removeEventListener("click", away);
+  }, { once: true }), 0);
+
+  const rows = menu.querySelector("#vodAddRows") as HTMLElement;
+  const mk = (label: string, onClick: () => void) => {
+    const b = document.createElement("button");
+    b.style.cssText = "display:block;width:100%;text-align:left;padding:8px 10px;border:none;border-radius:8px;background:none;color:#fff;cursor:pointer;font:600 13px 'Space Grotesk',sans-serif;";
+    b.textContent = label;
+    b.onmouseenter = () => (b.style.background = "rgba(255,255,255,.08)");
+    b.onmouseleave = () => (b.style.background = "none");
+    b.onclick = () => { menu.remove(); onClick(); };
+    return b;
+  };
+
+  const all = await listCollections().catch(() => []);
+  const sections = all.filter((c) => c.scope === "household" && c.show_as_tab);
+  rows.replaceChildren();
+  if (!sections.length) {
+    const none = document.createElement("div");
+    none.style.cssText = "padding:4px 10px 10px;color:#7C828C;font-size:12px;line-height:1.5;";
+    none.textContent = "No sections yet.";
+    rows.appendChild(none);
+  }
+  for (const c of sections) {
+    rows.appendChild(mk(c.name, async () => {
+      try { await addToCollection(c.id, item.id, !!item.series_id); showToast(`Added to ${c.name}`); }
+      catch (e: any) { showToast(e?.message || "Could not add"); }
+    }));
+  }
+  const sep = document.createElement("div");
+  sep.style.cssText = "height:1px;background:rgba(255,255,255,.1);margin:5px 4px;";
+  rows.appendChild(sep);
+  rows.appendChild(mk("New section…", async () => {
+    const name = prompt("Name this section");
+    if (!name?.trim()) return;
+    try {
+      const id = await createSection(name.trim());
+      await addToCollection(id, item.id, !!item.series_id);
+      showToast(`Created ${name.trim()}`);
+      window.dispatchEvent(new CustomEvent("veedeeoh:sections-changed"));
+    } catch (e: any) { showToast(e?.message || "Could not create"); }
+  }));
 }
 
 function renderFilterChips(container: HTMLElement, genres: string[], activeGenre: string, onSelect: (g: string) => void): void {

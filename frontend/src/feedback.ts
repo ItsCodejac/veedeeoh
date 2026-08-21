@@ -78,6 +78,22 @@ async function submit(kind: "bug" | "feature", title: string, body: string): Pro
   if (error) throw error;
 }
 
+/** One-tap "this didn't play" report from inside the player. Everything needed
+ *  to diagnose it is attached automatically -- provider, title, stream URL shape
+ *  and the console tail -- so the tester only has to tap once. Playback failures
+ *  are the reports where the console matters most and where a written
+ *  description helps least. */
+export async function reportPlaybackFailure(ctx: {
+  title?: string; contentId?: string; provider?: string; detail?: string;
+}): Promise<void> {
+  const body = [
+    ctx.contentId ? `content: ${ctx.contentId}` : null,
+    ctx.provider ? `provider: ${ctx.provider}` : null,
+    ctx.detail ? `error: ${ctx.detail}` : null,
+  ].filter(Boolean).join("\n");
+  await submit("bug", `Won't play: ${ctx.title || "unknown title"}`, body);
+}
+
 function openForm(): void {
   if (document.getElementById("fbModal")) return;
   const m = document.createElement("div");
