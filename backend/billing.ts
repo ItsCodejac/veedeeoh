@@ -78,18 +78,51 @@ export async function createPortalSession(userId: string, origin: string): Promi
 }
 
 /** Mirror a subscription's state onto the account row. */
+// How long a customer keeps access after a renewal fails. Stripe's smart retries
+// run for roughly three weeks; the grace should outlast them so a card that
+// eventually succeeds never causes a lockout. When Stripe gives up it moves the
+// subscription to unpaid or canceled and access ends immediately.
+const DUNNING_GRACE_DAYS = 24;
+
 async function applySubscription(sub: Stripe.Subscription): Promise<void> {
   const sb = adminSupabase();
   const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer.id;
-  const active = sub.status === "active" || sub.status === "trialing";
+
+  // Entitlement follows Stripe's dunning window rather than cutting at the first
+  // decline. Revoking on past_due turns a recoverable expired card into
+  // involuntary churn on day one.
+  //
+  //   active, trialing     paid and current
+  //   past_due             renewal failed, Stripe still retrying -> keep access
+  //   unpaid               retries exhausted                     -> revoke
+  //   canceled             ended                                 -> revoke
+  //   incomplete(_expired) first payment never completed         -> no access
+  //   paused               intentionally paused                  -> no access
+  const entitled = sub.status === "active" || sub.status === "trialing" || sub.status === "past_due";
+
   // period end lives on the subscription (older API) or its items (newer API)
   const periodEnd =
     (sub as any).current_period_end ?? (sub.items?.data?.[0] as any)?.current_period_end ?? null;
   const seats = sub.items?.data?.[0]?.quantity ?? BASE_SEATS;
 
+  // During past_due the paid period has already elapsed, so carrying the old
+  // period end through would leave tier_expires in the past and hasActiveAccess
+  // would deny anyway. The grace has to be explicit.
+  let expires: string;
+  if (!entitled) {
+    expires = new Date().toISOString();
+  } else if (sub.status === "past_due") {
+    expires = new Date(Date.now() + DUNNING_GRACE_DAYS * 86_400_000).toISOString();
+  } else {
+    expires = periodEnd ? new Date(periodEnd * 1000).toISOString() : new Date().toISOString();
+  }
+
   await sb.from("profiles").update({
-    tier: active ? "cloud_paid" : "canceled",
-    tier_expires: active && periodEnd ? new Date(periodEnd * 1000).toISOString() : new Date().toISOString(),
+    // past_due deliberately stays on cloud_paid. A distinct tier would have to be
+    // added to PAID_TIERS in the frontend gate, and forgetting that would revoke
+    // access again -- exactly the bug being fixed here.
+    tier: entitled ? "cloud_paid" : "canceled",
+    tier_expires: expires,
     stripe_subscription_id: sub.id,
     seats,
   }).eq("stripe_customer_id", customerId);
@@ -121,6 +154,16 @@ export async function handleWebhook(rawBody: string, signature: string): Promise
     case "customer.subscription.deleted":
       await applySubscription(event.data.object as Stripe.Subscription);
       break;
+    // A renewal succeeding or failing does not always emit a subscription event,
+    // and without payment_failed the dunning window is invisible. Both re-sync
+    // from the subscription.
+    case "invoice.paid":
+    case "invoice.payment_failed": {
+      const inv = event.data.object as Stripe.Invoice;
+      const subId = (inv as any).subscription;
+      if (subId) await applySubscription(await getStripe().subscriptions.retrieve(subId as string));
+      break;
+    }
     case "checkout.session.completed": {
       const s = event.data.object as Stripe.Checkout.Session;
       if (s.subscription) {
