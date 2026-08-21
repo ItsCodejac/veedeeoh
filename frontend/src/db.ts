@@ -585,3 +585,64 @@ export async function listCollectionItems(collectionId: string): Promise<string[
   if (error) { console.warn("[db] listCollectionItems", error); return []; }
   return (data ?? []).map((r: any) => r.content_id);
 }
+
+// ------------------------------------------------------------- referrals ---
+//
+// Attribution is first-touch and permanent, enforced by the definer functions
+// in the database rather than here. The client's only jobs are to remember a
+// ?ref= code across the sign-up round trip and to hand it over once there is a
+// session to attach it to.
+
+const REF_PENDING_KEY = "veedeeoh_pending_ref";
+
+export interface ReferralSummary {
+  referred: number;
+  converted: number;
+  pending_cents: number;
+  paid_cents: number;
+}
+
+/** Stash a ?ref= code seen before sign-in. Kept until it is either redeemed or
+ *  superseded, because the sign-up flow leaves the page (OAuth, magic link). */
+export function rememberReferral(code: string): void {
+  try { localStorage.setItem(REF_PENDING_KEY, code.toUpperCase()); } catch {}
+}
+
+/** Redeem a stashed code, if any. Safe to call on every boot: the function is
+ *  a no-op once the account already has a referrer. */
+export async function redeemPendingReferral(): Promise<void> {
+  let code: string | null = null;
+  try { code = localStorage.getItem(REF_PENDING_KEY); } catch {}
+  if (!code) return;
+
+  const { data: user } = await getSupabase().auth.getUser();
+  if (!user.user) return;                       // still anonymous; try next boot
+
+  const { data, error } = await getSupabase().rpc("attribute_referral", {
+    ref_code: code, src: "link", party: null,
+  });
+  if (error) { console.warn("[referral] attribute failed", error); return; }
+
+  // Clear on any definitive answer -- success, already attributed, unknown
+  // code, self-referral. Only a transport error is worth retrying, and that
+  // returns above with the code still stored.
+  try { localStorage.removeItem(REF_PENDING_KEY); } catch {}
+  if ((data as any)?.ok === false) console.info("[referral]", (data as any).error);
+}
+
+/** The caller's own referral code, minted on first request. */
+export async function myReferralCode(): Promise<string | null> {
+  const { data, error } = await getSupabase().rpc("ensure_referral_code");
+  if (error) { console.warn("[referral] ensure code", error); return null; }
+  return (data as string) || null;
+}
+
+export function referralLink(code: string): string {
+  return `${location.origin}/?ref=${code}`;
+}
+
+export async function referralSummary(): Promise<ReferralSummary | null> {
+  const { data, error } = await getSupabase().rpc("referral_summary");
+  if (error) { console.warn("[referral] summary", error); return null; }
+  return data as ReferralSummary;
+}

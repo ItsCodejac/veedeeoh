@@ -154,6 +154,82 @@ export async function setSeats(userId: string, seats: number): Promise<number> {
   return qty;
 }
 
+// ---------------------------------------------------------------- referrals ---
+
+/** Accrue affiliate commission for one paid invoice.
+ *
+ *  Idempotent by construction: referral_earnings is unique on
+ *  stripe_invoice_id, so a webhook retry hits the conflict and credits nothing
+ *  twice. Stripe retries aggressively, and a double-credited ledger is money
+ *  paid out that was never earned.
+ *
+ *  Never throws into the webhook. A referral bookkeeping failure must not make
+ *  Stripe retry an invoice whose ENTITLEMENT was already applied -- the user
+ *  losing access is a far worse outcome than a missed accrual, which is
+ *  recoverable from Stripe's own invoice history.
+ */
+async function accrueReferral(inv: Stripe.Invoice): Promise<void> {
+  try {
+    const sb = adminSupabase();
+    const customerId = typeof inv.customer === "string" ? inv.customer : inv.customer?.id;
+    if (!customerId || !inv.id) return;
+
+    // Commission is on NET revenue. Tax is collected on behalf of a tax
+    // authority and was never ours to share.
+    const gross =
+      (inv as any).total_excluding_tax ?? ((inv.amount_paid || 0) - ((inv as any).tax || 0));
+    if (!gross || gross <= 0) return;   // $0 invoices, full credits, trials
+
+    const { data: payer } = await sb.from("profiles")
+      .select("id").eq("stripe_customer_id", customerId).maybeSingle();
+    if (!payer?.id) return;
+
+    const { data: ref } = await sb.from("referrals")
+      .select("referrer_user_id, rate_bps, duration_months, first_paid_at")
+      .eq("referred_user_id", payer.id).maybeSingle();
+    if (!ref) return;
+
+    // The commission window runs from the FIRST payment, not from signup, so a
+    // referred account that lingers on a free trial does not burn the window
+    // the affiliate was promised. duration_months = 0 means for the life of
+    // the account.
+    if (ref.duration_months > 0 && ref.first_paid_at) {
+      const end = new Date(ref.first_paid_at);
+      end.setMonth(end.getMonth() + ref.duration_months);
+      if (Date.now() > end.getTime()) return;
+    }
+
+    const commission = Math.round((gross * ref.rate_bps) / 10000);
+    if (commission <= 0) return;
+
+    const { error } = await sb.from("referral_earnings").insert({
+      referrer_user_id: ref.referrer_user_id,
+      referred_user_id: payer.id,
+      stripe_invoice_id: inv.id,
+      currency: inv.currency || "usd",
+      gross_cents: gross,
+      rate_bps: ref.rate_bps,
+      commission_cents: commission,
+      occurred_at: new Date((inv.created || Math.floor(Date.now() / 1000)) * 1000).toISOString(),
+    });
+    // 23505 is the unique violation on stripe_invoice_id: this invoice was
+    // already accrued, which is the retry path working as designed.
+    if (error && error.code !== "23505") {
+      console.error("[billing] referral accrual failed", error);
+      return;
+    }
+
+    if (!ref.first_paid_at) {
+      await sb.from("referrals")
+        .update({ first_paid_at: new Date().toISOString() })
+        .eq("referred_user_id", payer.id)
+        .is("first_paid_at", null);
+    }
+  } catch (e) {
+    console.error("[billing] referral accrual threw", e);
+  }
+}
+
 /** Verify + process a Stripe webhook. Throws on bad signature. */
 export async function handleWebhook(rawBody: string, signature: string): Promise<void> {
   const secret = process.env.STRIPE_WEBHOOK_SECRET || "";
@@ -173,6 +249,9 @@ export async function handleWebhook(rawBody: string, signature: string): Promise
       const inv = event.data.object as Stripe.Invoice;
       const subId = (inv as any).subscription;
       if (subId) await applySubscription(await getStripe().subscriptions.retrieve(subId as string));
+      // Entitlement first, then bookkeeping. accrueReferral swallows its own
+      // errors so it can never cost the customer their access.
+      if (event.type === "invoice.paid") await accrueReferral(inv);
       break;
     }
     case "checkout.session.completed": {

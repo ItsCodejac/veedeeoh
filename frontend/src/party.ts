@@ -96,11 +96,17 @@ export async function joinParty(joinCode: string, password?: string): Promise<vo
   const { data: u } = await sb.auth.getUser();
   if (!u.user) { showToast("Sign in to join the party"); return; }
 
-  // Recording the join is also the affiliate attribution: the host invited this
-  // guest and the guest had to sign in, so a later subscription is unambiguous.
+  // Two separate records, deliberately. party_joins is the presence log for
+  // this party; the referral is a permanent, first-touch claim on the guest's
+  // account that outlives it. attribute_party_join is a no-op if the guest
+  // already has a referrer, so an existing customer joining a party does not
+  // get reassigned to the host.
   await sb.from("party_joins").upsert({
     party_id: party.id, user_id: u.user.id, host_user_id: party.host_user_id,
   }).then(({ error: e }) => { if (e) console.warn("[party] join not recorded", e); });
+
+  await sb.rpc("attribute_party_join", { party: party.id })
+    .then(({ error: e }) => { if (e) console.warn("[party] referral not recorded", e); });
 
   const item = await lookupCatalogItem(party.content_id);
   if (!item) { showToast("That title isn't in the catalog any more"); return; }

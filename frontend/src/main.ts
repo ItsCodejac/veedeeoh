@@ -202,6 +202,19 @@ async function boot(): Promise<void> {
     hideBootSplash();
   }
 
+  // A referral link lands here: ?ref=CODE. Stashed rather than redeemed on the
+  // spot, because a brand new visitor has no session yet and sign-up leaves the
+  // page. redeemPendingReferral runs on every boot and no-ops once attributed.
+  {
+    const ref = new URLSearchParams(location.search).get("ref");
+    if (ref) {
+      const { rememberReferral } = await import("./db");
+      rememberReferral(ref);
+      history.replaceState({}, "", location.pathname + location.hash);
+    }
+    void import("./db").then((db) => db.redeemPendingReferral());
+  }
+
   // A party link lands here: ?party=CODE. Handled after the profile is resolved,
   // so the joining profile's rating limits are known before anything plays.
   const partyCode = new URLSearchParams(location.search).get("party");

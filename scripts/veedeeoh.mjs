@@ -164,21 +164,68 @@ function inviteCode() {
   return Array.from({ length: 10 }, () => A[Math.floor(Math.random() * A.length)]).join("");
 }
 
-function inviteEmailHtml(code, tier) {
+// Editions. One invite pipeline, several audiences -- a founder comp, a beta
+// tester, an affiliate partner and a personal comp all need different copy and
+// different terms, and picking the wrong one is easy to do by hand. Keeping the
+// copy and the granted tier together in one record is what stops the email
+// promising something the tier does not actually grant.
+const EDITIONS = {
+  founder: {
+    label: "Founder",
+    tier: "founder_vip",
+    expiresDays: null,
+    subject: "You're a veedeeoh founder",
+    heading: "You're in.",
+    lede: "You've been invited to the veedeeoh beta. Thousands of free movies and TV shows in one app, with profiles and parental controls for the whole household.",
+    grant: "founder access, free for as long as veedeeoh runs",
+  },
+  beta: {
+    label: "Beta tester",
+    tier: "founder_vip",
+    expiresDays: 180,
+    subject: "Your veedeeoh beta invite",
+    heading: "Want to break something?",
+    lede: "You've been invited to test veedeeoh before it opens up. Thousands of free movies and TV shows in one app, with profiles and parental controls for the whole household. Expect rough edges -- that's the point.",
+    grant: "full access for the length of the beta",
+  },
+  partner: {
+    label: "Affiliate partner",
+    tier: "founder_vip",
+    expiresDays: null,
+    subject: "Your veedeeoh partner account",
+    heading: "Let's work together.",
+    lede: "Here's your veedeeoh partner account. Thousands of free movies and TV shows in one app, with profiles and parental controls for the whole household.",
+    grant: "full access plus a partner share of every subscription you refer",
+    extra: "Your referral link is in Settings once you sign in. Anyone who joins a watch party you host is credited to you as well, with no link needed.",
+  },
+  comp: {
+    label: "Friends and family",
+    tier: "founder_vip",
+    expiresDays: null,
+    subject: "veedeeoh, on me",
+    heading: "This one's on me.",
+    lede: "I built veedeeoh: thousands of free movies and TV shows in one app, with profiles and parental controls for the whole household. Here's an account, no charge.",
+    grant: "full access, on the house, permanently",
+  },
+};
+
+function inviteEmailHtml(code, edition) {
+  const ed = EDITIONS[edition] || EDITIONS.founder;
   const link = `${SITE}/landing.html?beta=${code}`;
   return `
   <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background-color:#0b0f19;color:#f3f4f6;border-radius:12px;border:1px solid #1f293d;">
     <div style="margin-bottom:24px;"><span style="font-size:24px;font-weight:800;color:#ffffff;">veedeeoh</span><span style="color:#c5f04e;font-size:24px;font-weight:800;">.</span></div>
-    <h1 style="font-size:22px;font-weight:700;margin-bottom:16px;color:#ffffff;">You're in.</h1>
+    <h1 style="font-size:22px;font-weight:700;margin-bottom:16px;color:#ffffff;">${ed.heading}</h1>
     <p style="font-size:15px;line-height:1.6;color:#9ca3af;margin-bottom:20px;">
-      You've been invited to the veedeeoh beta. Thousands of free movies and TV shows in one app, with profiles and parental controls for the whole household.
+      ${ed.lede}
     </p>
     <p style="font-size:15px;line-height:1.6;color:#9ca3af;margin-bottom:24px;">
-      Your invite includes <strong style="color:#ffffff;">${tier === "founder_vip" ? "founder access, free for as long as veedeeoh runs" : tier}</strong>. Create your account with this link and it is applied automatically.
+      Your invite includes <strong style="color:#ffffff;">${ed.grant}</strong>. Create your account with this link and it is applied automatically.
     </p>
     <p style="margin:0 0 26px;">
       <a href="${link}" style="display:inline-block;background:#c5f04e;color:#06070a;font-weight:800;font-size:15px;text-decoration:none;padding:13px 26px;border-radius:10px;">Create your account</a>
     </p>
+    ${ed.extra ? `<p style="font-size:14px;line-height:1.6;color:#9ca3af;margin-bottom:24px;">${ed.extra}</p>` : ""}
     <p style="font-size:13px;line-height:1.6;color:#6b7280;margin-bottom:8px;">
       Or use invite code <strong style="color:#9ca3af;letter-spacing:1px;">${code}</strong> at <a href="${SITE}" style="color:#9ca3af;">veedeeoh.com</a>.
     </p>
@@ -190,13 +237,22 @@ function inviteEmailHtml(code, tier) {
   </div>`;
 }
 
-async function createInvite({ email, tier = "founder_vip", send = true }) {
+async function createInvite({ email, edition = "founder", tier, send = true }) {
   if (!email) return { ok: false, error: "email required" };
+  const ed = EDITIONS[edition] || EDITIONS.founder;
   const code = inviteCode();
+  // The edition owns the tier unless one is passed explicitly, so the copy and
+  // the grant cannot drift apart.
+  const grantTier = tier || ed.tier;
+  const expires = ed.expiresDays
+    ? new Date(Date.now() + ed.expiresDays * 86400000).toISOString()
+    : null;
   const r = await sb("beta_invites", {
     method: "POST",
     headers: { Prefer: "return=representation" },
-    body: JSON.stringify({ code, email: email.trim().toLowerCase(), tier }),
+    body: JSON.stringify({
+      code, email: email.trim().toLowerCase(), tier: grantTier, tier_expires: expires,
+    }),
   });
   const rows = await r.json();
   if (!r.ok) return { ok: false, error: rows.message || JSON.stringify(rows) };
@@ -211,8 +267,8 @@ async function createInvite({ email, tier = "founder_vip", send = true }) {
         body: JSON.stringify({
           from: "veedeeoh <support@veedeeoh.com>",
           to: [email],
-          subject: "Your veedeeoh beta invite",
-          html: inviteEmailHtml(code, tier),
+          subject: ed.subject,
+          html: inviteEmailHtml(code, edition),
         }),
       });
       const eb = await er.json().catch(() => ({}));
@@ -221,7 +277,89 @@ async function createInvite({ email, tier = "founder_vip", send = true }) {
       else await sb(`beta_invites?code=eq.${code}`, { method: "PATCH", body: JSON.stringify({ sent_at: new Date().toISOString() }) });
     }
   }
-  return { ok: true, code, link: `${SITE}/landing.html?beta=${code}`, sent, sendError };
+  return { ok: true, code, edition, tier: grantTier, link: `${SITE}/landing.html?beta=${code}`, sent, sendError };
+}
+
+// -------------------------------------------------------------- referrals ---
+
+/** Who is owed what. Grouped in JS rather than SQL because PostgREST cannot
+ *  express a grouped aggregate without a view, and this list is small enough
+ *  that a view would be premature. */
+async function referralPayouts() {
+  const r = await sb("referral_earnings?select=*&order=occurred_at.desc&limit=2000");
+  if (!r.ok) return { ok: false, error: await r.text() };
+  const rows = await r.json();
+
+  const byReferrer = new Map();
+  for (const e of rows) {
+    let g = byReferrer.get(e.referrer_user_id);
+    if (!g) {
+      g = { user_id: e.referrer_user_id, email: null, pending_cents: 0, paid_cents: 0, invoices: 0 };
+      byReferrer.set(e.referrer_user_id, g);
+    }
+    g.invoices += 1;
+    if (e.paid_out_at) g.paid_cents += e.commission_cents;
+    else g.pending_cents += e.commission_cents;
+  }
+
+  // Attach emails so a payout can actually be sent to a person.
+  const ids = [...byReferrer.keys()];
+  if (ids.length) {
+    const q = `profiles?select=id,email&id=in.(${ids.join(",")})`;
+    const pr = await sb(q);
+    if (pr.ok) for (const p of await pr.json()) {
+      const g = byReferrer.get(p.id);
+      if (g) g.email = p.email;
+    }
+  }
+
+  const out = [...byReferrer.values()].sort((a, b) => b.pending_cents - a.pending_cents);
+  return {
+    ok: true,
+    total_pending_cents: out.reduce((n, g) => n + g.pending_cents, 0),
+    referrers: out,
+  };
+}
+
+/** Mark everything currently owed to one referrer as settled. Scoped to
+ *  paid_out_at is null so a concurrent accrual arriving mid-payout is not
+ *  swept up in a payment that did not include it. */
+async function markReferralPaid({ user_id, ref }) {
+  if (!user_id) return { ok: false, error: "user_id required" };
+  const r = await sb(
+    `referral_earnings?referrer_user_id=eq.${encodeURIComponent(user_id)}&paid_out_at=is.null`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({ paid_out_at: new Date().toISOString(), payout_ref: ref || null }),
+    }
+  );
+  if (!r.ok) return { ok: false, error: await r.text() };
+  const rows = await r.json();
+  return { ok: true, settled: rows.length, cents: rows.reduce((n, e) => n + e.commission_cents, 0) };
+}
+
+/** Set a partner rate. Snapshotted onto future referrals only -- existing
+ *  agreements keep the terms they were made under, by design. */
+async function setReferralTerms({ email, rate_bps, duration_months, kind }) {
+  const ur = await sb(`profiles?select=id&email=eq.${encodeURIComponent((email || "").toLowerCase())}`);
+  const users = ur.ok ? await ur.json() : [];
+  if (!users.length) return { ok: false, error: "no such user" };
+
+  const patch = {};
+  if (rate_bps != null) patch.rate_bps = Number(rate_bps);
+  if (duration_months != null) patch.duration_months = Number(duration_months);
+  if (kind) patch.kind = kind;
+
+  const r = await sb(`referral_codes?user_id=eq.${users[0].id}`, {
+    method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify(patch),
+  });
+  if (!r.ok) return { ok: false, error: await r.text() };
+  const rows = await r.json();
+  if (!rows.length) {
+    return { ok: false, error: "that user has no referral code yet -- they must open Settings once" };
+  }
+  return { ok: true, code: rows[0].code, rate_bps: rows[0].rate_bps, duration_months: rows[0].duration_months };
 }
 
 async function listInvites() {
@@ -395,6 +533,8 @@ const routes = {
   "GET /api/providers": () => checkProviders(),
   "GET /api/user": (u) => findUser(u.searchParams.get("email") || ""),
   "POST /api/tier": (u, b) => setTier(b.email, b.tier),
+  "GET /api/editions": () => Object.entries(EDITIONS).map(([id, e]) =>
+    ({ id, label: e.label, tier: e.tier, expiresDays: e.expiresDays, subject: e.subject })),
   "GET /api/invites": () => listInvites(),
   "POST /api/invite": (u, b) => createInvite(b),
   "POST /api/invite/revoke": (u, b) => revokeInvite(b.code),
@@ -403,6 +543,9 @@ const routes = {
   "POST /api/curate/decide": (u, b) => curateDecide(b),
   "POST /api/curate/undo": (u, b) => curateUndo(b),
   "POST /api/feedback/update": (u, b) => updateFeedback(b),
+  "GET /api/referrals": () => referralPayouts(),
+  "POST /api/referrals/paid": (u, b) => markReferralPaid(b),
+  "POST /api/referrals/terms": (u, b) => setReferralTerms(b),
 };
 
 // Read per request, not once at startup: this is a local tool, the file is

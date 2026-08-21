@@ -176,11 +176,27 @@ function renderSettingsModalInternal(): void {
         </div>
       </div>
 
+      <!-- Refer & earn. Populated after mount: the code is minted on demand by
+           the database, so there is nothing to show synchronously. -->
+      <div style="margin-bottom: 24px;">
+        <div style="margin-bottom: 10px;">
+          <h3 style="margin: 0; font-size: 18px; font-weight: 700; display: inline-flex; align-items: center; gap: 8px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c5f04e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            Refer &amp; earn
+          </h3>
+          <div style="font-size: 12px; color: #c5f04e; font-weight: 700;">Share your link. Earn a share of what they pay, for a year.</div>
+        </div>
+        <div id="referralBox" style="background: #080a10; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 16px; font-size: 13px; color: #9aa5b5;">
+          Loading your link...
+        </div>
+      </div>
+
       </div>
     </div>
   `;
 
   document.body.appendChild(modal);
+  void mountReferral(modal);
 
   const closeBtn = modal.querySelector('#closeSettingsBtn');
   if (closeBtn) closeBtn.addEventListener('click', () => modal.remove());
@@ -341,6 +357,57 @@ function renderSettingsModalInternal(): void {
       modal.remove();
       openSettingsModal();
     });
+  });
+}
+
+/** Fill in the Refer & earn box. Kept out of the template because the code is
+ *  minted by an RPC on first request -- there is nothing to render until it
+ *  answers, and a failure here must not take the rest of Settings with it. */
+async function mountReferral(modal: HTMLElement): Promise<void> {
+  const box = modal.querySelector<HTMLElement>('#referralBox');
+  if (!box) return;
+
+  const db = await import('./db');
+  const [code, sum] = await Promise.all([db.myReferralCode(), db.referralSummary()]);
+  if (!code) {
+    box.textContent = 'Referral links are unavailable right now.';
+    return;
+  }
+
+  const link = db.referralLink(code);
+  const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+  const stat = (label: string, value: string) => `
+    <div style="flex: 1; min-width: 90px;">
+      <div style="font-size: 20px; font-weight: 800; color: #fff;">${escapeHtml(value)}</div>
+      <div style="font-size: 11px; color: #9aa5b5; text-transform: uppercase; letter-spacing: .04em;">${escapeHtml(label)}</div>
+    </div>`;
+
+  box.innerHTML = `
+    <div style="display: flex; gap: 10px; margin-bottom: 14px;">
+      <input type="text" id="referralLinkField" readonly value="${escapeHtml(link)}"
+             style="flex: 1; min-width: 0; padding: 10px 14px; background: #10141e; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 13px; outline: none;" />
+      <button id="copyReferralBtn" style="background: #c5f04e; color: #06070a; border: none; padding: 10px 18px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer;">Copy</button>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 14px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 14px;">
+      ${stat('Signed up', String(sum?.referred ?? 0))}
+      ${stat('Subscribed', String(sum?.converted ?? 0))}
+      ${stat('Owed to you', money(sum?.pending_cents ?? 0))}
+      ${stat('Paid out', money(sum?.paid_cents ?? 0))}
+    </div>
+    <p style="margin: 14px 0 0; font-size: 12px; color: #6b7482;">
+      Anyone who joins a watch party you host is credited to you too, without needing this link.
+      Payouts are made by hand while the program is in beta.
+    </p>`;
+
+  const copyBtn = box.querySelector<HTMLButtonElement>('#copyReferralBtn');
+  copyBtn?.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(link);
+      copyBtn.textContent = 'Copied';
+      setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1600);
+    } catch {
+      box.querySelector<HTMLInputElement>('#referralLinkField')?.select();
+    }
   });
 }
 
