@@ -163,9 +163,6 @@ class VodPlayer {
   }
 
   private buildChrome(): void {
-    // Legacy overlay markup is inert but still present; keep it out of the way.
-    Array.from(this.overlay.children).forEach((c) => { (c as HTMLElement).style.display = "none"; });
-
     const root = document.createElement("div");
     root.className = "vodStage";
     root.dataset.mode = "full";
