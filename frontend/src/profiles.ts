@@ -579,8 +579,19 @@ export function openProfileEditor(editingProfile?: HouseholdProfile, onClose?: (
   const matDesc = modal.querySelector('#maturityDesc') as HTMLElement | null;
   const pinWrap = modal.querySelector('#pinFieldWrap') as HTMLElement | null;
 
-  const RATING_MAP = ['TV-Y', 'PG', 'TV-14', ''];
-  const DESC_MAP = ['Little Kids (TV-Y / G)', 'Older Kids (PG / TV-PG)', 'Teen (TV-14 / PG-13)', 'Adult (No Limit)'];
+  // Tiers are expressed in TV Parental Guidelines ratings only, because those
+  // are what actually gate (see filterRailsForGatedProfile in db.ts). The old
+  // labels promised MPAA levels the gate never delivered: "Older Kids (PG)"
+  // could not show PG because a hard cap clamped every kids profile to TV-G,
+  // and "Teen (TV-14)" was clamped to the same place, making it identical to
+  // Older Kids. Anything MPAA-rated is now opt-in per title instead.
+  const RATING_MAP = ['TV-Y', 'TV-G', 'TV-14', ''];
+  const DESC_MAP = [
+    'Little Kids (TV-Y)',
+    'Older Kids (up to TV-G)',
+    'Teen (up to TV-14)',
+    'Adult (No Limit)',
+  ];
 
   if (slider && matDesc) {
     if (pRating === 'TV-Y' || pRating === 'TV-Y7' || pRating === 'TV-G' || pRating === 'G') slider.value = '0';
@@ -646,7 +657,10 @@ export function openProfileEditor(editingProfile?: HouseholdProfile, onClose?: (
       }
 
       const val = parseInt((modal.querySelector('#editMaturitySlider') as HTMLInputElement).value, 10);
-      const isKids = val < 3;
+      // is_kids drives the kids CHROME (bright theme, stripped sidebar), not the
+      // content gate -- that is max_rating now. A teen should not get the
+      // preschool skin, so only the first two tiers count as kids.
+      const isKids = val < 2;
       const maxRating = RATING_MAP[val] || null;
 
       const rawPin = ((modal.querySelector('#editPin') as HTMLInputElement | null)?.value || '').trim();

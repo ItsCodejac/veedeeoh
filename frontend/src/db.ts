@@ -459,3 +459,52 @@ export async function listExclusions(profileId: string): Promise<Set<string>> {
   if (error) { console.warn("[db] listExclusions", error); return new Set(); }
   return new Set((data ?? []).map((r: any) => r.content_id));
 }
+
+// ---------------------------------------------------------------------------
+// Gating for restricted profiles
+//
+// Only the TV Parental Guidelines are trusted to gate automatically. They were
+// introduced in 1997, so a TV rating cannot suffer the drift that makes MPAA
+// letters unreliable: PG-13 did not exist until 1984, so pre-1984 PG absorbed
+// what would now be PG-13 (Airplane!, 1980, is rated PG and has nudity). Old G
+// drifted similarly. We have no release year for Pluto titles -- 56% of the
+// catalog -- so era cannot even be detected, let alone corrected for.
+//
+// So: TV-rated content within the profile's ceiling is admitted automatically.
+// Everything else -- every MPAA letter, every unrated title -- is opt-in, and
+// reaches a restricted profile only if a human put it in a collection.
+// ---------------------------------------------------------------------------
+
+const TV_MATURITY: Record<string, number> = {
+  "TV-Y": 0, "TV-Y7": 1, "TV-Y7-FV": 1, "TV-G": 2, "TV-PG": 3, "TV-14": 4, "TV-MA": 5,
+};
+
+export function isTvRated(rating?: string | null): boolean {
+  return !!rating && Object.prototype.hasOwnProperty.call(TV_MATURITY, rating.trim().toUpperCase());
+}
+
+export function tvMaturity(rating?: string | null): number | null {
+  if (!rating) return null;
+  const m = TV_MATURITY[rating.trim().toUpperCase()];
+  return m === undefined ? null : m;
+}
+
+/** Content a restricted profile may see: TV-rated within its ceiling, plus
+ *  anything explicitly approved. Approvals bypass the rating test entirely --
+ *  that is the point of them, and how a G-rated film a parent trusts gets in. */
+export function filterRailsForGatedProfile<T extends { items: any[] }>(
+  rails: T[],
+  ceiling: number,
+  approved: Set<string>,
+): T[] {
+  return rails
+    .map((r) => ({
+      ...r,
+      items: r.items.filter((i: any) => {
+        if (approved.has(String(i.id))) return true;
+        const m = tvMaturity(i.rating);
+        return m !== null && m <= ceiling;
+      }),
+    }))
+    .filter((r) => r.items.length > 0);
+}

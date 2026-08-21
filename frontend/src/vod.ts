@@ -3,7 +3,7 @@ import { state } from "./state";
 import type { Stream, VodItem, VodEpisode, VodRail } from "./types";
 import { escapeHtml, $, setupHorizontalScroll, buildBrandLoader, buildRailSkeleton, showToast } from "./util";
 import { getActiveProfile, getStoredProfiles } from "./profiles";
-import { maturityCeiling, filterRailsByMaturity, filterRailsForKids, isKidsSafeItem, addFavorite, removeFavorite, getWatchHistory, listExclusions, allowForAge, excludeFromProfile, unexcludeFromProfile } from "./db";
+import { maturityCeiling, filterRailsByMaturity, filterRailsForKids, isKidsSafeItem, addFavorite, removeFavorite, getWatchHistory, listExclusions, listApprovedContent, filterRailsForGatedProfile, allowForAge, excludeFromProfile, unexcludeFromProfile } from "./db";
 import { openVodPlayer } from "./vodplayer";
 
 // The active profile's real Supabase id (null for local/unsynced placeholders).
@@ -115,7 +115,17 @@ document.addEventListener("click", (e) => {
 // profile's removals can never be applied to another.
 let cachedExclusions: { profileId: string; ids: Set<string> } | null = null;
 if (typeof window !== "undefined") {
-  window.addEventListener("veedeeoh:profile-changed", () => { cachedExclusions = null; });
+  window.addEventListener("veedeeoh:profile-changed", () => { cachedExclusions = null; cachedApproved = null; });
+}
+
+// Approved set per profile tier, cached alongside exclusions.
+let cachedApproved: { ceiling: number; ids: Set<string> } | null = null;
+
+async function approvedFor(ceiling: number): Promise<Set<string>> {
+  if (cachedApproved?.ceiling === ceiling) return cachedApproved.ids;
+  const ids = await listApprovedContent(ceiling).catch(() => new Set<string>());
+  cachedApproved = { ceiling, ids };
+  return ids;
 }
 
 async function exclusionsFor(profileId: string): Promise<Set<string>> {
@@ -136,7 +146,7 @@ function applyExclusions<T extends { items: any[] }>(rails: T[], excluded: Set<s
 }
 
 /** Invalidate after a parent adds or removes an exclusion. */
-export function invalidateExclusions(): void { cachedExclusions = null; }
+export function invalidateExclusions(): void { cachedExclusions = null; cachedApproved = null; }
 
 export async function getVodRails(): Promise<VodRail[]> {
   if (!cachedVodRails || cachedVodRails.length === 0) {
@@ -157,14 +167,24 @@ export async function getVodRails(): Promise<VodRail[]> {
   // Kids profiles get the genre+maturity gate AND their own rating cap. Applying
   // only the kids gate would ignore max_rating entirely, so a profile set to
   // "Little Kids (TV-Y)" would still be shown TV-Y7 and G titles.
-  // Exclusions are applied LAST and to every profile, so a parent's removal
-  // overrules the automatic rules rather than competing with them. This works
-  // today, before the collections gate is switched on.
   const excluded = await exclusionsFor(p.id);
-  if (p.is_kids) {
-    return applyExclusions(filterRailsByMaturity(filterRailsForKids(full), Math.min(2, ceiling)), excluded) as VodRail[];
+
+  // A profile with a rating cap is GATED: it sees TV-rated content within its
+  // ceiling, plus whatever a human has explicitly approved. Nothing else. Only
+  // the TV Parental Guidelines (1997) are trusted to gate automatically --
+  // MPAA letters drifted when PG-13 was introduced in 1984, and we have no
+  // release year for Pluto titles to correct for it.
+  //
+  // This replaces the genre gate entirely. KIDS_SIGNAL_RE tested the RAIL NAME
+  // as well as the item, so its verdict was constant across a rail and Tubi's
+  // "Adult Animation" rail matched /animat/. The rating does the work now.
+  if (p.max_rating) {
+    const approved = await approvedFor(ceiling);
+    return applyExclusions(filterRailsForGatedProfile(full, ceiling, approved), excluded) as VodRail[];
   }
-  return applyExclusions(filterRailsByMaturity(full, ceiling), excluded) as VodRail[];
+
+  // Ungated (adult) profile: everything, minus anything the household removed.
+  return applyExclusions(full, excluded) as VodRail[];
 }
 
 // Continue Watching is stored PER PROFILE so a kids profile never sees an adult
