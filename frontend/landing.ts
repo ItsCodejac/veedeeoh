@@ -1,4 +1,4 @@
-import { getSession, restoreSession, signIn, signUp, signInWithGoogle, signInWithPasskey } from './src/auth';
+import { getSession, restoreSession, signIn, signUp, signInWithGoogle, signInWithPasskey, getSupabase } from './src/auth';
 
 async function checkAuth() {
   const session = await restoreSession();
@@ -75,8 +75,19 @@ async function loadLiveStats() {
   }
 }
 
+// Beta invite: ?beta=CODE grants a tier on signup. Stashed rather than redeemed
+// immediately because there is no session until the account exists.
+function checkBetaLink() {
+  const code = new URLSearchParams(window.location.search).get('beta');
+  if (code) {
+    localStorage.setItem('veedeeoh_pending_beta', code);
+    isSignUpMode = true;
+  }
+}
+
 void loadLiveStats();
 checkInviteLink();
+checkBetaLink();
 
 const navAuthBtn = document.getElementById('navAuthBtn') as HTMLButtonElement;
 const authModal = document.getElementById('authModal') as HTMLDivElement;
@@ -276,6 +287,15 @@ if (authForm) {
     try {
       if (isSignUpMode) {
         await signUp(email, password);
+        // Redeem a beta invite now that a session exists. Best effort: a failed
+        // redemption must never block an account that was created successfully.
+        const betaCode = localStorage.getItem('veedeeoh_pending_beta');
+        if (betaCode) {
+          try {
+            await getSupabase().rpc('redeem_beta_invite', { invite_code: betaCode });
+            localStorage.removeItem('veedeeoh_pending_beta');
+          } catch (err) { console.warn('[beta] redeem failed', err); }
+        }
         showStep('success');
         successTitle.textContent = 'Account Created';
         successMessage.textContent = 'Account created successfully. Redirecting to your dashboard...';

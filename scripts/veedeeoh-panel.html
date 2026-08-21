@@ -57,6 +57,28 @@
     </div>
     <div id="user" class="muted">No account loaded.</div>
   </div>
+  <div class="card">
+    <h2>Beta invites</h2>
+    <div class="actions" style="margin-top:0">
+      <input id="invEmail" type="email" placeholder="tester@example.com" />
+      <button id="invSend">Invite</button>
+    </div>
+    <div id="invResult" class="muted"></div>
+    <div id="invList" class="muted">loading…</div>
+  </div>
+
+  <div class="card" style="grid-column:1/-1">
+    <h2>Feedback</h2>
+    <div class="actions" style="margin-top:0">
+      <select id="fbFilter">
+        <option value="new">new</option><option value="triaged">triaged</option>
+        <option value="done">done</option><option value="wontfix">wontfix</option>
+        <option value="all">all</option>
+      </select>
+      <button class="ghost" id="fbRefresh">Refresh</button>
+    </div>
+    <div id="fbList" class="muted">loading…</div>
+  </div>
 </div>
 
 <script>
@@ -129,5 +151,52 @@ $('lookup').onclick = async () => {
   };
 };
 
-loadCatalog();
+// ---- invites ----
+async function loadInvites() {
+  const rows = await j('/api/invites');
+  if (!Array.isArray(rows) || !rows.length) { $('invList').textContent = 'No invites yet.'; return; }
+  $('invList').innerHTML = rows.map(r => {
+    const st = r.revoked_at ? '<span class="bad">revoked</span>'
+      : r.redeemed_at ? '<span class="ok">redeemed</span>'
+      : r.sent_at ? '<span class="warn">sent</span>' : '<span class="dim">created</span>';
+    return `<div class="row"><span>${r.email}<br><span class="dim" style="font-size:11.5px">${r.code} · ${r.tier}</span></span>
+      <span style="text-align:right">${st}${r.redeemed_at || r.revoked_at ? '' :
+        `<br><button class="ghost" style="padding:3px 8px;font-size:11px;margin-top:4px" onclick="revokeInv('${r.code}')">revoke</button>`}</span></div>`;
+  }).join('');
+}
+window.revokeInv = async (code) => { await j('/api/invite/revoke', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({code}) }); loadInvites(); };
+$('invSend').onclick = async () => {
+  const email = $('invEmail').value.trim(); if (!email) return;
+  const b = $('invSend'); b.disabled = true; b.textContent = 'Sending…';
+  const r = await j('/api/invite', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email }) });
+  $('invResult').innerHTML = r.ok
+    ? (r.sent ? `<span class="ok">Sent to ${email}</span>` : `<span class="warn">Created but not emailed: ${r.sendError}</span><br><span class="dim" style="font-size:11.5px">${r.link}</span>`)
+    : `<span class="bad">${r.error}</span>`;
+  $('invEmail').value = ''; b.disabled = false; b.textContent = 'Invite'; loadInvites();
+};
+
+// ---- feedback ----
+async function loadFeedback() {
+  const rows = await j('/api/feedback?status=' + $('fbFilter').value);
+  if (!Array.isArray(rows) || !rows.length) { $('fbList').textContent = 'Nothing here.'; return; }
+  $('fbList').innerHTML = rows.map(r => `
+    <div style="border-bottom:1px solid rgba(255,255,255,.06);padding:12px 0">
+      <div style="display:flex;justify-content:space-between;gap:12px">
+        <b>${r.kind === 'bug' ? '<span class="bad">bug</span>' : '<span class="warn">feature</span>'} ${escapeHtml(r.title || '')}</b>
+        <span class="dim" style="font-size:12px;white-space:nowrap">${new Date(r.created_at).toLocaleString()}</span>
+      </div>
+      ${r.body ? `<div class="dim" style="font-size:13px;margin:6px 0">${escapeHtml(r.body)}</div>` : ''}
+      <div class="dim" style="font-size:11.5px">${[r.reporter_email, r.view, r.app_version, r.viewport].filter(Boolean).map(escapeHtml).join(' · ')}</div>
+      ${r.console_tail && r.console_tail.length ? `<pre>${escapeHtml(JSON.stringify(r.console_tail, null, 1)).slice(0, 900)}</pre>` : ''}
+      <div class="actions">
+        ${['new','triaged','done','wontfix'].map(st => `<button class="ghost" style="padding:5px 10px;font-size:11.5px${r.status===st?';background:var(--accent);color:#06070a':''}" onclick="setFb('${r.id}','${st}')">${st}</button>`).join('')}
+      </div>
+    </div>`).join('');
+}
+function escapeHtml(x){ return String(x??'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+window.setFb = async (id, status) => { await j('/api/feedback/update', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id,status}) }); loadFeedback(); };
+$('fbFilter').onchange = loadFeedback;
+$('fbRefresh').onclick = loadFeedback;
+
+loadCatalog(); loadInvites(); loadFeedback();
 </script></body></html>

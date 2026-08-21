@@ -3663,3 +3663,21 @@ body.kids-mode { --brand-accent: #ff9f1c; }
   cursor: pointer;
 }
 .sidebar-install-dismiss:hover { color: #fff; background: rgba(255,255,255,0.08); }
+
+/* Feedback entry: same quiet sidebar treatment as the install prompt. */
+.sidebar-feedback {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+  color: #9aa5b5;
+  font: 600 13px/1.2 'Space Grotesk', sans-serif;
+  cursor: pointer;
+  text-align: left;
+}
+.sidebar-feedback:hover { background: rgba(255,255,255,0.09); color: #fff; }

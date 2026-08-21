@@ -497,11 +497,15 @@ function wireHeader(): void {
 }
 
 import { initPWA } from "./pwa";
+import { installConsoleCapture, mountFeedbackEntry } from "./feedback";
 
 wireSidebar();
 wireHeader();
 wireVodDetails();
 initPWA();
+// Capture console errors from here on, so a report carries whatever went wrong.
+installConsoleCapture();
+mountFeedbackEntry();
 void boot();
 // Safety net: never let the splash trap the user if boot stalls or throws.
 setTimeout(hideBootSplash, 8000);
