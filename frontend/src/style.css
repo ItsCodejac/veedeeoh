@@ -1217,11 +1217,17 @@ select { max-width: 190px; }
   transition: transform .1s;
 }
 .vodCard:hover .vodPoster { transform: scale(1.04); outline: 1px solid var(--accent); }
-/* Posters vary in aspect ratio, and `cover` in a fixed 347:500 frame crops the
-   overflow evenly top and bottom. On a movie poster that top strip is the
-   credits block and often the title, so anchor to the top and let any crop come
-   off the bottom instead. */
-.vodPoster img { width: 100%; height: 100%; object-fit: cover; object-position: center top; }
+
+/* A card scaled on hover grows into the row/section above it, which then paints
+   over the top of it. z-index only applies to positioned elements, so the card
+   is positioned and lifted on hover. The rail is lifted too, via :has, because
+   if the overlapping element sits in a different stacking context then raising
+   the card alone cannot escape it. */
+.vodCard { position: relative; z-index: 0; }
+.vodCard:hover { z-index: 30; }
+.rail:has(.vodCard:hover),
+.showcaseRail:has(.vodCard:hover) { z-index: 30; }
+.vodPoster img { width: 100%; height: 100%; object-fit: cover; }
 .vodTitle {
   font-size: 12px;
   font-weight: 600;
