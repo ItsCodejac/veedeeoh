@@ -371,3 +371,91 @@ export async function acceptInvite(token: string): Promise<string> {
   if (error) throw error;
   return data as string;
 }
+
+// ---------------------------------------------------------------------------
+// Curated collections (household side)
+//
+// See docs/plans/2026-08-21-curated-content-collections-design.md. Platform
+// collections are the operator-curated baseline; a household layers its own
+// picks on top and its own exclusions over everything. Exclusions always win.
+// ---------------------------------------------------------------------------
+
+export interface Collection {
+  id: string;
+  scope: "platform" | "household";
+  name: string;
+  min_age: number | null;
+  show_as_tab: boolean;
+}
+
+/** Platform collections plus this household's own, in one call. RLS decides
+ *  what comes back: platform rows are world-readable, household rows are not. */
+export async function listCollections(): Promise<Collection[]> {
+  const { data, error } = await getSupabase()
+    .from("collections")
+    .select("id, scope, name, min_age, show_as_tab");
+  if (error) { console.warn("[db] listCollections", error); return []; }
+  return (data ?? []) as Collection[];
+}
+
+/** Content ids visible at or below a maturity tier, from every collection the
+ *  caller can see. Used to build the approved set for a restricted profile. */
+export async function listApprovedContent(maxAge: number): Promise<Set<string>> {
+  const sb = getSupabase();
+  const { data: cols, error: e1 } = await sb
+    .from("collections").select("id").not("min_age", "is", null).lte("min_age", maxAge);
+  if (e1 || !cols?.length) return new Set();
+  const { data, error } = await sb
+    .from("collection_items").select("content_id")
+    .in("collection_id", cols.map((c: any) => c.id));
+  if (error) { console.warn("[db] listApprovedContent", error); return new Set(); }
+  return new Set((data ?? []).map((r: any) => r.content_id));
+}
+
+/** Add a title to one of this household's collections, creating it on demand. */
+export async function allowForAge(minAge: number, item: { id: string; isSeries?: boolean }): Promise<void> {
+  const sb = getSupabase();
+  const { data: user } = await sb.auth.getUser();
+  const owner = user.user?.id;
+  if (!owner) throw new Error("not signed in");
+
+  const name = minAge === 0 ? "Allowed: Little Kids" : minAge === 1 ? "Allowed: Older Kids" : "Allowed: Teen";
+  let { data: found } = await sb.from("collections")
+    .select("id").eq("scope", "household").eq("owner_id", owner).eq("name", name).maybeSingle();
+
+  let id = found?.id;
+  if (!id) {
+    const { data, error } = await sb.from("collections")
+      .insert({ scope: "household", owner_id: owner, name, min_age: minAge, show_as_tab: false })
+      .select("id").single();
+    if (error) throw error;
+    id = data.id;
+  }
+  const { error } = await sb.from("collection_items")
+    .upsert({ collection_id: id, content_id: item.id, kind: item.isSeries ? "series" : "title" });
+  if (error) throw error;
+}
+
+/** Hide a title from one profile. Exclusions beat every collection, so this is
+ *  how a parent overrules an operator pick they disagree with. */
+export async function excludeFromProfile(profileId: string, contentId: string): Promise<void> {
+  const { data: user } = await getSupabase().auth.getUser();
+  const owner = user.user?.id;
+  if (!owner) throw new Error("not signed in");
+  const { error } = await getSupabase().from("profile_exclusions")
+    .upsert({ profile_id: profileId, content_id: contentId, owner_id: owner });
+  if (error) throw error;
+}
+
+export async function unexcludeFromProfile(profileId: string, contentId: string): Promise<void> {
+  const { error } = await getSupabase().from("profile_exclusions")
+    .delete().eq("profile_id", profileId).eq("content_id", contentId);
+  if (error) throw error;
+}
+
+export async function listExclusions(profileId: string): Promise<Set<string>> {
+  const { data, error } = await getSupabase()
+    .from("profile_exclusions").select("content_id").eq("profile_id", profileId);
+  if (error) { console.warn("[db] listExclusions", error); return new Set(); }
+  return new Set((data ?? []).map((r: any) => r.content_id));
+}

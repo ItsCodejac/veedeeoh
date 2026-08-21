@@ -2,8 +2,8 @@ import { fetchArchiveStream, fetchPlutoStream, fetchTubiStream, fetchVod, fetchV
 import { state } from "./state";
 import type { Stream, VodItem, VodEpisode, VodRail } from "./types";
 import { escapeHtml, $, setupHorizontalScroll, buildBrandLoader, buildRailSkeleton, showToast } from "./util";
-import { getActiveProfile } from "./profiles";
-import { maturityCeiling, filterRailsByMaturity, filterRailsForKids, isKidsSafeItem, addFavorite, removeFavorite, getWatchHistory } from "./db";
+import { getActiveProfile, getStoredProfiles } from "./profiles";
+import { maturityCeiling, filterRailsByMaturity, filterRailsForKids, isKidsSafeItem, addFavorite, removeFavorite, getWatchHistory, listExclusions, allowForAge, excludeFromProfile, unexcludeFromProfile } from "./db";
 import { openVodPlayer } from "./vodplayer";
 
 // The active profile's real Supabase id (null for local/unsynced placeholders).
@@ -111,6 +111,33 @@ document.addEventListener("click", (e) => {
   }
 });
 
+// Per-profile exclusion cache. Cleared when the active profile changes so one
+// profile's removals can never be applied to another.
+let cachedExclusions: { profileId: string; ids: Set<string> } | null = null;
+if (typeof window !== "undefined") {
+  window.addEventListener("veedeeoh:profile-changed", () => { cachedExclusions = null; });
+}
+
+async function exclusionsFor(profileId: string): Promise<Set<string>> {
+  if (cachedExclusions?.profileId === profileId) return cachedExclusions.ids;
+  const isCloudProfile = profileId && !profileId.startsWith("default_") && !profileId.startsWith("profile_");
+  const ids = isCloudProfile ? await listExclusions(profileId).catch(() => new Set<string>()) : new Set<string>();
+  cachedExclusions = { profileId, ids };
+  return ids;
+}
+
+/** Drop excluded titles. A parent's removal beats every collection and every
+ *  automatic rule, so this is applied last and unconditionally. */
+function applyExclusions<T extends { items: any[] }>(rails: T[], excluded: Set<string>): T[] {
+  if (!excluded.size) return rails;
+  return rails
+    .map((r) => ({ ...r, items: r.items.filter((i: any) => !excluded.has(String(i.id))) }))
+    .filter((r) => r.items.length > 0);
+}
+
+/** Invalidate after a parent adds or removes an exclusion. */
+export function invalidateExclusions(): void { cachedExclusions = null; }
+
 export async function getVodRails(): Promise<VodRail[]> {
   if (!cachedVodRails || cachedVodRails.length === 0) {
     const res = await fetchVod();
@@ -130,8 +157,14 @@ export async function getVodRails(): Promise<VodRail[]> {
   // Kids profiles get the genre+maturity gate AND their own rating cap. Applying
   // only the kids gate would ignore max_rating entirely, so a profile set to
   // "Little Kids (TV-Y)" would still be shown TV-Y7 and G titles.
-  if (p.is_kids) return filterRailsByMaturity(filterRailsForKids(full), Math.min(2, ceiling)) as VodRail[];
-  return filterRailsByMaturity(full, ceiling) as VodRail[];
+  // Exclusions are applied LAST and to every profile, so a parent's removal
+  // overrules the automatic rules rather than competing with them. This works
+  // today, before the collections gate is switched on.
+  const excluded = await exclusionsFor(p.id);
+  if (p.is_kids) {
+    return applyExclusions(filterRailsByMaturity(filterRailsForKids(full), Math.min(2, ceiling)), excluded) as VodRail[];
+  }
+  return applyExclusions(filterRailsByMaturity(full, ceiling), excluded) as VodRail[];
 }
 
 // Continue Watching is stored PER PROFILE so a kids profile never sees an adult
@@ -229,6 +262,84 @@ function asChannel(item: VodItem, streams: Stream[]): any {
     vodPoster: item.poster,
     vodBanner: item.banner,
     vodItem: item,
+  };
+}
+
+// Parent controls in the detail view: allow a title for a kids tier, or hide it
+// from a specific kids profile. Hidden on kids profiles themselves, so a child
+// cannot grant themselves access.
+//
+// Exclusions take effect immediately -- they are applied at the getVodRails
+// chokepoint and beat every automatic rule. Allowances only become visible when
+// the collections gate is switched on; until then they are being banked.
+function setupParentControls(item: VodItem): void {
+  const existing = document.getElementById("vdParentBtn");
+  existing?.remove();
+  document.getElementById("vdParentMenu")?.remove();
+
+  if (getActiveProfile()?.is_kids) return;               // never offer this to a child
+  const kidsProfiles = getStoredProfiles().filter((p) => p.is_kids);
+  const anchor = document.getElementById("vdMyListBtn") || document.getElementById("vdPlayBtn");
+  if (!anchor?.parentElement) return;
+
+  const btn = document.createElement("button");
+  btn.id = "vdParentBtn";
+  btn.className = anchor.className;
+  btn.style.cssText = "background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);color:#fff;display:inline-flex;align-items:center;gap:8px;";
+  btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>Kids access`;
+  anchor.parentElement.insertBefore(btn, anchor.nextSibling);
+
+  btn.onclick = async (e) => {
+    e.stopPropagation();
+    if (document.getElementById("vdParentMenu")) { document.getElementById("vdParentMenu")!.remove(); return; }
+
+    const menu = document.createElement("div");
+    menu.id = "vdParentMenu";
+    menu.style.cssText = "position:absolute;z-index:10060;min-width:260px;background:#10141e;border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:8px;box-shadow:0 18px 44px rgba(0,0,0,.7);font-family:'Space Grotesk',sans-serif;";
+    const r = btn.getBoundingClientRect();
+    menu.style.left = `${Math.max(12, r.left)}px`;
+    menu.style.top = `${r.bottom + 8}px`;
+
+    const row = (label: string, sub: string, onClick: () => void) => {
+      const b = document.createElement("button");
+      b.style.cssText = "display:block;width:100%;text-align:left;padding:9px 10px;border:none;border-radius:8px;background:none;color:#fff;cursor:pointer;font:600 13px 'Space Grotesk',sans-serif;";
+      b.innerHTML = `${label}<div style="font-weight:500;font-size:11.5px;color:#9aa5b5;margin-top:2px">${sub}</div>`;
+      b.onmouseenter = () => (b.style.background = "rgba(255,255,255,.08)");
+      b.onmouseleave = () => (b.style.background = "none");
+      b.onclick = async () => { menu.remove(); onClick(); };
+      menu.appendChild(b);
+    };
+
+    row("Allow for Little Kids", "Adds it to your household's approved list", async () => {
+      try { await allowForAge(0, { id: item.id, isSeries: !!item.series_id }); showToast("Allowed for Little Kids"); }
+      catch (err: any) { showToast(err?.message || "Could not save"); }
+    });
+    row("Allow for Older Kids", "Adds it to your household's approved list", async () => {
+      try { await allowForAge(1, { id: item.id, isSeries: !!item.series_id }); showToast("Allowed for Older Kids"); }
+      catch (err: any) { showToast(err?.message || "Could not save"); }
+    });
+
+    if (kidsProfiles.length) {
+      const sep = document.createElement("div");
+      sep.style.cssText = "height:1px;background:rgba(255,255,255,.1);margin:6px 4px;";
+      menu.appendChild(sep);
+      for (const kp of kidsProfiles) {
+        const cloud = kp.id && !kp.id.startsWith("default_") && !kp.id.startsWith("profile_");
+        row(`Hide from ${escapeHtml(kp.name)}`, cloud ? "Takes effect immediately" : "Needs a cloud profile", async () => {
+          if (!cloud) { showToast("That profile isn't synced yet"); return; }
+          try {
+            await excludeFromProfile(kp.id, item.id);
+            invalidateExclusions();
+            showToast(`Hidden from ${kp.name}`);
+          } catch (err: any) { showToast(err?.message || "Could not hide"); }
+        });
+      }
+    }
+
+    document.body.appendChild(menu);
+    setTimeout(() => document.addEventListener("click", function away() {
+      menu.remove(); document.removeEventListener("click", away);
+    }, { once: true }), 0);
   };
 }
 
@@ -350,6 +461,7 @@ export async function openVodDetails(item: VodItem): Promise<void> {
   $("vdSummary").textContent = item.summary || "No description available.";
 
   setupMyListButton(item);
+  setupParentControls(item);
 
   const selectContainer = $("vdSelectorContainer");
   const select = $<HTMLSelectElement>("vdSeasonSelect");
