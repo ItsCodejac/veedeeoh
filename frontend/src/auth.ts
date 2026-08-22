@@ -12,8 +12,13 @@ export function getSupabase(): SupabaseClient {
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,
-        storageKey: 'veedeeoh_supabase_auth_session'
-      }
+        storageKey: 'veedeeoh_supabase_auth_session',
+        // The passkey API is gated behind this flag in auth-js, so the
+        // "Sign in with a passkey" button on the landing page could only ever
+        // throw. Required for signInWithPasskey, registerPasskey and
+        // listPasskeys to exist at all.
+        experimental: { passkey: true },
+      } as any
     });
 
     _supabase.auth.onAuthStateChange((event, session) => {
@@ -205,6 +210,28 @@ export async function signUp(email: string, password: string): Promise<void> {
 }
 
 /** Sign in using WebAuthn Passkeys */
+/** Enrol a passkey for the signed-in account.
+ *
+ *  Sign-in with a passkey shipped without any way to CREATE one, so the button
+ *  had no reachable success path -- every press ended at "you may need to
+ *  enroll a passkey first", pointing at a screen that did not exist. */
+export async function registerPasskey(friendlyName?: string): Promise<void> {
+  const auth = getSupabase().auth as any;
+  const { error } = await auth.registerPasskey(friendlyName ? { friendlyName } : undefined);
+  if (error) throw error;
+}
+
+export async function listPasskeys(): Promise<Array<{ id: string; friendly_name?: string; created_at?: string }>> {
+  const { data, error } = await (getSupabase().auth as any).listPasskeys();
+  if (error) throw error;
+  return (data?.passkeys ?? data ?? []) as any[];
+}
+
+export async function deletePasskey(id: string): Promise<void> {
+  const { error } = await (getSupabase().auth as any).deletePasskey({ id });
+  if (error) throw error;
+}
+
 export async function signInWithPasskey(): Promise<void> {
   const { data, error } = await getSupabase().auth.signInWithPasskey();
   if (error) throw error;

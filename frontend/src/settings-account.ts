@@ -3,7 +3,7 @@
 // readable at about this size.
 
 import { escapeHtml, showToast } from "./util";
-import { getSession, signOut, getSupabase } from "./auth";
+import { getSession, signOut, getSupabase, registerPasskey, listPasskeys, deletePasskey } from "./auth";
 import { getActiveProfile, getStoredProfiles } from "./profiles";
 import { getAccount, openBillingPortal, startCheckout, partyCreditSummary, buyPartyCredits } from "./db";
 import { card, row, fmtDate } from "./settings-ui";
@@ -23,6 +23,7 @@ export async function renderAccount(el: HTMLElement): Promise<void> {
     + `<div id="setBilling"></div>`
     + `<div id="setReferral"></div>`
     + card("Sign-in and security", `
+        <div id="setPasskeys"></div>
         <div class="setBtnRow">
           <a class="setBtn" href="/change-password.html">Change password</a>
           <button class="setBtn" id="setSignOutAll">Sign out everywhere</button>
@@ -57,6 +58,7 @@ export async function renderAccount(el: HTMLElement): Promise<void> {
   el.querySelector("#setExport")?.addEventListener("click", (e) => void exportData(e));
   el.querySelector("#setDelete")?.addEventListener("click", () => void confirmDelete(session?.email || ""));
 
+  void renderPasskeys(el.querySelector<HTMLElement>("#setPasskeys")!);
   void renderBilling(el.querySelector<HTMLElement>("#setBilling")!);
   const { renderReferral } = await import("./settings-referral");
   void renderReferral(el.querySelector<HTMLElement>("#setReferral")!);
@@ -253,5 +255,63 @@ async function renderCredits(el: HTMLElement): Promise<void> {
     b.disabled = true; b.textContent = "Opening…";
     try { await buyPartyCredits(); }
     catch (err: any) { showToast(err?.message || "Couldn't start checkout"); b.disabled = false; b.textContent = "Add 4 hours — $1"; }
+  });
+}
+
+// --------------------------------------------------------------- passkeys ---
+
+/** Passkey enrolment and management.
+ *
+ *  The landing page has had a "Sign in with a passkey" button for some time
+ *  with nothing anywhere that could enrol one, so it had no reachable success
+ *  path. This is the missing half.
+ *
+ *  Rendered only where the browser can actually do WebAuthn -- offering to
+ *  create a passkey on a device that cannot is a dead end with a confusing
+ *  error at the end of it. */
+async function renderPasskeys(el: HTMLElement): Promise<void> {
+  if (!window.PublicKeyCredential) { el.innerHTML = ""; return; }
+
+  let keys: Array<{ id: string; friendly_name?: string; created_at?: string }> = [];
+  try { keys = await listPasskeys(); }
+  catch { el.innerHTML = ""; return; }   // project has passkeys off: say nothing
+
+  const rows = keys.length
+    ? keys.map((k) => `
+        <div class="setRow">
+          <span class="setRowLabel">${escapeHtml(k.friendly_name || "Passkey")}
+            ${k.created_at ? `<span class="setDim"> · added ${fmtDate(k.created_at)}</span>` : ""}</span>
+          <span class="setRowValue">
+            <button class="setBtn small danger" data-pk="${escapeHtml(k.id)}">Remove</button>
+          </span>
+        </div>`).join("")
+    : `<p class="setHint">No passkeys yet. Add one to sign in with Touch ID, Windows Hello or your phone instead of a password.</p>`;
+
+  el.innerHTML = `
+    <div class="setSubhead">Passkeys</div>
+    ${rows}
+    <div class="setBtnRow"><button class="setBtn" id="setAddPasskey">Add a passkey</button></div>`;
+
+  el.querySelector("#setAddPasskey")?.addEventListener("click", async (e) => {
+    const b = e.currentTarget as HTMLButtonElement;
+    b.disabled = true; b.textContent = "Follow your browser…";
+    try {
+      await registerPasskey(`${navigator.platform || "Device"} · ${new Date().toLocaleDateString()}`);
+      showToast("Passkey added");
+      void renderPasskeys(el);
+    } catch (err: any) {
+      // A user cancelling the browser prompt is not an error worth shouting at.
+      const msg = String(err?.message || "");
+      showToast(/abort|cancel|NotAllowed/i.test(msg) ? "Cancelled" : (msg || "Couldn't add a passkey"));
+      b.disabled = false; b.textContent = "Add a passkey";
+    }
+  });
+
+  el.querySelectorAll<HTMLElement>("[data-pk]").forEach((b) => {
+    b.addEventListener("click", async () => {
+      if (!confirm("Remove this passkey? You will not be able to sign in with it again.")) return;
+      try { await deletePasskey(b.dataset.pk!); showToast("Passkey removed"); void renderPasskeys(el); }
+      catch (err: any) { showToast(err?.message || "Couldn't remove that passkey"); }
+    });
   });
 }
