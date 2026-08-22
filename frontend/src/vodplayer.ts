@@ -31,6 +31,7 @@ import { toggleWatched } from "./api";
 import { saveProgress } from "./db";
 import { getActiveProfile } from "./profiles";
 import { reportPlaybackFailure } from "./feedback";
+import { showToast } from "./util";
 
 const BRAND = "#c5f04e";
 
@@ -166,12 +167,17 @@ class VodPlayer {
    *  explanation. Now they get something to press, which is the only thing that
    *  can lift the block. */
   private guardAutoplay(p: any): void {
-    const attempt = p.play?.();
-    if (!attempt?.catch) return;
-
-    attempt.catch(() => {
+    // Listen for the player's OWN failure rather than calling play() here.
+    //
+    // The first version raced: Vidstack is constructed with autoplay:true and
+    // calls play() itself, so a second concurrent play() makes one of the two
+    // reject with an abort -- even though playback is starting fine. That
+    // rejection then put "Couldn't start playback" over a film whose audio was
+    // already running.
+    const onFail = () => {
       if (this.destroyed || !p.paused) return;
 
+      if (this.root?.querySelector(".vdTapPlay")) return;
       const el = document.createElement("button");
       el.className = "vdTapPlay";
       el.innerHTML = `
@@ -179,16 +185,16 @@ class VodPlayer {
         <span>Tap to play</span>`;
       el.addEventListener("click", () => {
         el.remove();
-        void p.play()?.catch?.(() => {
-          this.showPanel("Couldn't start playback.", "Try another title.");
-        });
+        // No panel on failure here either: the player is alive and the film may
+        // well be playing. Tearing the view down over a rejected promise is how
+        // the last version turned a non-problem into a dead end.
+        void p.play()?.catch?.(() => showToast("Couldn't start playback"));
       });
       this.root?.appendChild(el);
-
-      // If something else starts it -- a keyboard shortcut, the player's own
-      // control bar -- the prompt has served its purpose and should go.
       p.addEventListener("playing", () => el.remove(), { once: true, signal: this.ac.signal });
-    });
+    };
+
+    p.addEventListener("autoplay-error", onFail, { signal: this.ac.signal });
   }
 
   /** Relabel quality options that have no resolution to report.

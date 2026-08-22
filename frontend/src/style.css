@@ -4447,6 +4447,20 @@ body.party-guest { background: #06070a; }
    The host drives playback, so a viewer's transport controls could only take
    them out of sync with no way back -- which is what happened in testing.
    Volume, captions and fullscreen stay: those are personal, not shared. */
+/* Element selectors as well as classes: the layout renders <media-play-button>
+   custom elements, and matching only .vds-play-button missed the large centre
+   button that appears whenever the video is paused -- which is precisely when a
+   viewer is tempted to press it. */
+.party-viewer media-play-button,
+.party-viewer media-seek-button,
+.party-viewer media-time-slider,
+/* Element selectors as well as classes: the layout renders <media-play-button>
+   custom elements, and matching only .vds-play-button missed the large centre
+   button shown whenever the video is paused -- precisely when a viewer is
+   tempted to press it. */
+.party-viewer media-play-button,
+.party-viewer media-seek-button,
+.party-viewer media-time-slider,
 .party-viewer .vds-play-button,
 .party-viewer .vds-seek-button,
 .party-viewer .vds-time-slider,

@@ -238,11 +238,16 @@ export async function joinParty(joinCode: string): Promise<void> {
 
   window.addEventListener("veedeeoh:party-start", () => {
     closeLobby();
-    void openVodPlayer(asPartyChannel(item, url), party.stream_idx || 0, 0).then(() => {
-      // The host drives. Leaving a viewer their own transport controls only
-      // lets them desync with no way back, which is exactly what happened.
-      setPartyViewerMode(true);
-    });
+    // Viewer mode goes on BEFORE the player mounts. Applying it afterwards left
+    // a window where the transport controls were live, and the viewer in
+    // testing used exactly that window to press play.
+    setPartyViewerMode(true);
+    // `streams` carries the whole episode list for a series, which is what
+    // makes the host's streamIdx resolvable. An earlier edit to pass it did not
+    // apply -- the argument is optional, so nothing failed to compile and the
+    // guest silently kept a one-episode list.
+    void openVodPlayer(asPartyChannel(item, url, streams), party.stream_idx || 0, 0)
+      .then(() => setPartyViewerMode(true));
   }, { once: true });
 
   await connect(joinCode, false);
