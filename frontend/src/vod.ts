@@ -431,9 +431,26 @@ export async function startWatchParty(item: VodItem): Promise<boolean> {
     // streams at all and the party started on a black screen.
     let streams = (item as any).streams as any[] | undefined;
     if (!streams?.length) {
-      const url = await resolveItemStream(item);
-      if (!url) { showToast("That title can't be hosted right now"); return false; }
-      streams = [{ url, quality: null, source: item.genre || "Party" }];
+      // A SERIES carries no playable url of its own -- roughly a third of the
+      // catalogue -- so resolveItemStream returns nothing for it and hosting
+      // failed with "that title can't be hosted". Episodes are fetched on
+      // demand and each carries a direct url, exactly as the detail view does.
+      if (item.series_id) {
+        const eps = await fetchVodSeries(item.series_id).catch(() => [] as VodEpisode[]);
+        if (!eps.length) { showToast("Couldn't load episodes for that show"); return false; }
+        const ordered = [...eps].sort((a, b) =>
+          (a.season ?? 1) - (b.season ?? 1) || (a.number ?? 0) - (b.number ?? 0));
+        streams = ordered.map((ep) => ({
+          url: ep.url,
+          quality: null,
+          source: `S${ep.season ?? "?"}E${ep.number ?? "?"} ${ep.title}`.slice(0, 48),
+          id: `vod:${item.id}:s${ep.season ?? 1}e${ep.number ?? 0}`,
+        }));
+      } else {
+        const url = await resolveItemStream(item);
+        if (!url) { showToast("That title can't be hosted right now"); return false; }
+        streams = [{ url, quality: null, source: item.genre || "Party" }];
+      }
     }
 
     const { joinCode, link } = await party.createParty({
