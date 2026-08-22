@@ -9,7 +9,7 @@ import type { VodItem } from "./types";
 import { escapeHtml, showToast } from "./util";
 import {
   activePartyCode, disconnect, joinParty, partyEnabled, partyLink, recentParty, forgetParty,
-  resumeHosting,
+  resumeHosting, listPublicParties,
 } from "./party";
 
 let viewers = 0;
@@ -32,6 +32,8 @@ export function renderParty(el: HTMLElement): void {
       </div>
 
       ${code ? activeCard(code) : rejoinCard()}
+
+      <div id="partyOpenList"></div>
 
       <section class="partyCard">
         <h2>Join a party</h2>
@@ -99,6 +101,7 @@ export function renderParty(el: HTMLElement): void {
     renderParty(el);
   });
 
+  void renderOpenParties(el.querySelector<HTMLElement>("#partyOpenList")!);
   wirePicker(el);
 
   el.querySelector("#partyCopyBtn")?.addEventListener("click", async () => {
@@ -241,4 +244,75 @@ function rejoinCard(): string {
         <button id="partyForget" class="partyBtn">${host ? "End it" : "Not now"}</button>
       </div>
     </section>`;
+}
+
+
+/** Parties anyone can drop into.
+ *
+ *  Rendered only when there is something to show. An empty "open parties"
+ *  heading on a new product is worse than no heading: it advertises that
+ *  nobody is using the feature, every time someone opens the page.
+ *
+ *  Gated by the active profile's rating limits like every other surface. The
+ *  join path refuses out-of-limit content anyway, but listing something a
+ *  profile may not watch and then refusing it is a worse experience than never
+ *  offering it.
+ */
+async function renderOpenParties(box: HTMLElement): Promise<void> {
+  if (!box) return;
+
+  let parties = await listPublicParties();
+  if (!parties.length) { box.innerHTML = ""; return; }
+
+  try {
+    const { getVodRails } = await import("./vod");
+    const { allowedRatingsFor } = await import("./db");
+    const { getActiveProfile } = await import("./profiles");
+
+    const rails = await getVodRails();
+    const byId = new Map<string, any>();
+    for (const r of rails) for (const i of r.items as any[]) byId.set(String(i.id).replace(/^vod:/, ""), i);
+
+    const allowed = allowedRatingsFor(getActiveProfile());
+    parties = parties.filter((p) => {
+      const item = byId.get(p.content_id);
+      // Not in this profile's catalogue at all -- a different region, or
+      // excluded -- so do not advertise it.
+      if (!item) return false;
+      if (!allowed) return true;
+      return allowed.has(String(item.rating || "").toUpperCase());
+    }).map((p) => ({ ...p, art: byId.get(p.content_id)?.banner || byId.get(p.content_id)?.poster || "" }));
+  } catch { /* if the catalogue will not load, list what we have */ }
+
+  if (!parties.length) { box.innerHTML = ""; return; }
+
+  const ago = (iso: string) => {
+    const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+    if (m < 1) return "just started";
+    return m < 60 ? `${m}m in` : `${Math.floor(m / 60)}h ${m % 60}m in`;
+  };
+
+  box.innerHTML = `
+    <section class="partyCard">
+      <h2>Happening now</h2>
+      <p class="partyHint">Parties anyone can drop into. The host controls playback.</p>
+      <div class="partyPickList">
+        ${parties.map((p: any) => `
+          <button class="partyPick" data-code="${escapeHtml(p.join_code)}">
+            <img src="${escapeHtml(p.art || "")}" alt="" loading="lazy">
+            <span>
+              <span class="partyPickTitle">${escapeHtml(p.title || "Untitled")}</span><br>
+              <span class="partyPickMeta">${escapeHtml(ago(p.started_at))}
+                &middot; ${p.joined_count} watching${p.seat_limit ? ` of ${p.seat_limit}` : ""}</span>
+            </span>
+          </button>`).join("")}
+      </div>
+    </section>`;
+
+  box.querySelectorAll<HTMLElement>("[data-code]").forEach((b) => {
+    b.addEventListener("click", () => {
+      (b as HTMLButtonElement).disabled = true;
+      void joinParty(b.dataset.code!);
+    });
+  });
 }

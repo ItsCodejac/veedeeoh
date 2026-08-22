@@ -25,6 +25,10 @@ function isPhone(): boolean {
 export interface PartySetup {
   seatLimit: number | null;
   requireApproval: boolean;
+  /** Opted in to the open directory. Explicit, not inferred from the other two
+   *  settings: a host picking "anyone with the link" for convenience should not
+   *  find out later that strangers were watching. */
+  isPublic: boolean;
 }
 
 /** The handoff from the catalogue into the party surface.
@@ -91,6 +95,14 @@ export function openPartySetup(item: VodItem): Promise<PartySetup | null> {
           </div>
         </div>
 
+        <label class="psCheck" id="psPublicRow" hidden>
+          <input type="checkbox" id="psPublic" />
+          <span>
+            <b>List it publicly</b>
+            <em>Anyone browsing veedeeoh.party can drop in. You can still remove people.</em>
+          </span>
+        </label>
+
         <div class="psField">
           <label class="psLabel" for="psSeats">Seat limit</label>
           <input id="psSeats" class="psInput" type="number" inputmode="numeric"
@@ -139,6 +151,20 @@ export function openPartySetup(item: VodItem): Promise<PartySetup | null> {
     };
     pick("approval", "psOpt");
 
+    // Listing is only offered once approval is off. A public party that makes
+    // strangers knock is a queue the host did not sign up to manage, and the
+    // stranger has no idea who they are waiting on.
+    const publicRow = el.querySelector<HTMLElement>("#psPublicRow")!;
+    const publicBox = el.querySelector<HTMLInputElement>("#psPublic")!;
+    const syncPublic = () => {
+      const open = el.querySelector<HTMLElement>("[data-approval].selected")?.dataset.approval === "0";
+      publicRow.hidden = !open;
+      if (!open) publicBox.checked = false;
+    };
+    el.querySelectorAll<HTMLElement>("[data-approval]").forEach((b) =>
+      b.addEventListener("click", syncPublic));
+    syncPublic();
+
     const seatsEl = el.querySelector<HTMLInputElement>("#psSeats")!;
     // Blank means unlimited, so an empty field must stay empty -- clamping on
     // input would turn "I am still typing" into a number the host did not pick.
@@ -156,6 +182,7 @@ export function openPartySetup(item: VodItem): Promise<PartySetup | null> {
       done({
         seatLimit: Number.isFinite(n) && n >= 1 ? Math.min(500, n) : null,
         requireApproval: approval !== "0",
+        isPublic: publicBox.checked && approval === "0",
       });
     });
     // Escape cancels, which a prompt() chain never allowed cleanly.
