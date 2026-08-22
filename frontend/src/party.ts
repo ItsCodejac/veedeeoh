@@ -292,6 +292,8 @@ async function connect(joinCode: string, isHost: boolean): Promise<void> {
       case "pending":   emit({}, "veedeeoh:party-pending"); showToast("Waiting for the host to let you in"); break;
       case "admitted":  emit({}, "veedeeoh:party-admitted"); showToast("You're in"); break;
       case "start":     emit({}, "veedeeoh:party-start"); break;
+      case "away":      if (!isHost) showHostAway(true); break;
+      case "back":      if (!isHost) showHostAway(false); break;
       case "refused":   showToast("The host did not let you in"); break;
       case "removed":   showToast("The host removed you from the party"); disconnect(); break;
       case "closed":
@@ -311,7 +313,13 @@ async function connect(joinCode: string, isHost: boolean): Promise<void> {
   });
 
   if (isHost) {
+    watchHostVisibility();
     setPartyEmitter((s) => {
+      // Suppressed while the tab is hidden. A backgrounded browser pauses the
+      // video, which would otherwise be emitted as paused:true and stop the
+      // whole room -- turning "the host's phone rang" into "everyone's film
+      // stopped". Absence is signalled once, as `away`, and viewers keep going.
+      if (hostAway) return;
       if (socket?.readyState === WebSocket.OPEN) {
         // streamIdx travels; contentId does not. The episode index is what a
         // viewer needs to follow a binge, and it is meaningless outside this
@@ -348,6 +356,8 @@ export function endParty(): void {
 
 export function disconnect(): void {
   stopMetering();
+  stopWatchingVisibility();
+  showHostAway(false);
   showResync(false);
   setPartyViewerMode(false);
   lastHostState = null;
@@ -562,4 +572,53 @@ export async function closeParty(joinCode: string): Promise<void> {
   }
   try { localStorage.removeItem(tokenKey(joinCode)); } catch {}
   forgetParty();
+}
+
+
+// ------------------------------------------------- host presence & absence ---
+
+let hostAway = false;
+let visHandler: (() => void) | null = null;
+
+/** Tell viewers when the host's tab goes away, instead of letting a
+ *  browser-forced pause propagate as a deliberate one.
+ *
+ *  This matters most on mobile, where iOS suspends timers and throttles sockets
+ *  the moment the user switches apps or locks the screen -- a completely
+ *  routine thing to do with a phone, and previously enough to stall a whole
+ *  party on its last known position. */
+function watchHostVisibility(): void {
+  stopWatchingVisibility();
+  visHandler = () => {
+    const hidden = document.visibilityState === "hidden";
+    if (hidden === hostAway) return;
+    hostAway = hidden;
+    try { socket?.send(JSON.stringify({ type: hidden ? "away" : "back" })); } catch {}
+    // On return, resume if the browser paused us while backgrounded. Without
+    // this the host comes back paused and the next heartbeat stops everyone --
+    // reintroducing the exact problem one beat later.
+    if (!hidden) {
+      void import("./vodplayer").then((m) => m.resumeIfBackgroundPaused());
+    }
+  };
+  document.addEventListener("visibilitychange", visHandler);
+}
+
+function stopWatchingVisibility(): void {
+  if (visHandler) document.removeEventListener("visibilitychange", visHandler);
+  visHandler = null;
+  hostAway = false;
+}
+
+let awayEl: HTMLElement | null = null;
+
+/** Viewer-side notice. Deliberately quiet and non-blocking: the film is still
+ *  playing, and this is information, not an interruption. */
+function showHostAway(on: boolean): void {
+  if (!on) { awayEl?.remove(); awayEl = null; return; }
+  if (awayEl) return;
+  awayEl = document.createElement("div");
+  awayEl.id = "partyHostAway";
+  awayEl.textContent = "The host stepped away — still playing";
+  document.body.appendChild(awayEl);
 }

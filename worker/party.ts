@@ -238,6 +238,18 @@ export class Party extends DurableObject<Env> {
       return;
     }
 
+    // The host stepped away or came back. Deliberately NOT a pause: a pause is
+    // a command and stops everyone, while a host backgrounding a tab, crashing
+    // or losing wifi is an absence. Viewers keep playing through an absence --
+    // stopping a room of people because one person's phone rang is the wrong
+    // default, and they are all playing the same content at the same rate, so
+    // they stay together until the host returns and corrects them.
+    if (msg?.type === "away" || msg?.type === "back") {
+      if (!att.isHost) return;
+      this.broadcast({ type: msg.type }, ws, true);
+      return;
+    }
+
     // Host opens the doors. Until this lands, an approved guest sits in the
     // lobby holding a socket and receives no playback state at all.
     if (msg?.type === "start") {
@@ -274,7 +286,14 @@ export class Party extends DurableObject<Env> {
   }
 
   async webSocketClose(ws: WebSocket): Promise<void> {
+    const att = ws.deserializeAttachment() as Attachment | null;
     try { ws.close(); } catch { /* already closed */ }
+
+    // The host's socket dropping is the same class of event as backgrounding:
+    // tell viewers, do not stop them. The party is not over -- the host may be
+    // reconnecting, and the idle alarm will close the room if they are not.
+    if (att?.isHost) this.broadcast({ type: "away" }, ws, true);
+
     this.broadcastPresence();
   }
 

@@ -875,6 +875,18 @@ export function applyPartyState(s: PartyPlaybackState): void {
   applyingRemote = false;
 }
 
+/** Resume playback that a backgrounded browser paused.
+ *
+ *  Called when a host's tab becomes visible again. Without it the host returns
+ *  paused and their next heartbeat stops the whole room -- the same problem the
+ *  away signal exists to prevent, just one beat later. Does nothing if the host
+ *  paused on purpose before leaving, because then they are already paused and
+ *  playing for them would be the surprise. */
+export function resumeIfBackgroundPaused(): void {
+  const p = current?.raw();
+  if (p?.paused) void p.play?.()?.catch?.(() => {});
+}
+
 /** Put the player into viewer mode: the host drives, so transport controls
  *  would only let a viewer desync themselves with no way back. Volume,
  *  captions and fullscreen stay -- those are personal, not shared. */

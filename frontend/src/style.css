@@ -4514,3 +4514,20 @@ body.party-guest { background: #06070a; }
   display: flex; align-items: center; justify-content: center;
 }
 .vdTapIcon svg { width: 26px; height: 26px; margin-left: 3px; }
+
+/* Host stepped away. Quiet on purpose: the film is still playing and this is
+   information, not an interruption -- the whole point of separating an absence
+   from a deliberate pause. */
+#partyHostAway {
+  position: fixed; left: 50%; top: 18px; transform: translateX(-50%);
+  z-index: 10002;
+  padding: 8px 16px; border-radius: 999px;
+  background: rgba(6,7,10,.92); border: 1px solid rgba(255,255,255,.16);
+  color: #cfd6e0; font-family: var(--display); font-size: 12.5px; font-weight: 600;
+  backdrop-filter: blur(8px); pointer-events: none;
+}
+.psWarn {
+  font-size: 12.5px; line-height: 1.5; color: #ffcf7a; margin: -6px 0 18px;
+  background: rgba(255, 184, 77, .08); border: 1px solid rgba(255, 184, 77, .28);
+  border-radius: 9px; padding: 10px 12px;
+}

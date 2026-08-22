@@ -14,6 +14,14 @@
 import type { VodItem } from "./types";
 import { escapeHtml, showToast } from "./util";
 
+/** Phone-sized and touch-primary. Not a blocklist -- hosting from a phone is
+ *  allowed, because it works as long as the tab stays open. This only warns,
+ *  since backgrounding is a completely routine thing to do with a phone and a
+ *  host who does not know that will blame the app. */
+function isPhone(): boolean {
+  return window.matchMedia("(max-width: 820px), (pointer: coarse)").matches;
+}
+
 export interface PartySetup {
   seatLimit: number | null;
   requireApproval: boolean;
@@ -95,6 +103,12 @@ export function openPartySetup(item: VodItem): Promise<PartySetup | null> {
           You control playback. Everyone else follows along, and each person
           streams from the provider directly &mdash; nothing is re-broadcast.
         </p>
+        ${isPhone() ? `
+          <p class="psWarn">
+            Hosting from a phone works, but keep this tab open. Switching apps
+            or locking the screen suspends the sync, and the party carries on
+            without you until you come back.
+          </p>` : ""}
 
         <div class="psRow">
           <button class="psBtn" id="psCancel">Cancel</button>
