@@ -643,14 +643,35 @@ function wireHeader(): void {
   if (regionSelector) {
     import("./api").then(api => {
       regionSelector.value = api.getActiveRegion();
-      regionSelector.addEventListener("change", (e) => {
-        const val = (e.target as HTMLSelectElement).value;
+      regionSelector.addEventListener("change", async (e) => {
+        const sel = e.target as HTMLSelectElement;
+        const val = sel.value;
         api.setActiveRegion(val);
-        renderHome();
-        const showsRails = $("showsRails");
-        if (showsRails) showsRails.replaceChildren();
-        const moviesRails = $("moviesRails");
-        if (moviesRails) moviesRails.replaceChildren();
+
+        // Drop the cached catalog FIRST. getVodRails hands back the rails it
+        // already has without re-fetching, so re-rendering alone just redraws
+        // the previous region and the control looks dead.
+        const vod = await import("./vod");
+        vod.invalidateCatalogCache();
+
+        // Only US is written to catalog_cache by the cron; other regions build
+        // live and take a few seconds. Say so rather than appearing frozen.
+        sel.disabled = true;
+        const label = sel.options[sel.selectedIndex]?.text || val;
+        showToast(`Loading the ${label} catalog...`);
+
+        $("showsRails")?.replaceChildren();
+        $("moviesRails")?.replaceChildren();
+        try {
+          const rails = await vod.getVodRails();
+          const titles = new Set(rails.flatMap((r) => r.items.map((i: any) => String(i.id)))).size;
+          await renderHome();
+          showToast(`${label}: ${titles.toLocaleString()} titles`);
+        } catch {
+          showToast("Couldn't load that region's catalog");
+        } finally {
+          sel.disabled = false;
+        }
       });
     });
   }

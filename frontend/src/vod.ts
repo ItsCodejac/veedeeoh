@@ -148,6 +148,17 @@ function applyExclusions<T extends { items: any[] }>(rails: T[], excluded: Set<s
 /** Invalidate after a parent adds or removes an exclusion. */
 export function invalidateExclusions(): void { cachedExclusions = null; cachedApproved = null; }
 
+/** Drop the whole catalog, not just the gate caches. Needed when the REGION
+ *  changes: getVodRails returns cachedVodRails without re-fetching, so without
+ *  this the previous region's rails are simply re-rendered and the selector
+ *  looks broken. Also clears the two derived caches, since approvals and
+ *  exclusions are keyed on content ids that may not exist in the new catalog. */
+export function invalidateCatalogCache(): void {
+  cachedVodRails = null;
+  cachedExclusions = null;
+  cachedApproved = null;
+}
+
 export async function getVodRails(): Promise<VodRail[]> {
   if (!cachedVodRails || cachedVodRails.length === 0) {
     const res = await fetchVod();
@@ -1645,14 +1656,44 @@ export async function renderHome(): Promise<void> {
     }
 
     // Popular on veedeeoh — real aggregate plays. Hidden until there's enough data.
+    //
+    // Split by rating. One mixed rail put a preschool cartoon next to a TV-MA
+    // thriller purely because both are watched a lot, which reads as an
+    // unsorted list rather than a recommendation.
+    //
+    // TV-G and under only, and only TV ratings. A pre-1997 G or PG says nothing
+    // reliable about whether a child should watch it -- Airplane! is PG -- so
+    // those stay in the general rail and remain a parental choice.
     try {
-      const { getPopularContentIds } = await import("./db");
-      const popular = await getPopularContentIds(20);
+      const { getPopularContentIds, tvMaturity } = await import("./db");
+      // Ask for more than one rail needs: the two lists come out of one query,
+      // and 20 total could leave either side under the 4-item threshold.
+      const popular = await getPopularContentIds(50);
       if (popular.length) {
         const byId = new Map<string, VodItem>();
         [...uniqueMovies, ...uniqueTv].forEach(i => byId.set(strip(i.id), i));
         const items = popular.map(p => byId.get(p.content_id)).filter(Boolean) as VodItem[];
-        if (items.length >= 4) renderGenreRail("Popular on veedeeoh", items, true);
+
+        const kidSafe = (i: VodItem) => {
+          const m = tvMaturity(i.rating);
+          return m !== null && m <= 2;                       // TV-Y, TV-Y7, TV-G
+        };
+
+        // On a kids profile the whole catalog is already gated, so splitting
+        // would just produce one rail and one empty one.
+        if (document.body.classList.contains("kids-mode")) {
+          if (items.length >= 4) renderGenreRail("Popular on veedeeoh", items, true);
+        } else {
+          const kids = items.filter(kidSafe);
+          const rest = items.filter((i) => !kidSafe(i));
+          if (rest.length >= 4) renderGenreRail("Popular on veedeeoh", rest, true);
+          if (kids.length >= 4) renderGenreRail("Popular with kids", kids, true);
+          // Too few of either to stand alone: one mixed rail beats hiding
+          // popularity entirely.
+          if (rest.length < 4 && kids.length < 4 && items.length >= 4) {
+            renderGenreRail("Popular on veedeeoh", items, true);
+          }
+        }
       }
     } catch {}
 
