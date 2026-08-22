@@ -1061,3 +1061,30 @@ export async function wireHostChannel(root: ParentNode): Promise<void> {
     else a.remove();
   }
 }
+
+/** The catalogue picker as a one-shot sheet. Resolves with the chosen title, or
+ *  null if it was dismissed. Used wherever picking a title is the whole
+ *  interaction -- a recommendation, a suggestion to a host. */
+export function pickSheet(heading: string): Promise<import("./party-picker").PartyPick | null> {
+  return new Promise((resolve) => {
+    const sheet = document.createElement("div");
+    sheet.id = "partyNextSheet";
+    sheet.innerHTML = `
+      <div class="pnCard" role="dialog" aria-modal="true" aria-label="${escapeHtml(heading)}">
+        <div class="pnHead">
+          <h2>${escapeHtml(heading)}</h2>
+          <button class="pnClose" aria-label="Close">&times;</button>
+        </div>
+        <div class="pnPicker"></div>
+      </div>`;
+    document.body.appendChild(sheet);
+
+    const done = (v: any) => { sheet.remove(); resolve(v); };
+    sheet.querySelector(".pnClose")!.addEventListener("click", () => done(null));
+    sheet.addEventListener("click", (e) => { if (e.target === sheet) done(null); });
+
+    void import("./party-picker").then(({ mountPicker }) => {
+      mountPicker(sheet.querySelector<HTMLElement>(".pnPicker")!, (pick) => done(pick));
+    });
+  });
+}

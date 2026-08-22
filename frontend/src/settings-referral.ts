@@ -57,6 +57,9 @@ export async function renderReferral(el: HTMLElement): Promise<void> {
         + "A referral is yours for 90 days; once they subscribe it is yours for good. "
         + "Payouts are made by hand while the programme is in beta.");
 
+  void renderPublicProfile(el);
+  void renderPicks(el);
+  void renderSuggestionsInbox(el);
   void renderHostChannel(el);
 
   el.querySelector("#setRefCopy")?.addEventListener("click", async () => {
@@ -65,6 +68,13 @@ export async function renderReferral(el: HTMLElement): Promise<void> {
   });
 }
 
+
+const WEEKDAYS = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"];
+
+const REGIONS: Array<[string, string]> = [
+  ["US", "United States"], ["GB", "United Kingdom"], ["CA", "Canada"],
+  ["DE", "Germany"], ["ES", "Spain"], ["MX", "Mexico"], ["FR", "France"],
+];
 
 const PLATFORMS = [
   ["", "None"], ["discord", "Discord"], ["twitch", "Twitch"],
@@ -108,4 +118,182 @@ async function renderHostChannel(root: HTMLElement): Promise<void> {
       showToast("That handle has characters we cannot use");
     } finally { b.disabled = false; }
   });
+}
+
+/** A public page, and the handle that addresses it.
+ *
+ *  ENTIRELY OPT IN, and the handle is what opts you in: there is no page until
+ *  one is claimed, and clearing it withdraws the page again. Nothing on it is
+ *  derived from the account -- not the email, not the join date, not anything
+ *  watched -- only what is typed into these three fields, plus parties the host
+ *  has separately chosen to list publicly.
+ */
+async function renderPublicProfile(root: HTMLElement): Promise<void> {
+  const { getSupabase } = await import("./auth");
+  const { data: u } = await getSupabase().auth.getUser();
+  if (!u.user) return;
+  const { data } = await getSupabase()
+    .from("profiles").select("public_handle, display_name, bio")
+    .eq("id", u.user.id).maybeSingle();
+
+  const cur = {
+    handle: (data as any)?.public_handle || "",
+    name: (data as any)?.display_name || "",
+    bio: (data as any)?.bio || "",
+  };
+
+  const box = document.createElement("div");
+  box.innerHTML = card("Your public page", `
+    <div class="setField">
+      <label class="setLabel" for="ppHandle">Handle</label>
+      <input id="ppHandle" class="setInput" maxlength="24" placeholder="yourname"
+             value="${escapeHtml(cur.handle)}" />
+    </div>
+    <div class="setField">
+      <label class="setLabel" for="ppName">Display name</label>
+      <input id="ppName" class="setInput" maxlength="40" placeholder="What people call you"
+             value="${escapeHtml(cur.name)}" />
+    </div>
+    <div class="setField">
+      <label class="setLabel" for="ppBio">About</label>
+      <input id="ppBio" class="setInput" maxlength="200" placeholder="One line about what you host"
+             value="${escapeHtml(cur.bio)}" />
+    </div>
+    <div class="setField">
+      <label class="setLabel" for="ppRegion">Region you host from</label>
+      <select id="ppRegion" class="setInput" style="max-width:220px">
+        <option value="">Not shown</option>
+        ${REGIONS.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}
+      </select>
+    </div>
+    <div class="setField">
+      <label class="setLabel" for="ppDay">Usually hosts</label>
+      <div class="setBtnRow">
+        <select id="ppDay" class="setInput" style="max-width:150px">
+          <option value="">Not shown</option>
+          ${WEEKDAYS.map((d, i) => `<option value="${i}">${d}</option>`).join("")}
+        </select>
+        <select id="ppHour" class="setInput" style="max-width:120px">
+          ${Array.from({ length: 24 }, (_, h) =>
+            `<option value="${h}">${((h + 11) % 12) + 1}${h < 12 ? "am" : "pm"}</option>`).join("")}
+        </select>
+      </div>
+    </div>
+    <div class="setBtnRow">
+      <button class="setBtn" id="ppSave">Save</button>
+      <a class="setBtn" id="ppView" href="#host/${encodeURIComponent(cur.handle)}"
+         ${cur.handle ? "" : "hidden"}>View page</a>
+    </div>
+    <p class="setHint" id="ppLink">${cur.handle
+      ? `People can find you at <strong>veedeeoh.com/app#host/${escapeHtml(cur.handle)}</strong>`
+      : ""}</p>`,
+    "Claim a handle and people can follow you, so your public parties reach them. Leave the handle blank to take the page down. Lowercase letters, numbers and underscores.");
+  root.appendChild(box);
+
+  // Region matters more than it looks: a party plays region-locked content and
+  // the join refuses a title the viewer's catalogue does not have, so saying
+  // where you host from stops someone following you for parties they could
+  // never join.
+  const { data: extra } = await getSupabase()
+    .from("profiles").select("region, hosts_weekday, hosts_hour, hosts_tz")
+    .eq("id", u.user.id).maybeSingle();
+  const sel = (id: string) => box.querySelector<HTMLSelectElement>(id)!;
+  sel("#ppRegion").value = (extra as any)?.region || "";
+  sel("#ppDay").value = (extra as any)?.hosts_weekday == null ? "" : String((extra as any).hosts_weekday);
+  sel("#ppHour").value = String((extra as any)?.hosts_hour ?? 20);
+
+  box.querySelector("#ppSave")!.addEventListener("click", async (e) => {
+    const b = e.currentTarget as HTMLButtonElement;
+    const handle = (box.querySelector("#ppHandle") as HTMLInputElement).value.trim().toLowerCase();
+    const name = (box.querySelector("#ppName") as HTMLInputElement).value;
+    const bio = (box.querySelector("#ppBio") as HTMLInputElement).value;
+    b.disabled = true;
+    try {
+      const { claimHandle, saveProfileExtras } = await import("./party");
+      const err = await claimHandle(handle, name, bio);
+      if (err) { showToast(err); return; }
+      const day = sel("#ppDay").value;
+      await saveProfileExtras({
+        region: sel("#ppRegion").value || null,
+        weekday: day === "" ? null : Number(day),
+        hour: day === "" ? null : Number(sel("#ppHour").value),
+        // Captured from the browser rather than asked for: nobody knows their
+        // own IANA zone, and a schedule without one is a time in no place.
+        tz: day === "" ? null : (Intl.DateTimeFormat().resolvedOptions().timeZone || null),
+      });
+      showToast(handle ? "Public page saved" : "Public page taken down");
+      const view = box.querySelector<HTMLAnchorElement>("#ppView");
+      const hint = box.querySelector<HTMLElement>("#ppLink");
+      if (view) { view.href = `#host/${encodeURIComponent(handle)}`; view.toggleAttribute("hidden", !handle); }
+      if (hint) {
+        hint.innerHTML = handle
+          ? `People can find you at <strong>veedeeoh.com/app#host/${escapeHtml(handle)}</strong>` : "";
+      }
+    } finally { b.disabled = false; }
+  });
+}
+
+/** What you recommend, shown on your public page.
+ *
+ *  A DELIBERATE LIST rather than My List republished. Repurposing a private
+ *  watchlist means someone discovers they have published something they saved
+ *  for themselves, and there is no good apology for that. Built with the same
+ *  picker the party uses, so adding to it is browsing rather than typing.
+ */
+async function renderPicks(root: HTMLElement): Promise<void> {
+  const box = document.createElement("div");
+  box.innerHTML = card("What you recommend", `
+    <div id="pkList" class="setPickRow"></div>
+    <div class="setBtnRow"><button class="setBtn" id="pkAdd">Add a title</button></div>`,
+    "Shown on your public page. Nothing appears here unless you put it there.");
+  root.appendChild(box);
+
+  const list = box.querySelector<HTMLElement>("#pkList")!;
+  const { myPicks, setPick } = await import("./party");
+
+  const paint = async () => {
+    const picks = await myPicks();
+    if (!picks.length) { list.innerHTML = `<p class="setHint">Nothing yet.</p>`; return; }
+    list.replaceChildren();
+    for (const k of picks) {
+      const chip = document.createElement("span");
+      chip.className = "setChip";
+      chip.innerHTML = `${escapeHtml(k.title || k.content_id)}
+        <button class="setChipX" aria-label="Remove">&times;</button>`;
+      chip.querySelector("button")!.addEventListener("click", async () => {
+        await setPick(k.content_id, false);
+        void paint();
+      });
+      list.append(chip);
+    }
+  };
+  void paint();
+
+  box.querySelector("#pkAdd")!.addEventListener("click", async () => {
+    const { pickSheet } = await import("./party-setup");
+    const chosen = await pickSheet("Add a recommendation");
+    if (!chosen) return;
+    await setPick(String(chosen.item.id), true, chosen.item.title, chosen.item.poster || chosen.item.banner);
+    void paint();
+  });
+}
+
+/** What people have asked you to host.
+ *
+ *  Counts only, never who asked. Someone pointing at a title should not have to
+ *  wonder whether they are being watched doing it. */
+async function renderSuggestionsInbox(root: HTMLElement): Promise<void> {
+  const { mySuggestions } = await import("./party");
+  const rows = await mySuggestions().catch(() => []);
+  if (!rows.length) return;
+
+  const box = document.createElement("div");
+  box.innerHTML = card("Suggested to you", `
+    <div class="setPickRow">
+      ${rows.slice(0, 20).map((r) => `
+        <span class="setChip">${escapeHtml(r.title || r.content_id)}
+          ${r.votes > 1 ? `<b class="setChipN">${r.votes}</b>` : ""}</span>`).join("")}
+    </div>`,
+    "Titles people would like you to host. Who asked stays private.");
+  root.appendChild(box);
 }

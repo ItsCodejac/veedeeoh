@@ -1212,3 +1212,154 @@ export const REACTIONS = [
 export function sendReaction(kind: string): void {
   try { socket?.send(JSON.stringify({ type: "react", kind })); } catch {}
 }
+
+// ---------------------------------------------------------- public profiles ---
+//
+// The directory answers "what is on right now" and nothing else, so a host who
+// gathers people every week has no address anyone can come back to and no way
+// to tell them about the next one. Every party starts from nothing.
+//
+// Entirely opt in: an account has no public presence until it claims a handle,
+// and nothing here exposes anything the host did not type in for the purpose
+// or already choose to list.
+
+export interface PublicProfile {
+  ok: boolean;
+  error?: string;
+  userId?: string;
+  handle?: string;
+  name?: string;
+  bio?: string | null;
+  platform?: string | null;
+  handleSocial?: string | null;
+  followers?: number;
+  following?: boolean;
+  isSelf?: boolean;
+  live?: Array<{ joinCode: string; title: string; contentId: string; blurb: string | null; startedAt: string; watching: number }>;
+  picks?: Array<{ contentId: string; title: string | null; poster: string | null }>;
+  recent?: string[];
+  region?: string | null;
+  hostsWeekday?: number | null;
+  hostsHour?: number | null;
+  hostsTz?: string | null;
+}
+
+/** Flag a profile. Reasons are an allowlist; there is no free text field, for
+ *  the same reason the removal reasons have none. */
+export async function reportProfile(handle: string, why: string): Promise<boolean> {
+  const { data, error } = await getSupabase().rpc("report_profile", { handle, why });
+  if (error) return false;
+  return !!(data as any)?.ok;
+}
+
+/** Point a host at something in the catalogue. A TITLE, never a message: the
+ *  second one is a moderation queue, the first is a row with a content id. */
+export async function suggestToHost(handle: string, contentId: string, title: string): Promise<string | null> {
+  const { data, error } = await getSupabase().rpc("suggest_to_host", {
+    handle, content: contentId, name: title,
+  });
+  if (error) return "Could not send that";
+  const r = data as any;
+  return r?.ok ? null : (r?.error || "Could not send that");
+}
+
+export interface Suggestion { content_id: string; title: string | null; votes: number; newest: string }
+
+/** What people have asked this account to host, most-wanted first. Counts only:
+ *  who asked for what stays private, so nobody worries about being seen. */
+export async function mySuggestions(): Promise<Suggestion[]> {
+  const { data, error } = await getSupabase().rpc("my_suggestions");
+  if (error || !Array.isArray(data)) return [];
+  return data as Suggestion[];
+}
+
+/** Add or remove one of your public recommendations. */
+export async function setPick(
+  contentId: string, on: boolean, title?: string, poster?: string,
+): Promise<boolean> {
+  const sb = getSupabase();
+  const { data: u } = await sb.auth.getUser();
+  if (!u.user) return false;
+  if (!on) {
+    const { error } = await sb.from("public_picks").delete()
+      .eq("user_id", u.user.id).eq("content_id", contentId);
+    return !error;
+  }
+  const { error } = await sb.from("public_picks").upsert({
+    user_id: u.user.id, content_id: contentId, title: title ?? null, poster: poster ?? null,
+  });
+  return !error;
+}
+
+export async function myPicks(): Promise<Array<{ content_id: string; title: string | null; poster: string | null }>> {
+  const sb = getSupabase();
+  const { data: u } = await sb.auth.getUser();
+  if (!u.user) return [];
+  const { data } = await sb.from("public_picks")
+    .select("content_id, title, poster").eq("user_id", u.user.id);
+  return (data ?? []) as any[];
+}
+
+/** Region and schedule, saved alongside the handle. */
+export async function saveProfileExtras(fields: {
+  region: string | null; weekday: number | null; hour: number | null; tz: string | null;
+}): Promise<boolean> {
+  const sb = getSupabase();
+  const { data: u } = await sb.auth.getUser();
+  if (!u.user) return false;
+  const { error } = await sb.from("profiles").update({
+    region: fields.region, hosts_weekday: fields.weekday,
+    hosts_hour: fields.hour, hosts_tz: fields.tz,
+  }).eq("id", u.user.id);
+  return !error;
+}
+
+export async function publicProfile(handle: string): Promise<PublicProfile> {
+  const { data, error } = await getSupabase().rpc("public_profile", { want: handle });
+  if (error || !data) return { ok: false, error: "Could not load that profile" };
+  return data as PublicProfile;
+}
+
+/** Follow or unfollow. Written directly rather than through a function: the row
+ *  is the follower's own, and the policy already says so. */
+export async function followHost(hostUserId: string, on: boolean): Promise<boolean> {
+  const sb = getSupabase();
+  const { data: u } = await sb.auth.getUser();
+  if (!u.user) { showToast("Sign in to follow a host"); return false; }
+  if (on) {
+    const { error } = await sb.from("host_follows")
+      .upsert({ follower_user_id: u.user.id, host_user_id: hostUserId });
+    if (error) { showToast("Couldn't follow just now"); return false; }
+    return true;
+  }
+  const { error } = await sb.from("host_follows").delete()
+    .eq("follower_user_id", u.user.id).eq("host_user_id", hostUserId);
+  if (error) { showToast("Couldn't unfollow just now"); return false; }
+  return false;
+}
+
+export interface FollowedParty {
+  join_code: string; title: string; content_id: string; host_user_id: string;
+  host_name: string | null; host_handle: string | null; seat_limit: number | null;
+  started_at: string; joined_count: number; blurb: string | null;
+}
+
+export async function followedLiveParties(): Promise<FollowedParty[]> {
+  const { data, error } = await getSupabase().rpc("followed_live_parties");
+  if (error || !Array.isArray(data)) return [];
+  return data as FollowedParty[];
+}
+
+/** Claim, change or withdraw a public handle. Returns an error string, or null
+ *  when it worked -- uniqueness and the reserved list are decided server-side,
+ *  so the reason a handle was refused comes from there. */
+export async function claimHandle(
+  handle: string, displayName: string, bio: string,
+): Promise<string | null> {
+  const { data, error } = await getSupabase().rpc("claim_handle", {
+    want: handle, name: displayName, about: bio,
+  });
+  if (error) return "Could not save that";
+  const r = data as any;
+  return r?.ok ? null : (r?.error || "Could not save that");
+}

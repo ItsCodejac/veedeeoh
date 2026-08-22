@@ -240,6 +240,22 @@ export async function applyRoute(): Promise<void> {
     return;
   }
 
+  // Someone's public profile. Inside the party panel rather than a panel of its
+  // own: a permalink should land somewhere that already has the rest of the
+  // party furniture around it, so "back to veedeeoh.party" is one step. Both
+  // prefixes are accepted because #host/ shipped first and links outlive
+  // renames.
+  if (raw.startsWith("u/") || raw.startsWith("host/")) {
+    const handle = raw.slice(raw.indexOf("/") + 1).trim();
+    if (!handle) { switchViewRef?.("tabParty"); return; }
+    const panel = document.getElementById("partyPanel");
+    if (!panel) { switchViewRef?.("tabHome"); return; }
+    showOnly("partyView");
+    const { renderProfilePage } = await import("./partyview");
+    await renderProfilePage(panel, handle);
+    return;
+  }
+
   if (raw.startsWith("search/")) {
     const q = raw.slice("search/".length).trim();
     if (!q) { switchViewRef?.("tabHome"); return; }
