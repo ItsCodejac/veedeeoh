@@ -206,6 +206,9 @@ export async function getVodRails(): Promise<VodRail[]> {
 // same place the major services land. Anything older stays in watch_progress;
 // it is simply not on the shelf.
 const RESUME_RAIL_MAX = 20;
+// How many are on the shelf before See All. The rest are one click away rather
+// than behind a long horizontal scroll nobody reaches the end of.
+const RESUME_RAIL_VISIBLE = 8;
 
 function resumeHistoryKey(): string {
   let id = "default";
@@ -1587,16 +1590,24 @@ export async function renderHome(): Promise<void> {
     if (resumeHistory.length > 0) {
       const continueRail = document.createElement("div");
       continueRail.className = "rail";
+      // Matches every other rail: a short shelf plus See All, rather than one
+      // long scroller. Continue Watching is the rail most likely to be long,
+      // since it accumulates across devices.
+      const shown = resumeHistory.slice(0, RESUME_RAIL_VISIBLE);
+      const hasMore = resumeHistory.length > shown.length;
       continueRail.innerHTML = `
         <div class="railHead">
-          <h2>Continue Watching</h2>
-          <span class="railTag">Resume where you left off</span>
+          <div class="railHeadTitle">
+            <h2>Continue Watching</h2>
+            <span class="railTag">Resume where you left off</span>
+          </div>
+          ${hasMore ? `<button class="railExpandBtn" style="display:inline-flex;align-items:center;gap:6px;">See All (${resumeHistory.length})<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></button>` : ""}
         </div>
       `;
       const continueScroller = document.createElement("div");
       continueScroller.className = "railScroll";
 
-      resumeHistory.forEach((item) => {
+      const buildCard = (item: any) => {
         const card = document.createElement("button");
         card.className = "continueCard";
         const imgUrl = item.banner || item.poster || "";
@@ -1630,8 +1641,27 @@ export async function renderHome(): Promise<void> {
             card.classList.remove("loading");
           }
         };
-        continueScroller.append(card);
-      });
+        return card;
+      };
+
+      shown.forEach((item) => continueScroller.append(buildCard(item)));
+
+      // Expands in place into a grid, the same behaviour and the same CSS the
+      // other rails use -- not a category view, because these cards carry a
+      // resume position and a progress bar that a plain catalogue card drops.
+      const expandBtn = continueRail.querySelector<HTMLElement>(".railExpandBtn");
+      if (expandBtn) {
+        let open = false;
+        expandBtn.onclick = (e) => {
+          e.stopPropagation();
+          open = !open;
+          continueScroller.classList.toggle("expandedGrid", open);
+          continueScroller.replaceChildren();
+          (open ? resumeHistory : shown).forEach((it: any) => continueScroller.append(buildCard(it)));
+          expandBtn.firstChild!.textContent = open ? "Show less " : `See All (${resumeHistory.length})`;
+        };
+      }
+
       continueRail.append(continueScroller);
       setupHorizontalScroll(continueScroller, continueRail);
       railsContainer.append(continueRail);
