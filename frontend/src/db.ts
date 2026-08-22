@@ -646,3 +646,36 @@ export async function referralSummary(): Promise<ReferralSummary | null> {
   if (error) { console.warn("[referral] summary", error); return null; }
   return data as ReferralSummary;
 }
+
+export interface ReferralTerms {
+  code: string;
+  kind: "user" | "partner";
+  rate_bps: number;
+  duration_months: number;
+}
+
+/** The caller's own affiliate terms. Partners carry a negotiated rate, so the
+ *  page must read the row rather than print the 20%/12mo default at everyone. */
+export async function myReferralTerms(): Promise<ReferralTerms | null> {
+  const { data, error } = await getSupabase()
+    .from("referral_codes")
+    .select("code, kind, rate_bps, duration_months")
+    .maybeSingle();
+  if (error) { console.warn("[referral] terms", error); return null; }
+  return (data as ReferralTerms) ?? null;
+}
+
+/** Where this affiliate's referrals came from. Counted client-side over the
+ *  referrer's own rows -- RLS already scopes the select, and the row count is
+ *  small enough that a grouped RPC would be premature. */
+export async function referralsBySource(): Promise<Record<string, number>> {
+  const { data, error } = await getSupabase()
+    .from("referrals")
+    .select("source, first_paid_at");
+  if (error) { console.warn("[referral] sources", error); return {}; }
+  const out: Record<string, number> = {};
+  for (const r of (data ?? []) as Array<{ source: string }>) {
+    out[r.source] = (out[r.source] || 0) + 1;
+  }
+  return out;
+}

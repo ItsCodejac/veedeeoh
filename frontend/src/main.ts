@@ -108,8 +108,9 @@ function showRegionSplash(code: string): (subtitle?: string) => Promise<void> {
   o.innerHTML = `
     <div class="regionSplashInner">
       <div class="regionSplashMark">
-        <span class="vdShimmerText">veedeeoh</span><span class="sfx"><span class="dot">.</span><span style="color:${meta.color}">${escapeHtml(meta.suffix)}</span></span>
-        <span class="vdDot"></span>
+        <span class="vdShimmerText">veedeeoh</span
+        ><span class="vdDot"></span
+        ><span class="sfx" style="color:${meta.color}">${escapeHtml(meta.suffix)}</span>
       </div>
       <div class="regionSplashSub" id="regionSplashSub">Loading the ${escapeHtml(meta.name)} catalog</div>
       <div class="vdTrackBar"><span></span></div>
@@ -212,11 +213,32 @@ function routeAllowed(tabId: string): boolean {
   return el.style.display !== "none";
 }
 
+/** Reveal one full-page panel and hide every other. Routes that are not sidebar
+ *  tabs (search, settings) need this because switchView only knows about tabs. */
+function showOnly(panelId: string): void {
+  for (const id of ["homeView", "showsView", "moviesView", "kidsView", "partyView",
+                    "categoryView", "searchView", "settingsView"]) {
+    document.getElementById(id)?.setAttribute("hidden", "");
+  }
+  document.getElementById(panelId)?.removeAttribute("hidden");
+  document.querySelectorAll("aside .navBtn").forEach((b) => b.classList.remove("active"));
+}
+
 /** Apply the current hash. Falls back to Home whenever the route is unknown or
  *  not permitted, rather than leaving the app in a half-navigated state. */
 export async function applyRoute(): Promise<void> {
   const raw = decodeURIComponent(location.hash.replace(/^#/, ""));
   if (!raw || raw === "home") { switchViewRef?.("tabHome"); return; }
+
+  if (raw === "settings" || raw.startsWith("settings/")) {
+    const { settingsSections, renderSettings } = await import("./settingsview");
+    // A kids profile has only the safe sections; if none survive the filter
+    // there is nothing to show and Home is the honest destination.
+    if (!settingsSections().length) { switchViewRef?.("tabHome"); return; }
+    showOnly("settingsView");
+    await renderSettings(raw.slice("settings/".length) || undefined);
+    return;
+  }
 
   if (raw.startsWith("search/")) {
     const q = raw.slice("search/".length).trim();
@@ -469,6 +491,7 @@ function wireSidebar(): void {
     // The results page sits on top of the panel stack; leaving it hidden here
     // would make every sidebar tab look dead while search is open.
     document.getElementById("searchView")?.setAttribute("hidden", "");
+    document.getElementById("settingsView")?.setAttribute("hidden", "");
     document.getElementById("categoryView")?.setAttribute("hidden", "");
 
     clearSectionActive();
@@ -831,7 +854,7 @@ function wireHeader(): void {
         if (setBtn) {
           setBtn.addEventListener("click", () => {
             modal.remove();
-            import("./settings").then(s => s.openSettingsModal());
+            import("./settingsview").then((s) => s.openSettings());
           });
         }
 
