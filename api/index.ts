@@ -376,6 +376,75 @@ app.post('/billing/seats', async (c: Context) => {
 });
 
 // Stripe webhook — signature-verified, raw body. Sets tier/expiry on payment.
+// ---------------------------------------------------------------- account ---
+
+// Everything the account holds, as one JSON file. A user who can be deleted
+// must be able to leave with their data first, and GDPR portability expects a
+// machine-readable export rather than a screenshot.
+//
+// Uses the CALLER's client throughout, so RLS scopes every table to them --
+// service-role here would let a crafted request export someone else's history.
+app.get('/account/export', async (c: Context) => {
+  const user = await userFromRequest(c);
+  if (!user) return c.json({ error: 'unauthorized' }, 401);
+  const sb = await callerSupabase(c);
+
+  const grab = async (table: string) => {
+    const { data, error } = await sb.from(table).select('*');
+    return error ? { error: error.message } : data;
+  };
+
+  return c.json({
+    exported_at: new Date().toISOString(),
+    account: { id: user.id, email: user.email },
+    profiles: await grab('household_profiles'),
+    watch_progress: await grab('watch_progress'),
+    favorites: await grab('favorites'),
+    collections: await grab('collections'),
+    referrals: await grab('referrals'),
+    parties: await grab('parties'),
+  });
+});
+
+// Delete the account and everything hanging off it.
+//
+// Order matters and is not interchangeable:
+//   1. cancel Stripe   -- the customer is an independent object, so deleting
+//                         the row first leaves a subscription renewing forever
+//                         against a user who no longer exists
+//   2. delete the auth user -- every table FKs auth.users ON DELETE CASCADE, so
+//                         this removes profiles, history, parties and referrals
+//                         in one transaction rather than a best-effort sweep
+//
+// Requires the caller to re-state their email, because an accidental click here
+// is unrecoverable. Verified server-side, not just in the dialog.
+app.post('/account/delete', async (c: Context) => {
+  const user = await userFromRequest(c);
+  if (!user) return c.json({ error: 'unauthorized' }, 401);
+
+  const body = await c.req.json().catch(() => ({} as any));
+  const confirm = String(body?.confirm || '').trim().toLowerCase();
+  if (!user.email || confirm !== user.email.toLowerCase()) {
+    return c.json({ error: 'confirmation did not match the account email' }, 400);
+  }
+
+  const billing = await import('../backend/billing');
+  const cancel = await billing.cancelForDeletion(user.id);
+
+  const { createClient } = await import('@supabase/supabase-js');
+  const admin = createClient(
+    process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+    { auth: { persistSession: false, autoRefreshToken: false } }
+  );
+  const { error } = await admin.auth.admin.deleteUser(user.id);
+  if (error) return c.json({ error: error.message }, 500);
+
+  // Reported rather than swallowed: if Stripe refused, the user needs to know
+  // to check, because their account is now gone and they cannot look it up.
+  return c.json({ ok: true, subscriptionCanceled: cancel.canceled, billingError: cancel.error ?? null });
+});
+
 app.post('/billing/webhook', async (c: Context) => {
   const sig = c.req.header('stripe-signature') || '';
   const raw = await c.req.text();

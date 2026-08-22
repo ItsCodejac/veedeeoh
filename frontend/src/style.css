@@ -4071,3 +4071,21 @@ body.kids-mode { --brand-accent: #ff9f1c; }
   .settingsNav::-webkit-scrollbar { display: none; }
   .setNavBtn { flex: none; white-space: nowrap; }
 }
+
+/* Parental-controls matrix. Scrolls horizontally on its own rather than letting
+   the page do it, since the rating columns outgrow a phone. */
+.setMatrixScroll { overflow-x: auto; margin: 0 -4px; padding: 0 4px; }
+.setMatrix { border-collapse: collapse; width: 100%; font-size: 13px; }
+.setMatrix th, .setMatrix td { padding: 9px 8px; text-align: center; }
+.setMatrix thead th {
+  font-size: 11px; font-weight: 700; letter-spacing: .03em;
+  color: rgba(255,255,255,0.5); white-space: nowrap;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.setMatrix tbody th {
+  text-align: left; font-weight: 600; white-space: nowrap;
+  padding-right: 14px; position: sticky; left: 0; background: #0f1219;
+}
+.setMatrix tbody tr { border-bottom: 1px solid rgba(255,255,255,0.06); }
+.setMatrix tbody tr:last-child { border-bottom: none; }
+.setMatrix input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }

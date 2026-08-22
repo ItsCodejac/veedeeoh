@@ -88,6 +88,44 @@ export async function createPortalSession(userId: string, origin: string): Promi
   return portal.url;
 }
 
+/** Cancel any live subscription immediately, for account deletion.
+ *
+ *  Deletion MUST cancel before the row disappears. The Stripe customer is an
+ *  independent object: delete the account row and the subscription keeps
+ *  renewing forever against a user who no longer exists, and the webhook that
+ *  would have recorded it can no longer find a profile to write to. Charging a
+ *  deleted account is the worst possible outcome of a delete button.
+ *
+ *  Deliberately does not throw. A billing failure must not block a user from
+ *  deleting their data -- it is reported to the caller, who surfaces it so the
+ *  user knows to check Stripe, but deletion proceeds.
+ */
+export async function cancelForDeletion(userId: string): Promise<{ canceled: boolean; error?: string }> {
+  try {
+    const sb = adminSupabase();
+    const { data } = await sb.from("profiles")
+      .select("stripe_customer_id, stripe_subscription_id").eq("id", userId).maybeSingle();
+    if (!data?.stripe_customer_id) return { canceled: false };
+
+    // Cancel every subscription on the customer, not just the id cached on the
+    // row: a resubscribe can leave the cached id stale while a different
+    // subscription is the live one.
+    const subs = await getStripe().subscriptions.list({
+      customer: data.stripe_customer_id, status: "all", limit: 100,
+    });
+    let n = 0;
+    for (const sub of subs.data) {
+      if (sub.status === "canceled" || sub.status === "incomplete_expired") continue;
+      await getStripe().subscriptions.cancel(sub.id, { prorate: false });
+      n++;
+    }
+    return { canceled: n > 0 };
+  } catch (e: any) {
+    console.error("[billing] cancelForDeletion failed", e);
+    return { canceled: false, error: e?.message || "stripe cancel failed" };
+  }
+}
+
 /** Mirror a subscription's state onto the account row. */
 // How long a customer keeps access after a renewal fails. Stripe's smart retries
 // run for roughly three weeks; the grace should outlast them so a card that

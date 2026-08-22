@@ -11,9 +11,9 @@
 // and nothing else.
 
 import { escapeHtml, showToast } from "./util";
-import { getSession, signOut } from "./auth";
 import { getStoredProfiles, openProfileEditor, getActiveProfile } from "./profiles";
-import { getAccount, openBillingPortal, startCheckout } from "./db";
+import { card, row } from "./settings-ui";
+import { renderAccount } from "./settings-account";
 
 type SectionId = "account" | "household" | "playback" | "about";
 
@@ -32,173 +32,6 @@ const ICON = {
   info: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`,
 };
 
-// --------------------------------------------------------------- helpers ---
-
-const card = (title: string, body: string, hint = "") => `
-  <section class="setCard">
-    <h2>${escapeHtml(title)}</h2>
-    ${hint ? `<p class="setHint">${hint}</p>` : ""}
-    ${body}
-  </section>`;
-
-const row = (label: string, value: string) => `
-  <div class="setRow"><span class="setRowLabel">${escapeHtml(label)}</span><span class="setRowValue">${value}</span></div>`;
-
-const fmtDate = (iso: string | null | undefined): string =>
-  iso ? new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) : "—";
-
-// --------------------------------------------------------------- sections ---
-
-async function renderAccount(el: HTMLElement): Promise<void> {
-  const session = getSession();
-  const active = getActiveProfile();
-
-  el.innerHTML = card("Account", `
-    ${row("Signed in as", escapeHtml(session?.email || "Local / self-hosted"))}
-    ${row("Role", active.role === "owner" ? "Account owner" : "Household member")}
-    <div class="setField">
-      <label for="setAccountName">Household name</label>
-      <input id="setAccountName" type="text" placeholder="e.g. Cojac's Household" />
-    </div>`)
-    + `<div id="setBilling"></div>`
-    + `<div id="setReferral"></div>`
-    + card("Security", `
-      <p class="setHint">Password and sign-in are managed on a dedicated page so a
-        half-finished settings edit can never sit behind a redirect.</p>
-      <div class="setBtnRow">
-        <a class="setBtn" href="/change-password.html">Change password</a>
-        <button class="setBtn danger" id="setSignOut">Sign out</button>
-      </div>`);
-
-  const nameInput = el.querySelector<HTMLInputElement>("#setAccountName")!;
-  const defaultName = session?.email ? session.email.split("@")[0]! : "My Household";
-  nameInput.value = localStorage.getItem("veedeeoh_account_name") || defaultName;
-  nameInput.addEventListener("change", () => {
-    const v = nameInput.value.trim();
-    if (v) { localStorage.setItem("veedeeoh_account_name", v); showToast("Household name saved"); }
-  });
-
-  el.querySelector("#setSignOut")?.addEventListener("click", () => { void signOut(); });
-
-  void renderBilling(el.querySelector<HTMLElement>("#setBilling")!);
-  void renderReferral(el.querySelector<HTMLElement>("#setReferral")!);
-}
-
-// Billing states FACTS. The version this replaces hardcoded "Pro Cloud Tier",
-// "$4.00 / month", a renewal date of August 28 2026 and a feature list, none of
-// which came from the account -- so every subscriber was shown someone else's
-// renewal date. It also offered two add-ons that do not exist, one priced
-// "$TBD/mo", whose buttons started an ordinary $4 subscription.
-async function renderBilling(el: HTMLElement): Promise<void> {
-  el.innerHTML = card("Plan and billing", `<p class="setHint">Loading…</p>`);
-
-  let acct: Awaited<ReturnType<typeof getAccount>> = null;
-  try { acct = await getAccount(); }
-  catch { el.innerHTML = card("Plan and billing", `<p class="setHint">Couldn't load your plan.</p>`); return; }
-
-  if (!acct) {
-    el.innerHTML = card("Plan and billing", `<p class="setHint">Self-hosted. No subscription, nothing to bill.</p>`);
-    return;
-  }
-
-  const TIER_LABEL: Record<string, string> = {
-    cloud_paid: "veedeeoh Cloud",
-    founder_vip: "Founder",
-    trial: "Free trial",
-    canceled: "Canceled",
-  };
-  const label = TIER_LABEL[acct.tier] || acct.tier;
-  const expires = acct.tier_expires ? new Date(acct.tier_expires) : null;
-  const daysLeft = expires ? Math.ceil((expires.getTime() - Date.now()) / 86_400_000) : null;
-  const lapsed = daysLeft !== null && daysLeft <= 0;
-  const comped = acct.tier === "founder_vip";
-
-  // A founder comp has no expiry and no Stripe customer, so a renewal line and
-  // a portal button would both be nonsense.
-  const dateLabel = comped ? "Access" : lapsed ? "Ended" : acct.tier === "trial" ? "Trial ends" : "Renews";
-  const dateValue = comped ? "No expiry" : fmtDate(acct.tier_expires);
-
-  el.innerHTML = card("Plan and billing", `
-    ${row("Plan", `<span class="setBadge${comped ? " gold" : ""}">${escapeHtml(label)}</span>`)}
-    ${row(dateLabel, escapeHtml(dateValue) + (daysLeft !== null && daysLeft > 0 && !comped ? ` <span class="setDim">(${daysLeft} day${daysLeft === 1 ? "" : "s"})</span>` : ""))}
-    ${row("Profiles", `${getStoredProfiles().length} of ${acct.seats ?? 3} seats`)}
-    <div class="setBtnRow">
-      ${comped ? "" : acct.tier === "cloud_paid"
-        ? `<button class="setBtn" id="setPortal">Manage billing</button>`
-        : `<button class="setBtn primary" id="setSubscribe">Subscribe — $4/mo</button>`}
-    </div>
-    ${comped ? `<p class="setHint">Comped account. You are not charged and there is nothing to manage.</p>` : ""}`);
-
-  el.querySelector("#setPortal")?.addEventListener("click", async (e) => {
-    const b = e.currentTarget as HTMLButtonElement;
-    b.disabled = true; b.textContent = "Opening…";
-    try { await openBillingPortal(); }
-    catch { showToast("Couldn't open the billing portal"); b.disabled = false; b.textContent = "Manage billing"; }
-  });
-  el.querySelector("#setSubscribe")?.addEventListener("click", async (e) => {
-    const b = e.currentTarget as HTMLButtonElement;
-    b.disabled = true; b.textContent = "Opening…";
-    try { await startCheckout(); }
-    catch (err: any) { showToast(err?.message || "Checkout failed"); b.disabled = false; b.textContent = "Subscribe — $4/mo"; }
-  });
-}
-
-const SOURCE_LABEL: Record<string, string> = {
-  link: "Referral link",
-  party: "Watch party",
-  household: "Household invite",
-  partner: "Partner deal",
-};
-
-async function renderReferral(el: HTMLElement): Promise<void> {
-  const db = await import("./db");
-  const [code, sum, terms, sources] = await Promise.all([
-    db.myReferralCode(), db.referralSummary(), db.myReferralTerms(), db.referralsBySource(),
-  ]);
-  if (!code) { el.innerHTML = ""; return; }
-
-  const link = db.referralLink(code);
-  const money = (c: number) => `$${(c / 100).toFixed(2)}`;
-  const isPartner = terms?.kind === "partner";
-  const rate = terms ? (terms.rate_bps / 100).toFixed(terms.rate_bps % 100 ? 1 : 0) : "20";
-  const months = terms?.duration_months ?? 12;
-
-  // Attribution by source is the honest answer to "is hosting parties worth
-  // it?". Without it a host cannot tell whether their parties earned anything
-  // or whether every signup came from the link they posted somewhere.
-  const entries = Object.entries(sources).sort((a, b) => b[1] - a[1]);
-  const breakdown = entries.length ? `
-    <div class="setTable" style="margin-top:14px">
-      ${entries.map(([src, n]) => `
-        <div class="setTableRow">
-          <span>${escapeHtml(SOURCE_LABEL[src] || src)}</span>
-          <span><b>${n}</b></span>
-        </div>`).join("")}
-    </div>` : "";
-
-  el.innerHTML = card(isPartner ? "Partner programme" : "Refer and earn", `
-    ${row("Your terms", `<span class="setBadge${isPartner ? " gold" : ""}">${escapeHtml(rate)}% for ${months === 0 ? "the life of the account" : `${months} months`}</span>`)}
-    <div class="setBtnRow">
-      <input class="setInput" id="setRefLink" readonly value="${escapeHtml(link)}" />
-      <button class="setBtn primary" id="setRefCopy">Copy</button>
-    </div>
-    <div class="setStats">
-      <div><b>${sum?.referred ?? 0}</b><span>Signed up</span></div>
-      <div><b>${sum?.converted ?? 0}</b><span>Subscribed</span></div>
-      <div><b>${money(sum?.pending_cents ?? 0)}</b><span>Owed to you</span></div>
-      <div><b>${money(sum?.paid_cents ?? 0)}</b><span>Paid out</span></div>
-    </div>
-    ${breakdown}`,
-    isPartner
-      ? "Negotiated partner terms. The rate is snapshotted onto each referral when it is made, so a later change never rewrites what you already earned."
-      : "Anyone who joins a watch party you host is credited to you too, without this link. Payouts are made by hand while the programme is in beta.");
-
-  el.querySelector("#setRefCopy")?.addEventListener("click", async () => {
-    try { await navigator.clipboard.writeText(link); showToast("Referral link copied"); }
-    catch { el.querySelector<HTMLInputElement>("#setRefLink")?.select(); }
-  });
-}
-
 function renderHousehold(el: HTMLElement): void {
   const profiles = getStoredProfiles();
   const active = getActiveProfile();
@@ -210,14 +43,14 @@ function renderHousehold(el: HTMLElement): void {
           <span class="setAvatar" style="background:${escapeHtml(p.avatar_color || "#c5f04e")}">${escapeHtml(p.name.charAt(0).toUpperCase())}</span>
           <span class="setProfileMeta">
             <b>${escapeHtml(p.name)}${p.id === active.id ? ` <span class="setDim">(active)</span>` : ""}</b>
-            <span>${p.is_kids ? "Kids profile" : p.role === "owner" ? "Account owner" : "Standard profile"}</span>
+            <span>${p.is_kids ? "Kids profile" : p.role === "owner" ? "Account owner" : "Standard profile"}${p.pin ? " · PIN set" : ""}</span>
           </span>
           <button class="setBtn small" data-edit="${escapeHtml(p.id)}">Edit</button>
         </div>`).join("")}
     </div>
     <div class="setBtnRow"><button class="setBtn primary" id="setAddProfile">Add a profile</button></div>`)
     + card("Who can watch what", `<div id="setRatings"></div>`,
-        "Rating limits for every profile, side by side. Editing one opens its profile.");
+        "Every profile's rating limits, side by side and editable here. A profile with nothing ticked can watch anything.");
 
   el.querySelectorAll<HTMLElement>("[data-edit]").forEach((b) => {
     b.addEventListener("click", () => {
@@ -228,20 +61,84 @@ function renderHousehold(el: HTMLElement): void {
   el.querySelector("#setAddProfile")?.addEventListener("click", () =>
     openProfileEditor(undefined, () => openSettings("household")));
 
-  // The comparison table is the point of this section: a parent could
-  // previously only see one child's limits at a time, inside that child's
-  // editor, which made "is her sister allowed this?" a memory exercise.
-  const box = el.querySelector<HTMLElement>("#setRatings")!;
+  void renderRatingMatrix(el.querySelector<HTMLElement>("#setRatings")!);
+}
+
+/** The comparison matrix, editable in place.
+ *
+ *  This is the section that justified the whole rebuild. Limits used to live
+ *  only inside each child's own editor, so "is her sister allowed this?" was a
+ *  memory exercise across two modals. One grid, every profile, every rating.
+ *
+ *  Saves per toggle rather than behind a Save button: there is no coherent
+ *  half-finished state to protect, and a parent who ticks a box and navigates
+ *  away should not silently lose the change. */
+async function renderRatingMatrix(box: HTMLElement): Promise<void> {
+  const { RATING_GROUPS } = await import("./db");
+  const { updateProfileEverywhere } = await import("./profiles");
+  const profiles = getStoredProfiles();
+
+  // Owners are not rating-gated, and showing a row that cannot restrain anyone
+  // implies a control that does not exist.
+  const gated = profiles.filter((p) => p.role !== "owner");
+  if (!gated.length) {
+    box.innerHTML = `<p class="setHint">Only the account owner exists so far. Add a profile to set limits for it.</p>`;
+    return;
+  }
+
+  const codes = RATING_GROUPS.flatMap((g) => g.ratings.map((r) => r.code));
+
   box.innerHTML = `
-    <div class="setTable">
-      ${profiles.map((p) => {
-        const allowed = (p as any).allowed_ratings as string[] | null | undefined;
-        const summary = !allowed?.length
-          ? `<span class="setDim">Everything</span>`
-          : allowed.map((r) => `<span class="setChip">${escapeHtml(r)}</span>`).join("");
-        return `<div class="setTableRow"><span>${escapeHtml(p.name)}</span><span>${summary}</span></div>`;
-      }).join("")}
+    <div class="setMatrixScroll">
+      <table class="setMatrix">
+        <thead><tr><th></th>${codes.map((c) => `<th>${escapeHtml(c)}</th>`).join("")}</tr></thead>
+        <tbody>
+          ${gated.map((p) => {
+            const allowed = new Set((p.allowed_ratings ?? []).map((r) => r.toUpperCase()));
+            return `<tr data-pid="${escapeHtml(p.id)}">
+              <th scope="row">${escapeHtml(p.name)}
+                ${allowed.size ? "" : `<span class="setDim"> · everything</span>`}</th>
+              ${codes.map((c) => `<td>
+                <input type="checkbox" data-code="${escapeHtml(c)}"${allowed.has(c) ? " checked" : ""}
+                  aria-label="${escapeHtml(p.name)} may watch ${escapeHtml(c)}" />
+              </td>`).join("")}
+            </tr>`;
+          }).join("")}
+        </tbody>
+      </table>
     </div>`;
+
+  box.querySelectorAll<HTMLInputElement>("input[type=checkbox]").forEach((cb) => {
+    cb.addEventListener("change", async () => {
+      const tr = cb.closest("tr")!;
+      const pid = tr.dataset.pid!;
+      const target = getStoredProfiles().find((p) => p.id === pid);
+      if (!target) return;
+
+      const picked = Array.from(tr.querySelectorAll<HTMLInputElement>("input:checked"))
+        .map((i) => i.dataset.code!);
+
+      // Empty means unrestricted, which is what allowedRatingsFor already
+      // treats a null list as -- so store null rather than an empty array and
+      // keep one meaning for one state.
+      try {
+        await updateProfileEverywhere(pid, {
+          name: target.name,
+          avatar_color: target.avatar_color,
+          allowed_ratings: picked.length ? picked : null,
+        });
+        const note = tr.querySelector("th .setDim");
+        if (picked.length && note) note.remove();
+        if (!picked.length && !note) {
+          tr.querySelector("th")!.insertAdjacentHTML("beforeend", `<span class="setDim"> · everything</span>`);
+        }
+        showToast(`${target.name}: limits saved`);
+      } catch {
+        cb.checked = !cb.checked;
+        showToast("Couldn't save that. Try again.");
+      }
+    });
+  });
 }
 
 function renderPlayback(el: HTMLElement): void {
@@ -257,15 +154,15 @@ function renderPlayback(el: HTMLElement): void {
       </select>
     </div>
     <label class="setCheck"><input type="checkbox" id="setCC" /> <span>Turn on subtitles by default</span></label>`,
-    "These apply to this profile on this device, so a tablet on hotel wifi and a TV at home can differ.");
+    "These apply on this device, so a tablet on hotel wifi and a TV at home can differ. The player's own menu still overrides them for a single title.");
 
   const q = el.querySelector<HTMLSelectElement>("#setQuality")!;
   q.value = localStorage.getItem(QK) || "auto";
-  q.addEventListener("change", () => localStorage.setItem(QK, q.value));
+  q.addEventListener("change", () => { localStorage.setItem(QK, q.value); showToast("Saved"); });
 
   const cc = el.querySelector<HTMLInputElement>("#setCC")!;
   cc.checked = localStorage.getItem(CK) === "1";
-  cc.addEventListener("change", () => localStorage.setItem(CK, cc.checked ? "1" : "0"));
+  cc.addEventListener("change", () => { localStorage.setItem(CK, cc.checked ? "1" : "0"); showToast("Saved"); });
 }
 
 function renderAbout(el: HTMLElement): void {

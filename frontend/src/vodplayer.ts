@@ -131,9 +131,50 @@ class VodPlayer {
     }
 
     this.player = created;
+    this.applyPrefs(created);
     this.style();
     this.wire();
     this.showBump();
+  }
+
+  /** Apply the viewer's saved playback preferences.
+   *
+   *  These existed as two UI controls writing localStorage that NOTHING read --
+   *  a switch that does not switch anything is worse than no switch, because
+   *  the user stops trusting the ones that do work. Applied here, at the one
+   *  place a player is constructed.
+   *
+   *  Quality is a CEILING, not an exact pick: a stream may not publish 1080p,
+   *  and forcing an absent level would leave the player with nothing to play.
+   */
+  private applyPrefs(p: any): void {
+    try {
+      if (localStorage.getItem("veedeeoh_pref_cc") === "1") {
+        // Tracks arrive with the manifest, so this cannot run inline.
+        p.textTracks?.addEventListener?.("add", () => {
+          const track = p.textTracks?.getByKind?.("subtitles")?.[0]
+            || p.textTracks?.getByKind?.("captions")?.[0];
+          if (track && !p.textTracks.selected) track.mode = "showing";
+        });
+      }
+
+      const want = parseInt(localStorage.getItem("veedeeoh_pref_quality") || "", 10);
+      if (want) {
+        p.qualities?.addEventListener?.("change", () => {
+          if (!p.qualities || p.qualities.length === 0) return;
+          p.qualities.autoSelect?.();
+          let best: any = null;
+          for (const q of p.qualities) {
+            if (q.height <= want && (!best || q.height > best.height)) best = q;
+          }
+          // No level at or below the cap: leave auto alone rather than pinning
+          // the viewer to a quality they did not ask for.
+          if (best) best.selected = true;
+        }, { once: true });
+      }
+    } catch (e) {
+      console.warn("[vodplayer] could not apply playback prefs", e);
+    }
   }
 
   destroy(): void {
