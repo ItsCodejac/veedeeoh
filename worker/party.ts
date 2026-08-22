@@ -213,6 +213,21 @@ export class Party extends DurableObject<Env> {
       return;
     }
 
+    // Host removes someone already admitted. Approval covers who gets IN; this
+    // covers changing your mind, which is the other half of moderating a room
+    // you are responsible for.
+    if (msg?.type === "kick") {
+      if (!att.isHost) return;
+      const target = String(msg.userId || "");
+      for (const sock of this.ctx.getWebSockets()) {
+        const a = sock.deserializeAttachment() as Attachment | null;
+        if (!a || a.isHost || a.userId !== target) continue;
+        try { sock.send(JSON.stringify({ type: "removed" })); sock.close(4004, "removed"); } catch {}
+      }
+      this.broadcastPresence();
+      return;
+    }
+
     if (msg?.type === "end") {
       if (!att.isHost) return;
       await this.closeParty("ended by host");
@@ -300,12 +315,16 @@ export class Party extends DurableObject<Env> {
 
   private broadcastPresence(): void {
     const waiting: Array<{ userId: string; name: string }> = [];
+    const watching: Array<{ userId: string; name: string }> = [];
     for (const ws of this.ctx.getWebSockets()) {
       const a = ws.deserializeAttachment() as Attachment | null;
-      if (a && !a.isHost && !a.approved) waiting.push({ userId: a.userId, name: a.name });
+      if (!a || a.isHost) continue;
+      (a.approved ? watching : waiting).push({ userId: a.userId, name: a.name });
     }
-    this.broadcast({ type: "presence", viewers: this.viewerCount() });
-    if (waiting.length) this.sendToHost({ type: "waiting", waiting });
+    // Everyone gets the count; only the host gets the names. A guest has no
+    // business enumerating the other guests.
+    this.broadcast({ type: "presence", viewers: watching.length });
+    this.sendToHost({ type: "roster", watching, waiting });
   }
 }
 

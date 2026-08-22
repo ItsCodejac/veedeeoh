@@ -126,72 +126,155 @@ export function openPartySetup(item: VodItem): Promise<PartySetup | null> {
 // ------------------------------------------------------------------ lobby ---
 
 let lobby: HTMLElement | null = null;
+let roster: { watching: Array<{ userId: string; name: string }>; waiting: Array<{ userId: string; name: string }> } =
+  { watching: [], waiting: [] };
+let joinCodeRef = "";
+let linkRef = "";
+let expanded = false;
+let startedAt = 0;
 
-/** The host's controls while a party is running: the invite link, who is
- *  waiting, and a way to end it. Mounted over the player, because that is where
- *  the host is looking. */
+/** The host's panel while a party runs.
+ *
+ *  Was a single always-open bar across the top of the video. It covered the
+ *  picture, showed a bare viewer count, and put an arriving join request in the
+ *  same visual weight as everything else -- the owner missed one while testing,
+ *  which is the one thing this panel exists to prevent.
+ *
+ *  Collapsed to a tab by default so it stops sitting on the film; a pending
+ *  request forces it open and marks the tab, because that is the only event
+ *  here that needs an answer.
+ */
 export function mountHostLobby(joinCode: string, link: string): void {
   unmountHostLobby();
+  joinCodeRef = joinCode;
+  linkRef = link;
+  roster = { watching: [], waiting: [] };
+  expanded = false;
+  startedAt = Date.now();
 
   lobby = document.createElement("div");
-  lobby.id = "partyLobby";
-  lobby.innerHTML = `
-    <div class="plBar">
-      <span class="plCode">${escapeHtml(joinCode)}</span>
-      <button class="plBtn" id="plCopy">Copy invite link</button>
-      <span class="plCount" id="plCount">0 watching</span>
-      <button class="plBtn danger" id="plEnd">End party</button>
-    </div>
-    <div class="plKnocks" id="plKnocks"></div>`;
+  lobby.id = "partyPanel";
   document.body.appendChild(lobby);
+  render();
 
-  lobby.querySelector("#plCopy")!.addEventListener("click", async () => {
-    try { await navigator.clipboard.writeText(link); showToast("Invite link copied"); }
-    catch { showToast(`Party code ${joinCode}`); }
+  window.addEventListener("veedeeoh:party-roster", onRoster);
+  window.addEventListener("veedeeoh:party-presence", onPresence);
+  clock = window.setInterval(render, 30_000);
+}
+
+let clock: number | null = null;
+
+export function unmountHostLobby(): void {
+  window.removeEventListener("veedeeoh:party-roster", onRoster);
+  window.removeEventListener("veedeeoh:party-presence", onPresence);
+  if (clock !== null) { clearInterval(clock); clock = null; }
+  lobby?.remove();
+  lobby = null;
+}
+
+function onRoster(e: Event): void {
+  const d = (e as CustomEvent).detail || {};
+  const hadWaiting = roster.waiting.length;
+  roster = { watching: d.watching ?? [], waiting: d.waiting ?? [] };
+  // A new request opens the panel by itself. Anything less relies on the host
+  // happening to look at a collapsed tab mid-film.
+  if (roster.waiting.length > hadWaiting) expanded = true;
+  render();
+}
+
+function onPresence(): void { render(); }
+
+function elapsed(): string {
+  const m = Math.floor((Date.now() - startedAt) / 60_000);
+  if (m < 1) return "just started";
+  const h = Math.floor(m / 60);
+  return h ? `${h}h ${m % 60}m` : `${m}m`;
+}
+
+function render(): void {
+  if (!lobby) return;
+  const waiting = roster.waiting.length;
+
+  lobby.className = expanded ? "open" : "";
+  lobby.innerHTML = `
+    <button class="ppTab${waiting ? " alert" : ""}" id="ppToggle"
+            aria-expanded="${expanded}" aria-label="Watch party controls">
+      <span class="ppCode">${escapeHtml(joinCodeRef)}</span>
+      <span class="ppDot"></span>
+      <span class="ppCount">${roster.watching.length}</span>
+      ${waiting ? `<span class="ppBadge">${waiting}</span>` : ""}
+    </button>
+
+    <div class="ppBody">
+      ${waiting ? `
+        <div class="ppSection ppUrgent">
+          <div class="ppHead">${waiting === 1 ? "1 person wants to join" : `${waiting} people want to join`}</div>
+          ${roster.waiting.map((w) => `
+            <div class="ppRow" data-uid="${escapeHtml(w.userId)}">
+              <span class="ppName">${escapeHtml(w.name)}</span>
+              <span>
+                <button class="ppBtn primary" data-act="admit">Let in</button>
+                <button class="ppBtn" data-act="refuse">No</button>
+              </span>
+            </div>`).join("")}
+        </div>` : ""}
+
+      <div class="ppSection">
+        <div class="ppHead">Invite</div>
+        <div class="ppRow">
+          <span class="ppBigCode">${escapeHtml(joinCodeRef)}</span>
+          <button class="ppBtn" id="ppCopy">Copy link</button>
+        </div>
+      </div>
+
+      <div class="ppSection">
+        <div class="ppHead">Watching &middot; ${roster.watching.length}</div>
+        ${roster.watching.length
+          ? roster.watching.map((w) => `
+              <div class="ppRow" data-uid="${escapeHtml(w.userId)}">
+                <span class="ppName">${escapeHtml(w.name)}</span>
+                <button class="ppBtn subtle" data-act="kick">Remove</button>
+              </div>`).join("")
+          : `<div class="ppEmpty">Nobody yet. Share the link.</div>`}
+      </div>
+
+      <div class="ppSection">
+        <div class="ppRow"><span class="ppMuted">Running for</span><span>${elapsed()}</span></div>
+        <div class="ppRow"><span class="ppMuted">Hosting uses</span><span>1 credit / 10 min</span></div>
+      </div>
+
+      <button class="ppBtn danger wide" id="ppEnd">End party for everyone</button>
+    </div>`;
+
+  lobby.querySelector("#ppToggle")!.addEventListener("click", () => { expanded = !expanded; render(); });
+
+  lobby.querySelector("#ppCopy")?.addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(linkRef); showToast("Invite link copied"); }
+    catch { showToast(`Party code ${joinCodeRef}`); }
   });
-  lobby.querySelector("#plEnd")!.addEventListener("click", async () => {
+
+  lobby.querySelector("#ppEnd")?.addEventListener("click", async () => {
     if (!confirm("End the party for everyone?")) return;
     const { endParty } = await import("./party");
     endParty();
     unmountHostLobby();
   });
 
-  window.addEventListener("veedeeoh:party-presence", onPresence);
-  window.addEventListener("veedeeoh:party-waiting", onWaiting);
-}
-
-export function unmountHostLobby(): void {
-  window.removeEventListener("veedeeoh:party-presence", onPresence);
-  window.removeEventListener("veedeeoh:party-waiting", onWaiting);
-  lobby?.remove();
-  lobby = null;
-}
-
-function onPresence(e: Event): void {
-  const n = (e as CustomEvent).detail?.viewers ?? 0;
-  const el = document.getElementById("plCount");
-  if (el) el.textContent = `${n} watching`;
-}
-
-function onWaiting(e: Event): void {
-  const waiting = ((e as CustomEvent).detail?.waiting ?? []) as Array<{ userId: string; name: string }>;
-  const box = document.getElementById("plKnocks");
-  if (!box) return;
-
-  box.innerHTML = waiting.map((w) => `
-    <div class="plKnock" data-uid="${escapeHtml(w.userId)}">
-      <span><b>${escapeHtml(w.name)}</b> wants to join</span>
-      <button class="plBtn small primary" data-act="admit">Let in</button>
-      <button class="plBtn small" data-act="refuse">No</button>
-    </div>`).join("");
-
-  box.querySelectorAll<HTMLElement>("[data-act]").forEach((b) => {
+  lobby.querySelectorAll<HTMLElement>("[data-act]").forEach((b) => {
     b.addEventListener("click", async () => {
-      const uid = b.closest<HTMLElement>(".plKnock")?.dataset.uid;
+      const uid = b.closest<HTMLElement>("[data-uid]")?.dataset.uid;
       if (!uid) return;
-      const { respondToKnock } = await import("./party");
-      respondToKnock(uid, b.dataset.act === "admit");
-      b.closest(".plKnock")?.remove();
+      const party = await import("./party");
+      const act = b.dataset.act;
+      if (act === "kick") {
+        if (!confirm("Remove this person from the party?")) return;
+        party.kickViewer(uid);
+      } else {
+        party.respondToKnock(uid, act === "admit");
+      }
+      // Optimistic: the worker's next roster broadcast is authoritative, but
+      // leaving the row on screen makes the button feel dead.
+      b.closest<HTMLElement>("[data-uid]")?.remove();
     });
   });
 }

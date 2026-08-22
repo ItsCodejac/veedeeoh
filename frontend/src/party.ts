@@ -200,11 +200,12 @@ async function connect(joinCode: string, isHost: boolean): Promise<void> {
     switch (msg?.type) {
       case "state":     if (!isHost) applyPartyState(msg.state as PartyPlaybackState); break;
       case "presence":  emit({ viewers: msg.viewers }, "veedeeoh:party-presence"); break;
-      case "waiting":   emit({ waiting: msg.waiting }, "veedeeoh:party-waiting"); break;
+      case "roster":    emit({ watching: msg.watching, waiting: msg.waiting }, "veedeeoh:party-roster"); break;
       case "knock":     showToast(`${msg.name} wants to join`); break;
       case "pending":   emit({}, "veedeeoh:party-pending"); showToast("Waiting for the host to let you in"); break;
       case "admitted":  emit({}, "veedeeoh:party-admitted"); showToast("You're in"); break;
       case "refused":   showToast("The host did not let you in"); break;
+      case "removed":   showToast("The host removed you from the party"); disconnect(); break;
       case "closed":    showToast(msg.reason === "idle" ? "The party timed out" : "The host ended the party"); disconnect(); break;
     }
   });
@@ -225,6 +226,11 @@ async function connect(joinCode: string, isHost: boolean): Promise<void> {
 /** Host admits or refuses someone waiting in the lobby. */
 export function respondToKnock(userId: string, admit: boolean): void {
   socket?.send(JSON.stringify({ type: admit ? "admit" : "refuse", userId }));
+}
+
+/** Host removes someone already admitted. */
+export function kickViewer(userId: string): void {
+  socket?.send(JSON.stringify({ type: "kick", userId }));
 }
 
 /** Host ends the party for everyone, rather than leaving it to time out. */

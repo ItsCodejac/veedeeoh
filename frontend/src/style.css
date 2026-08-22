@@ -4194,32 +4194,7 @@ body.party-guest { background: #06070a; }
 }
 .psBtn.primary { background: var(--accent); border-color: var(--accent); color: #06070a; font-weight: 800; }
 
-/* ---- Host lobby, over the player ---- */
-#partyLobby { position: fixed; left: 0; right: 0; top: 0; z-index: 9999; pointer-events: none; }
-.plBar {
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-  padding: 9px 14px; margin: 10px auto; width: fit-content; max-width: calc(100% - 20px);
-  background: rgba(6,7,10,0.9); border: 1px solid rgba(197,240,78,0.28);
-  border-radius: 999px; backdrop-filter: blur(10px); pointer-events: auto;
-  font-family: var(--display); font-size: 13px; color: #cfd6e0;
-}
-.plCode { font-weight: 800; letter-spacing: .16em; color: var(--accent); }
-.plCount { color: #8A8F98; font-size: 12.5px; }
-.plBtn {
-  padding: 7px 13px; border-radius: 999px; font: inherit; font-size: 12.5px; font-weight: 700;
-  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.16);
-  color: #fff; cursor: pointer;
-}
-.plBtn.primary { background: var(--accent); border-color: var(--accent); color: #06070a; }
-.plBtn.danger { border-color: rgba(255,107,107,0.4); color: #ff8f8f; }
-.plBtn.small { padding: 5px 11px; font-size: 12px; }
-.plKnocks { display: flex; flex-direction: column; gap: 8px; align-items: center; }
-.plKnock {
-  display: flex; align-items: center; gap: 10px;
-  padding: 9px 14px; border-radius: 12px;
-  background: rgba(6,7,10,0.94); border: 1px solid rgba(197,240,78,0.35);
-  pointer-events: auto; font-family: var(--display); font-size: 13px; color: #fff;
-}
+
 
 /* Buffering spinner — loader 3 from the brand package. Shares vdSpin with the
    other loaders rather than defining a second rotation. */
@@ -4315,3 +4290,66 @@ body.party-guest { background: #06070a; }
   font-size: 12.5px; font-weight: 700; letter-spacing: 0.16em;
   text-transform: uppercase; color: #8A8F98;
 }
+
+/* ---- Host party panel -------------------------------------------------
+   Was an always-open bar across the top of the video: it covered the picture,
+   and an arriving join request looked the same as everything else, so one got
+   missed during testing. Collapsed to a tab by default; a pending request
+   opens it and marks the tab, since that is the only event needing an answer. */
+#partyPanel {
+  position: fixed; top: 50%; right: 0; transform: translateY(-50%);
+  z-index: 9999; display: flex; align-items: stretch;
+  font-family: var(--display);
+}
+.ppTab {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 14px 9px; align-self: center;
+  background: rgba(6,7,10,0.92); color: #fff;
+  border: 1px solid rgba(197,240,78,0.3); border-right: none;
+  border-radius: 12px 0 0 12px; cursor: pointer;
+  backdrop-filter: blur(10px);
+}
+.ppTab .ppCode { writing-mode: vertical-rl; font-weight: 800; letter-spacing: .18em; font-size: 12px; color: var(--accent); }
+.ppTab .ppDot { width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,.3); }
+.ppTab .ppCount { font-size: 12px; font-weight: 700; color: #9aa5b5; }
+.ppTab .ppBadge {
+  min-width: 19px; padding: 1px 5px; border-radius: 999px;
+  background: #ff5e7e; color: #fff; font-size: 11px; font-weight: 800;
+  animation: ppPulse 1.4s ease-in-out infinite;
+}
+.ppTab.alert { border-color: #ff5e7e; }
+@keyframes ppPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,94,126,.6); } 50% { box-shadow: 0 0 0 7px rgba(255,94,126,0); } }
+@media (prefers-reduced-motion: reduce) { .ppTab .ppBadge { animation: none; } }
+
+.ppBody {
+  width: 0; overflow: hidden; opacity: 0;
+  transition: width .22s ease, opacity .18s ease;
+  background: rgba(10,12,18,0.97);
+  border-left: 1px solid rgba(255,255,255,0.12);
+  max-height: 82vh; overflow-y: auto;
+}
+#partyPanel.open .ppBody { width: min(320px, 88vw); opacity: 1; padding: 16px; }
+
+.ppSection { border-bottom: 1px solid rgba(255,255,255,0.07); padding-bottom: 12px; margin-bottom: 12px; }
+.ppSection:last-of-type { border-bottom: none; }
+.ppUrgent {
+  background: rgba(255,94,126,0.09); border: 1px solid rgba(255,94,126,0.35);
+  border-radius: 10px; padding: 11px; margin: -4px 0 14px;
+}
+.ppHead { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: rgba(255,255,255,.55); margin-bottom: 9px; }
+.ppUrgent .ppHead { color: #ff8f9f; }
+.ppRow { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 5px 0; font-size: 13px; }
+.ppName { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ppMuted { color: rgba(255,255,255,.5); }
+.ppEmpty { font-size: 12.5px; color: rgba(255,255,255,.42); }
+.ppBigCode { font-weight: 800; letter-spacing: .2em; color: var(--accent); font-size: 16px; }
+.ppBtn {
+  padding: 6px 12px; border-radius: 8px; font: inherit; font-size: 12.5px; font-weight: 700;
+  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16);
+  color: #fff; cursor: pointer; white-space: nowrap;
+}
+.ppBtn.primary { background: var(--accent); border-color: var(--accent); color: #06070a; }
+.ppBtn.subtle { background: none; border-color: transparent; color: rgba(255,255,255,.45); }
+.ppBtn.subtle:hover { color: #ff8f8f; border-color: rgba(255,107,107,.35); }
+.ppBtn.danger { border-color: rgba(255,107,107,.4); color: #ff8f8f; }
+.ppBtn.wide { width: 100%; padding: 10px; }
