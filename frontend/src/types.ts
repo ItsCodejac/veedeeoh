@@ -33,6 +33,9 @@ export interface VodItem {
   url?: string;
   series_id?: string;
   identifier?: string;
+  /** Set by the catalog build for sleep/white-noise/soundscape content. One
+   *  classification, made once, rather than a regex per consumer. */
+  ambient?: boolean;
   episodes?: VodEpisode[];
 }
 

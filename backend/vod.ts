@@ -269,6 +269,12 @@ export async function getCatalog(regionCode?: string): Promise<{ rails: any[]; s
         }
         if (isAmbient(n.title || "", n.genre || "", cat.name || "")) {
           seenSleep[n.id] = n;
+          // Record the verdict on the ITEM, not just the rail membership. The
+          // frontend needs the same answer when deciding what may appear on a
+          // kids shelf, and re-deriving it there means a second regex that has
+          // to stay in step with this one -- which is how a white-noise track
+          // gets back into a children's rail three months from now.
+          n.ambient = true;
         }
         if (isKidsSafe(n, cat.name)) {
           seenKids[n.id] = n;
@@ -286,6 +292,7 @@ export async function getCatalog(regionCode?: string): Promise<{ rails: any[]; s
       }
       if (isAmbient(item.title || "", item.genre || "", tr.name || "")) {
         seenSleep[item.id] = item;
+        item.ambient = true;
       }
       if (isKidsSafe(item, tr.name)) {
         seenKids[item.id] = item;

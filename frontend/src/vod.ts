@@ -1704,8 +1704,15 @@ export async function renderHome(): Promise<void> {
         const KID_GENRES = /^(kids & family|animation|anime|comedy|education|sci-fi & fantasy|action & adventure)$/i;
         const AMBIENT = /white noise|sleep sound|rain sounds|ocean sounds|nature sounds|binaural|asmr|lullaby|dark screen|for sleeping/i;
         const COMPILATION = /songs|rhymes|nursery|lullab|compilation|non-stop|& more|top \d+/i;
+
+        // The catalog build stamps `ambient`, using a classifier that also sees
+        // genre and rail name. The regex is only a fallback for a catalog that
+        // was cached before that flag existed, and should be deleted once the
+        // cron has rolled over -- two definitions of the same thing is the
+        // failure mode, not the regex itself.
+        const ambientItem = (i: VodItem) => i.ambient === true || AMBIENT.test(i.title || "");
         const kidRailWorthy = (i: VodItem) =>
-          KID_GENRES.test((i.genre || "").trim()) && !AMBIENT.test(i.title || "");
+          KID_GENRES.test((i.genre || "").trim()) && !ambientItem(i);
 
         // On a kids profile the whole catalog is already gated, so splitting
         // would just produce one rail and one empty one.
