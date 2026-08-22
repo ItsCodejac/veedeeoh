@@ -438,6 +438,140 @@ async function curateUndo({ contentId }) {
 // ------------------------------------------------------------------ users ---
 const PAID = ["founder_vip", "giveaway", "cloud_paid", "trial_7day", "trial_dollar_month"];
 
+// -------------------------------------------------------------- referrals ---
+
+/** Who is owed what. Grouped in JS rather than SQL because PostgREST cannot
+ *  express a grouped aggregate without a view, and this list is small. */
+async function referralPayouts() {
+  const r = await sb("referral_earnings?select=*&order=occurred_at.desc&limit=2000");
+  if (!r.ok) return { ok: false, error: await r.text() };
+  const rows = await r.json();
+
+  const byReferrer = new Map();
+  for (const e of rows) {
+    let g = byReferrer.get(e.referrer_user_id);
+    if (!g) {
+      g = { user_id: e.referrer_user_id, email: null, pending_cents: 0, paid_cents: 0, invoices: 0 };
+      byReferrer.set(e.referrer_user_id, g);
+    }
+    g.invoices += 1;
+    if (e.paid_out_at) g.paid_cents += e.commission_cents;
+    else g.pending_cents += e.commission_cents;
+  }
+
+  const ids = [...byReferrer.keys()];
+  if (ids.length) {
+    const pr = await sb(`profiles?select=id,email&id=in.(${ids.join(",")})`);
+    if (pr.ok) for (const p of await pr.json()) {
+      const g = byReferrer.get(p.id);
+      if (g) g.email = p.email;
+    }
+  }
+
+  const out = [...byReferrer.values()].sort((a, b) => b.pending_cents - a.pending_cents);
+  return { ok: true, total_pending_cents: out.reduce((n, g) => n + g.pending_cents, 0), referrers: out };
+}
+
+/** Settle everything currently owed to one referrer. Scoped to unpaid rows so
+ *  an accrual landing mid-payout is not swept into a payment that predates it. */
+async function markReferralPaid({ user_id, ref }) {
+  if (!user_id) return { ok: false, error: "user_id required" };
+  const r = await sb(
+    `referral_earnings?referrer_user_id=eq.${encodeURIComponent(user_id)}&paid_out_at=is.null`,
+    { method: "PATCH", headers: { Prefer: "return=representation" },
+      body: JSON.stringify({ paid_out_at: new Date().toISOString(), payout_ref: ref || null }) }
+  );
+  if (!r.ok) return { ok: false, error: await r.text() };
+  const rows = await r.json();
+  return { ok: true, settled: rows.length, cents: rows.reduce((n, e) => n + e.commission_cents, 0) };
+}
+
+/** Partner terms. Snapshotted onto FUTURE referrals only -- existing agreements
+ *  keep the terms they were made under, by design. */
+async function setReferralTerms({ email, rate_bps, duration_months, kind }) {
+  const ur = await sb(`profiles?select=id&email=eq.${encodeURIComponent((email || "").toLowerCase())}`);
+  const users = ur.ok ? await ur.json() : [];
+  if (!users.length) return { ok: false, error: "no such user" };
+
+  const patch = {};
+  if (rate_bps != null) patch.rate_bps = Number(rate_bps);
+  if (duration_months != null) patch.duration_months = Number(duration_months);
+  if (kind) patch.kind = kind;
+
+  const r = await sb(`referral_codes?user_id=eq.${users[0].id}`, {
+    method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify(patch),
+  });
+  if (!r.ok) return { ok: false, error: await r.text() };
+  const rows = await r.json();
+  if (!rows.length) return { ok: false, error: "that user has no referral code yet -- they must open Settings once" };
+  return { ok: true, code: rows[0].code, rate_bps: rows[0].rate_bps, duration_months: rows[0].duration_months };
+}
+
+// ---------------------------------------------------------------- credits ---
+
+async function creditsFor(email) {
+  const r = await sb(`profiles?select=id,email,tier,party_credits,party_credits_accrued,party_credits_spent,party_credits_exempt,public_parties_banned&email=eq.${encodeURIComponent((email || "").toLowerCase())}`);
+  if (!r.ok) return { ok: false, error: await r.text() };
+  const rows = await r.json();
+  if (!rows.length) return { ok: false, error: "no such user" };
+  const u = rows[0];
+
+  const g = await sb(`free_month_grants?select=trigger,milestone,year,applied_at&user_id=eq.${u.id}&order=created_at.desc`);
+  u.free_months = g.ok ? await g.json() : [];
+  const l = await sb(`party_credit_ledger?select=delta,reason,created_at&user_id=eq.${u.id}&order=created_at.desc&limit=10`);
+  u.ledger = l.ok ? await l.json() : [];
+  return { ok: true, user: u };
+}
+
+/** Exemption is its own axis, not a tier property: granted and revoked per
+ *  account regardless of what that account pays. */
+async function setCreditExempt({ email, exempt }) {
+  const r = await sb(`profiles?email=eq.${encodeURIComponent((email || "").toLowerCase())}`, {
+    method: "PATCH", headers: { Prefer: "return=representation" },
+    body: JSON.stringify({ party_credits_exempt: !!exempt }),
+  });
+  if (!r.ok) return { ok: false, error: await r.text() };
+  const rows = await r.json();
+  if (!rows.length) return { ok: false, error: "no such user" };
+  return { ok: true, exempt: rows[0].party_credits_exempt };
+}
+
+/** Hand-adjust a balance, and write the ledger too. A balance that changed
+ *  with no ledger row is the thing you cannot explain to a customer later. */
+async function adjustCredits({ email, delta, note }) {
+  const n = parseInt(delta, 10);
+  if (!Number.isFinite(n) || n === 0) return { ok: false, error: "delta must be a non-zero integer" };
+
+  const cur = await creditsFor(email);
+  if (!cur.ok) return cur;
+  const next = Math.max(0, (cur.user.party_credits || 0) + n);
+
+  const r = await sb(`profiles?id=eq.${cur.user.id}`, {
+    method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify({ party_credits: next }),
+  });
+  if (!r.ok) return { ok: false, error: await r.text() };
+
+  await sb("party_credit_ledger", {
+    method: "POST",
+    body: JSON.stringify({ user_id: cur.user.id, delta: n, reason: "admin", note: note || "manual adjustment" }),
+  });
+  return { ok: true, balance: next };
+}
+
+/** Remove a host from the PUBLIC DIRECTORY without touching their ability to
+ *  host at all. A blanket hosting ban would punish their own household for a
+ *  public-listing problem. */
+async function setPartyListing({ email, banned }) {
+  const r = await sb(`profiles?email=eq.${encodeURIComponent((email || "").toLowerCase())}`, {
+    method: "PATCH", headers: { Prefer: "return=representation" },
+    body: JSON.stringify({ public_parties_banned: !!banned }),
+  });
+  if (!r.ok) return { ok: false, error: await r.text() };
+  const rows = await r.json();
+  if (!rows.length) return { ok: false, error: "no such user" };
+  return { ok: true, banned: rows[0].public_parties_banned };
+}
+
 async function findUser(email) {
   const r = await sb(`profiles?select=id,email,tier,tier_expires,seats&email=eq.${encodeURIComponent(email.toLowerCase())}`);
   const rows = await r.json();
@@ -476,6 +610,7 @@ const routes = {
   "GET /api/referrals": () => referralPayouts(),
   "POST /api/referrals/paid": (u, b) => markReferralPaid(b),
   "POST /api/referrals/terms": (u, b) => setReferralTerms(b),
+  "POST /api/party/listing": (u, b) => setPartyListing(b),
 };
 
 // Read per request, not once at startup: this is a local tool, the file is

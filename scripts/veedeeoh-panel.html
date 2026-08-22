@@ -498,6 +498,10 @@ async function loadCredits() {
       <input id="crDelta" type="number" placeholder="+/- credits" style="width:130px" />
       <button class="ghost" onclick="adjustCr('${u.email}')">Adjust</button>
     </div>
+    <div class="actions">
+      <button class="ghost" onclick="setListing('${u.email}', true)">Unlist from public parties</button>
+      <button class="ghost" onclick="setListing('${u.email}', false)">Allow listing</button>
+    </div>
     ${u.ledger.length ? `<div class="dim" style="font-size:11.5px;margin-top:8px">${
       u.ledger.map(l => `${l.delta > 0 ? '+' : ''}${l.delta} · ${l.reason} · ${l.created_at.slice(0,10)}`).join('<br>')}</div>` : ''}`;
 }
@@ -505,6 +509,10 @@ $('crLoad').onclick = loadCredits;
 window.setExempt = async (email, exempt) => {
   await j('/api/credits/exempt', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, exempt }) });
   loadCredits();
+};
+window.setListing = async (email, banned) => {
+  const r = await j('/api/party/listing', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, banned }) });
+  alert(r.ok ? (r.banned ? 'Unlisted from public parties' : 'Listing allowed') : r.error);
 };
 window.adjustCr = async (email) => {
   const delta = $('crDelta').value;

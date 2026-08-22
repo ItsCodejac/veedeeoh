@@ -9,7 +9,7 @@ import type { VodItem } from "./types";
 import { escapeHtml, showToast } from "./util";
 import {
   activePartyCode, disconnect, joinParty, partyEnabled, partyLink, recentParty, forgetParty,
-  resumeHosting, listPublicParties,
+  resumeHosting, listPublicParties, socialUrl,
 } from "./party";
 
 let viewers = 0;
@@ -298,14 +298,18 @@ async function renderOpenParties(box: HTMLElement): Promise<void> {
       <p class="partyHint">Parties anyone can drop into. The host controls playback.</p>
       <div class="partyPickList">
         ${parties.map((p: any) => `
-          <button class="partyPick" data-code="${escapeHtml(p.join_code)}">
-            <img src="${escapeHtml(p.art || "")}" alt="" loading="lazy">
-            <span>
-              <span class="partyPickTitle">${escapeHtml(p.title || "Untitled")}</span><br>
-              <span class="partyPickMeta">${escapeHtml(ago(p.started_at))}
-                &middot; ${p.joined_count} watching${p.seat_limit ? ` of ${p.seat_limit}` : ""}</span>
-            </span>
-          </button>`).join("")}
+          <div class="partyOpenRow">
+            <button class="partyPick" data-code="${escapeHtml(p.join_code)}">
+              <img src="${escapeHtml(p.art || "")}" alt="" loading="lazy">
+              <span>
+                <span class="partyPickTitle">${escapeHtml(p.title || "Untitled")}</span><br>
+                <span class="partyPickMeta">${p.host_name ? `${escapeHtml(p.host_name)} &middot; ` : ""}${escapeHtml(ago(p.started_at))}
+                  &middot; ${p.joined_count} watching${p.seat_limit ? ` of ${p.seat_limit}` : ""}</span>
+                ${p.blurb ? `<br><span class="partyBlurb">${escapeHtml(p.blurb)}</span>` : ""}
+              </span>
+            </button>
+            ${socialLink(p)}
+          </div>`).join("")}
       </div>
     </section>`;
 
@@ -315,4 +319,24 @@ async function renderOpenParties(box: HTMLElement): Promise<void> {
       void joinParty(b.dataset.code!);
     });
   });
+}
+
+
+const SOCIAL_LABEL: Record<string, string> = {
+  discord: "Discord", twitch: "Twitch", youtube: "YouTube",
+  x: "X", tiktok: "TikTok", instagram: "Instagram",
+};
+
+/** The host's channel, if they set one.
+ *
+ *  Built from a platform and a handle, never from a stored URL -- so a
+ *  disguised link, a redirect or a shortener cannot appear here. rel is
+ *  noopener noreferrer because this is an outbound link to a stranger's page
+ *  shown under veedeeoh's name. */
+function socialLink(p: any): string {
+  const url = socialUrl(p.social_platform, p.social_handle);
+  if (!url) return "";
+  return `<a class="partySocial" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer"
+     title="${escapeHtml(SOCIAL_LABEL[p.social_platform] || "Channel")}">
+     ${escapeHtml(SOCIAL_LABEL[p.social_platform] || "Channel")}</a>`;
 }

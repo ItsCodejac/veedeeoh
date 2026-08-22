@@ -29,6 +29,7 @@ export interface PartySetup {
    *  settings: a host picking "anyone with the link" for convenience should not
    *  find out later that strangers were watching. */
   isPublic: boolean;
+  blurb: string | null;
 }
 
 /** The handoff from the catalogue into the party surface.
@@ -99,9 +100,15 @@ export function openPartySetup(item: VodItem): Promise<PartySetup | null> {
           <input type="checkbox" id="psPublic" />
           <span>
             <b>List it publicly</b>
-            <em>Anyone browsing veedeeoh.party can drop in. You can still remove people.</em>
+            <em>Anyone browsing veedeeoh.party can drop in. You can still remove people,
+              and anyone who signs up from your party earns you a share of what they pay.</em>
           </span>
         </label>
+
+        <div class="psField" id="psBlurbRow" hidden>
+          <label class="psLabel" for="psBlurb">Say what it is</label>
+          <input id="psBlurb" class="psInput" maxlength="70" placeholder="Horror night, come in late" />
+        </div>
 
         <div class="psField">
           <label class="psLabel" for="psSeats">Seat limit</label>
@@ -156,11 +163,29 @@ export function openPartySetup(item: VodItem): Promise<PartySetup | null> {
     // stranger has no idea who they are waiting on.
     const publicRow = el.querySelector<HTMLElement>("#psPublicRow")!;
     const publicBox = el.querySelector<HTMLInputElement>("#psPublic")!;
+    const blurbRow = el.querySelector<HTMLElement>("#psBlurbRow")!;
     const syncPublic = () => {
       const open = el.querySelector<HTMLElement>("[data-approval].selected")?.dataset.approval === "0";
       publicRow.hidden = !open;
       if (!open) publicBox.checked = false;
+      // A blurb only means anything on a listing, so it appears with one.
+      blurbRow.hidden = !publicBox.checked;
     };
+    publicBox.addEventListener("change", syncPublic);
+
+    // Checked up front so a host who is capped or blocked finds out before
+    // choosing, rather than by having the tick silently ignored.
+    void (async () => {
+      try {
+        const { canListPublicParty } = await import("./party");
+        const r = await canListPublicParty();
+        if (!r.ok) {
+          publicBox.disabled = true;
+          publicRow.classList.add("disabled");
+          publicRow.querySelector("em")!.textContent = r.reason || "Listing is unavailable right now.";
+        }
+      } catch { /* leave it enabled; the insert is still guarded */ }
+    })();
     el.querySelectorAll<HTMLElement>("[data-approval]").forEach((b) =>
       b.addEventListener("click", syncPublic));
     syncPublic();
@@ -183,6 +208,7 @@ export function openPartySetup(item: VodItem): Promise<PartySetup | null> {
         seatLimit: Number.isFinite(n) && n >= 1 ? Math.min(500, n) : null,
         requireApproval: approval !== "0",
         isPublic: publicBox.checked && approval === "0",
+        blurb: (el.querySelector<HTMLInputElement>("#psBlurb")?.value || "").trim() || null,
       });
     });
     // Escape cancels, which a prompt() chain never allowed cleanly.
@@ -548,6 +574,7 @@ export function showPartyEnded(opts: {
   watchedSecs: number;
   peakViewers?: number;
   reason?: string;
+  partyId?: string;
 }): void {
   document.getElementById("partyEnded")?.remove();
 
@@ -569,6 +596,7 @@ export function showPartyEnded(opts: {
           <div><b>${escapeHtml(opts.code)}</b><span>Party code</span></div>
         </div>
         <p class="peNote">Hosting used about ${Math.max(1, Math.ceil(mins / 10))} credit${Math.ceil(mins / 10) === 1 ? "" : "s"}.</p>
+        <p class="peNote" id="peEarned"></p>
       ` : `
         <p class="peNote">${opts.reason === "idle"
           ? "It timed out after everyone left."
@@ -585,6 +613,7 @@ export function showPartyEnded(opts: {
   const close = () => { el.classList.remove("in"); setTimeout(() => el.remove(), 300); };
   void renderEndedActions(el.querySelector<HTMLElement>("#peActions")!, opts, close);
   void renderEndedUpsell(el.querySelector<HTMLElement>("#peUpsell")!, opts.host);
+  if (opts.host && opts.partyId) void renderEndedEarnings(el, opts.partyId);
 
 }
 
@@ -676,4 +705,24 @@ async function renderEndedUpsell(box: HTMLElement, isHost: boolean): Promise<voi
       try { await startCheckout(); } catch { showToast("Couldn't start checkout"); }
     });
   } catch { box.innerHTML = ""; }
+}
+
+
+/** What the host earned from this party.
+ *
+ *  Every join creates a first-touch, permanent referral to the host, so a
+ *  public host has been doing affiliate work and being paid for it without
+ *  ever being told. Shown only when it is non-zero: "0 people signed up" is a
+ *  worse thing to read at the end of your own party than nothing at all.
+ */
+async function renderEndedEarnings(root: HTMLElement, partyId: string): Promise<void> {
+  const box = root.querySelector<HTMLElement>("#peEarned");
+  if (!box) return;
+  try {
+    const { partySignups } = await import("./party");
+    const n = await partySignups(partyId);
+    if (!n) return;
+    box.innerHTML = `<strong>${n} ${n === 1 ? "person" : "people"} signed up from this party.</strong>
+      You earn a share of everything they pay, for a year.`;
+  } catch { /* a missing number is better than a wrong one */ }
 }

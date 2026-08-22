@@ -766,3 +766,26 @@ export async function buyPartyCredits(): Promise<void> {
   const { url } = await authedPost("/api/billing/credits");
   if (url) window.location.href = url;
 }
+
+// ------------------------------------------------- host channel (socials) ---
+
+export interface HostSocial { platform: string | null; handle: string | null }
+
+export async function getHostSocial(): Promise<HostSocial> {
+  const { data } = await getSupabase()
+    .from("profiles").select("social_platform, social_handle").maybeSingle();
+  return { platform: data?.social_platform ?? null, handle: data?.social_handle ?? null };
+}
+
+/** Platform and handle, never a URL. The database also pattern-checks the
+ *  handle, so a link cannot be smuggled in through this field. */
+export async function setHostSocial(platform: string | null, handle: string | null): Promise<void> {
+  const { data: u } = await getSupabase().auth.getUser();
+  if (!u.user) throw new Error("not signed in");
+  const clean = (handle || "").trim().replace(/^@/, "");
+  const { error } = await getSupabase().from("profiles").update({
+    social_platform: clean ? platform : null,
+    social_handle: clean || null,
+  }).eq("id", u.user.id);
+  if (error) throw error;
+}
