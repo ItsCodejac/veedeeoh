@@ -37,24 +37,27 @@ export function openPartySetup(item: VodItem): Promise<PartySetup | null> {
           </div>
         </div>
 
-        <label class="psField">
-          <span>Who can join</span>
-          <select id="psApproval">
-            <option value="1">Ask me before letting someone in</option>
-            <option value="0">Anyone with the link</option>
-          </select>
-        </label>
+        <div class="psField">
+          <span class="psLabel">Who can join</span>
+          <div class="psChoice" role="radiogroup" aria-label="Who can join">
+            <button type="button" class="psOpt selected" data-approval="1" role="radio" aria-checked="true">
+              <b>Ask me first</b>
+              <em>You approve each person before they see anything</em>
+            </button>
+            <button type="button" class="psOpt" data-approval="0" role="radio" aria-checked="false">
+              <b>Anyone with the link</b>
+              <em>No approval step</em>
+            </button>
+          </div>
+        </div>
 
-        <label class="psField">
-          <span>Seat limit</span>
-          <select id="psSeats">
-            <option value="">No limit</option>
-            <option value="2">2 people</option>
-            <option value="4">4 people</option>
-            <option value="8">8 people</option>
-            <option value="20">20 people</option>
-          </select>
-        </label>
+        <div class="psField">
+          <label class="psLabel" for="psSeats">Seat limit</label>
+          <input id="psSeats" class="psInput" type="number" inputmode="numeric"
+                 min="1" max="500" step="1" placeholder="Leave blank for no limit"
+                 aria-describedby="psSeatsHint" />
+          <span class="psSub" id="psSeatsHint">People waiting for approval do not use a seat.</span>
+        </div>
 
         <p class="psNote">
           You control playback. Everyone else follows along, and each person
@@ -71,11 +74,42 @@ export function openPartySetup(item: VodItem): Promise<PartySetup | null> {
 
     el.addEventListener("click", (e) => { if (e.target === el) done(null); });
     el.querySelector("#psCancel")!.addEventListener("click", () => done(null));
+    // Segmented rather than <select>: a native option list cannot be styled, it
+    // renders as an OS menu over the app, and "Ask me before letting someone in"
+    // was truncating inside the control. Two and five short options both fit on
+    // screen, so there is nothing a dropdown was buying.
+    const pick = (group: string, cls: string) => {
+      el.querySelectorAll<HTMLElement>(`[data-${group}]`).forEach((b) => {
+        b.addEventListener("click", () => {
+          el.querySelectorAll<HTMLElement>(`[data-${group}]`).forEach((o) => {
+            o.classList.remove("selected");
+            o.setAttribute("aria-checked", "false");
+          });
+          b.classList.add("selected");
+          b.setAttribute("aria-checked", "true");
+        });
+        void cls;
+      });
+    };
+    pick("approval", "psOpt");
+
+    const seatsEl = el.querySelector<HTMLInputElement>("#psSeats")!;
+    // Blank means unlimited, so an empty field must stay empty -- clamping on
+    // input would turn "I am still typing" into a number the host did not pick.
+    seatsEl.addEventListener("blur", () => {
+      const v = seatsEl.value.trim();
+      if (!v) return;
+      const n = Math.round(Number(v));
+      seatsEl.value = Number.isFinite(n) && n >= 1 ? String(Math.min(500, n)) : "";
+    });
+
     el.querySelector("#psGo")!.addEventListener("click", () => {
-      const seats = (el.querySelector("#psSeats") as HTMLSelectElement).value;
+      const raw = seatsEl.value.trim();
+      const n = raw ? Math.round(Number(raw)) : NaN;
+      const approval = el.querySelector<HTMLElement>("[data-approval].selected")?.dataset.approval;
       done({
-        seatLimit: seats ? parseInt(seats, 10) : null,
-        requireApproval: (el.querySelector("#psApproval") as HTMLSelectElement).value === "1",
+        seatLimit: Number.isFinite(n) && n >= 1 ? Math.min(500, n) : null,
+        requireApproval: approval !== "0",
       });
     });
     // Escape cancels, which a prompt() chain never allowed cleanly.

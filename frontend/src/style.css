@@ -4218,3 +4218,34 @@ body.party-guest { background: #06070a; }
 .vdBuffer.on { opacity: 1; }
 .vdBuffer svg { width: 46px; height: 46px; animation: vdSpin .9s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .vdBuffer svg { animation-duration: 2.4s; } }
+
+/* Party setup: segmented choice + a plain number field.
+   Native <select> could not be styled, rendered as an OS menu over the app, and
+   truncated "Ask me before letting someone in" inside the control. */
+.psLabel {
+  display: block; font-size: 11px; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; color: rgba(255,255,255,0.5); margin-bottom: 8px;
+}
+.psChoice { display: flex; flex-direction: column; gap: 8px; }
+.psOpt {
+  display: block; width: 100%; text-align: left;
+  padding: 11px 14px; border-radius: 10px; cursor: pointer;
+  background: #080a10; border: 1px solid rgba(255,255,255,0.14);
+  color: #fff; font: inherit;
+}
+.psOpt:hover { border-color: rgba(255,255,255,0.3); }
+.psOpt.selected { border-color: var(--accent); background: rgba(197,240,78,0.08); }
+.psOpt b { display: block; font-size: 14px; font-weight: 700; }
+.psOpt em {
+  display: block; font-style: normal; font-size: 12px;
+  color: rgba(255,255,255,0.5); margin-top: 2px; line-height: 1.4;
+}
+.psOpt.selected em { color: rgba(255,255,255,0.65); }
+.psInput {
+  width: 100%; padding: 11px 13px; font: inherit; font-size: 14px;
+  background: #080a10; border: 1px solid rgba(255,255,255,0.16);
+  border-radius: 9px; color: #fff; outline: none;
+}
+.psInput:focus { border-color: var(--accent); }
+.psInput::placeholder { color: rgba(255,255,255,0.35); }
+.psSub { display: block; font-size: 11.5px; color: rgba(255,255,255,0.42); margin-top: 6px; }

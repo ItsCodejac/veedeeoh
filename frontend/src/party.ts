@@ -250,8 +250,11 @@ const METER_MINUTES = 10;
  *  credit is spent so a host with an empty balance is told up front rather than
  *  cut off ten minutes in. */
 export async function hasHostingCredit(): Promise<{ ok: boolean; exempt: boolean; balance: number }> {
-  const { partyCreditSummary } = await import("./db");
-  const c = await partyCreditSummary();
+  const { ensurePartyCredits, partyCreditSummary } = await import("./db");
+  // Grant this month's allowance first if it has not been issued yet, so a
+  // comped account -- which never triggers an invoice -- is not told it is out
+  // of hours it was never given.
+  const c = (await ensurePartyCredits()) ?? (await partyCreditSummary());
   if (!c) return { ok: true, exempt: false, balance: 0 };   // no data: do not block
   return { ok: c.exempt || c.balance > 0, exempt: c.exempt, balance: c.balance };
 }

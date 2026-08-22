@@ -713,6 +713,18 @@ export interface PartyCreditSummary {
   free_months_this_year: number;
 }
 
+/** Top up the monthly allowance if it is due, then return the summary.
+ *
+ *  Called before hosting rather than relying on the Stripe webhook alone: a
+ *  comped account never produces an invoice, so it would otherwise sit at zero
+ *  credits forever and be told it is out of hours it was never given. */
+export async function ensurePartyCredits(): Promise<PartyCreditSummary | null> {
+  const { data, error } = await getSupabase().rpc("ensure_party_credits");
+  if (error) { console.warn("[credits] ensure", error); return null; }
+  const out = data as any;
+  return out && out.ok === false ? null : (out as PartyCreditSummary);
+}
+
 export async function partyCreditSummary(): Promise<PartyCreditSummary | null> {
   const { data, error } = await getSupabase().rpc("party_credit_summary");
   if (error) { console.warn("[credits] summary", error); return null; }
