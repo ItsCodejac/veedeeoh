@@ -444,8 +444,19 @@ async function connect(joinCode: string, isHost: boolean, resume = false): Promi
         peakViewers = Math.max(peakViewers, msg.viewers || 0);
         emit({ viewers: msg.viewers }, "veedeeoh:party-presence");
         break;
-      case "roster":    emit({ watching: msg.watching, waiting: msg.waiting }, "veedeeoh:party-roster"); break;
-      case "knock":     showToast(`${msg.name} wants to join`); break;
+      case "roster": {
+        emit({ watching: msg.watching, waiting: msg.waiting }, "veedeeoh:party-roster");
+        // Someone who is no longer waiting has been dealt with, or has given up.
+        // Leaving their card on screen invites the host to answer a question
+        // nobody is still asking.
+        const still = new Set<string>((msg.waiting || []).map((w: any) => String(w.userId)));
+        void import("./party-setup").then((m) => m.reconcileKnocks(still));
+        break;
+      }
+      case "knock":
+        void import("./party-setup").then((m) =>
+          m.showKnock(String(msg.userId || ""), String(msg.name || "Someone")));
+        break;
       case "pending":   emit({}, "veedeeoh:party-pending"); showToast("Waiting for the host to let you in"); break;
       case "admitted":  emit({}, "veedeeoh:party-admitted"); showToast("You're in"); break;
       case "start":     emit({}, "veedeeoh:party-start"); break;
@@ -456,16 +467,21 @@ async function connect(joinCode: string, isHost: boolean, resume = false): Promi
       case "away":      if (!isHost) showHostAway(true); break;
       case "back":      if (!isHost) showHostAway(false); break;
       case "refused":   showToast("The host did not let you in"); break;
-      case "removed":
-        // forgetParty() as well as disconnecting: the saved invite is an offer
-        // to walk back in, and someone the host removed should not be given
-        // one. A second, unreachable `case "removed"` further down held this
-        // call and had been silently dead -- the duplicate label meant it never
-        // ran, so a removed viewer kept the party in their recent list.
-        showToast("The host removed you from the party");
+      case "removed": {
+        // A TOAST WAS THE WRONG SIZE FOR THIS. Being removed from a party is
+        // the most consequential thing that can happen to a guest, and it was
+        // announced in the same three seconds of small text used to confirm a
+        // copied link -- over a film that had just vanished, with no reason
+        // given and nothing to do about it.
+        const text = String(msg.text || "");
+        const canReturn = msg.canReturn !== false;
         forgetParty();
         disconnect();
+        void import("./vodplayer").then((m) => m.closeVodPlayer());
+        void import("./party-setup").then((m) =>
+          m.showRemoved({ title: partyTitle, code: joinCode, text, canReturn }));
         break;
+      }
       case "closed": {
         // Was a toast and nothing else, so the film kept playing and a viewer
         // could not tell "the party ended" from "the host paused".
@@ -609,9 +625,13 @@ export function startPlayback(): void {
   socket?.send(JSON.stringify({ type: "start" }));
 }
 
-/** Host removes someone already admitted. */
-export function kickViewer(userId: string): void {
-  socket?.send(JSON.stringify({ type: "kick", userId }));
+/** Host removes someone already admitted.
+ *
+ *  @param reason one of the worker's allowlisted codes. It decides both what
+ *  the person is told and whether they may come back, so the two can never
+ *  disagree -- a host who picks "connection trouble" has not banned anybody. */
+export function kickViewer(userId: string, reason = "fit"): void {
+  socket?.send(JSON.stringify({ type: "kick", userId, reason }));
 }
 
 /** Host ends the party for everyone, rather than leaving it to time out. */
@@ -647,7 +667,7 @@ export function disconnect(): void {
   stopWatchingVisibility();
   showHostAway(false);
   if (syncPoll !== null) { clearInterval(syncPoll); syncPoll = null; }
-  void import("./party-setup").then((m) => m.dismissWrap()).catch(() => {});
+  void import("./party-setup").then((m) => { m.dismissWrap(); m.dismissKnock(); }).catch(() => {});
   clearResync();
   setPartyViewerMode(false);
   lastHostState = null;

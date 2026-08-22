@@ -366,32 +366,49 @@ export function showGuestLobby(item: any, joinCode: string): () => void {
       <div class="prSub">Party ${escapeHtml(joinCode)}</div>
       <div class="vdTrackBar"><span></span></div>
       <p class="prNote" id="prGuestNote">Waiting for the host to start</p>
+      <button class="partyBtn prLeave" id="prGuestLeave">Leave</button>
     </div>`;
   document.body.appendChild(el);
   requestAnimationFrame(() => el.classList.add("in"));
+
+  // WAITING WAS A ROOM WITH NO DOOR. A guest whose request the host had not
+  // answered -- or was never going to -- had no way out of this screen except
+  // closing the tab, which is not a control, it is an escape.
+  el.querySelector("#prGuestLeave")!.addEventListener("click", async () => {
+    const { disconnect, forgetParty } = await import("./party");
+    disconnect();
+    forgetParty();
+    close();
+    showToast("Left the party");
+  });
 
   // The host may still be approving them; say so rather than leaving the same
   // line up regardless of what is actually happening.
   const pending = () => {
     const n = el.querySelector("#prGuestNote");
     if (n) n.textContent = "Waiting for the host to let you in";
+    const b = el.querySelector("#prGuestLeave");
+    if (b) b.textContent = "Cancel request";
   };
   const admitted = () => {
     const n = el.querySelector("#prGuestNote");
     if (n) n.textContent = "You are in. Waiting for the host to start";
+    const b = el.querySelector("#prGuestLeave");
+    if (b) b.textContent = "Leave";
   };
   window.addEventListener("veedeeoh:party-pending", pending);
   window.addEventListener("veedeeoh:party-admitted", admitted);
 
   let gone = false;
-  return () => {
+  function close(): void {
     if (gone) return;
     gone = true;
     window.removeEventListener("veedeeoh:party-pending", pending);
     window.removeEventListener("veedeeoh:party-admitted", admitted);
     el.classList.remove("in");
     setTimeout(() => el.remove(), 320);
-  };
+  }
+  return close;
 }
 
 // ------------------------------------------------------------------ lobby ---
@@ -548,8 +565,10 @@ function render(): void {
       const party = await import("./party");
       const act = b.dataset.act;
       if (act === "kick") {
-        if (!confirm("Remove this person from the party?")) return;
-        party.kickViewer(uid);
+        const name = b.closest<HTMLElement>("[data-uid]")?.querySelector(".ppName")?.textContent || "them";
+        const reason = await askRemovalReason(name);
+        if (!reason) return;
+        party.kickViewer(uid, reason);
       } else {
         party.respondToKnock(uid, act === "admit");
       }
@@ -824,3 +843,142 @@ export function showWrap(isHost: boolean, title: string): void {
 }
 
 export function dismissWrap(): void { wrapEl?.remove(); wrapEl = null; }
+
+// ---------------------------------------------------------------------------
+// Removing someone
+// ---------------------------------------------------------------------------
+//
+// Removal used to be one undifferentiated act behind a browser confirm(). The
+// host got "Remove this person from the party?" whether the guest's connection
+// kept dying or they were being unpleasant, it always shut the door for good,
+// and the person on the other end was told nothing at all -- a three-second
+// toast, over a film that had just disappeared.
+//
+// Both halves are now proportionate: the host says which of these it is, and
+// the guest is told the same thing.
+
+const REMOVAL_REASONS: Array<{ code: string; label: string; note: string }> = [
+  { code: "technical", label: "Connection trouble", note: "They can come back when it settles." },
+  { code: "space",     label: "Making room for someone else", note: "They can come back if a seat frees up." },
+  { code: "fit",       label: "Not the right fit", note: "They cannot rejoin this party." },
+  { code: "conduct",   label: "Behaviour in the party", note: "They cannot rejoin this party." },
+];
+
+/** Resolves with a reason code, or null if the host backed out. */
+function askRemovalReason(name: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const sheet = document.createElement("div");
+    sheet.id = "partyKickSheet";
+    sheet.innerHTML = `
+      <div class="pkkCard" role="dialog" aria-modal="true" aria-label="Remove someone from the party">
+        <h2>Remove ${escapeHtml(name)}?</h2>
+        <p class="partyHint">They will be told why. The softer reasons let them come back.</p>
+        <div class="pkkList">
+          ${REMOVAL_REASONS.map((r) => `
+            <button class="pkkReason" data-code="${r.code}">
+              <span class="pkkLabel">${escapeHtml(r.label)}</span>
+              <span class="pkkNote">${escapeHtml(r.note)}</span>
+            </button>`).join("")}
+        </div>
+        <button class="partyBtn pkkCancel">Cancel</button>
+      </div>`;
+    document.body.appendChild(sheet);
+
+    const done = (v: string | null) => { sheet.remove(); resolve(v); };
+    sheet.querySelectorAll<HTMLElement>(".pkkReason").forEach((b) => {
+      b.addEventListener("click", () => done(b.dataset.code || null));
+    });
+    sheet.querySelector(".pkkCancel")!.addEventListener("click", () => done(null));
+    sheet.addEventListener("click", (e) => { if (e.target === sheet) done(null); });
+  });
+}
+
+/** What the removed person sees. Full screen, with the reason, and a way back
+ *  in when the reason allows one. */
+export function showRemoved(o: { title: string; code: string; text: string; canReturn: boolean }): void {
+  document.getElementById("partyRemoved")?.remove();
+  const el = document.createElement("div");
+  el.id = "partyRemoved";
+  el.innerHTML = `
+    <div class="prmCard">
+      <p class="prmKicker">Removed from the party</p>
+      <h2>${escapeHtml(o.title || "The party")}</h2>
+      ${o.text ? `<p class="prmReason">${escapeHtml(o.text)}</p>` : ""}
+      <p class="prmHint">${o.canReturn
+        ? "The host said you can come back. They will be asked again when you do."
+        : "The host has closed this party to you."}</p>
+      <div class="prmRow">
+        ${o.canReturn ? `<button class="partyBtn primary" id="prmBack">Ask to rejoin</button>` : ""}
+        <button class="partyBtn" id="prmClose">Back to veedeeoh</button>
+      </div>
+    </div>`;
+  document.body.appendChild(el);
+
+  el.querySelector("#prmBack")?.addEventListener("click", async () => {
+    el.remove();
+    const { joinParty } = await import("./party");
+    await joinParty(o.code);
+  });
+  el.querySelector("#prmClose")!.addEventListener("click", () => el.remove());
+}
+
+// ---------------------------------------------------------------------------
+// Someone is asking to come in
+// ---------------------------------------------------------------------------
+
+/** A knock the host cannot miss.
+ *
+ *  It was a toast, which is the wrong instrument for something that needs an
+ *  answer: it expires on its own, and it is the same size as a copied-link
+ *  confirmation. Worse, the side panel is the only other place a request
+ *  appears, and it is not mounted at all when the host has closed the player --
+ *  so a host sitting on the party page was never told anyone had arrived.
+ */
+export function showKnock(userId: string, name: string): void {
+  const existing = document.getElementById("partyKnocks");
+  const stack = existing || (() => {
+    const s = document.createElement("div");
+    s.id = "partyKnocks";
+    document.body.appendChild(s);
+    return s;
+  })();
+  if (stack.querySelector(`[data-uid="${CSS.escape(userId)}"]`)) return;
+
+  const row = document.createElement("div");
+  row.className = "pknRow";
+  row.dataset.uid = userId;
+  row.innerHTML = `
+    <span class="pknName">${escapeHtml(name)}</span>
+    <span class="pknWhat">wants to join</span>
+    <span class="pknBtns">
+      <button class="ppBtn primary" data-knock="in">Let in</button>
+      <button class="ppBtn" data-knock="no">No</button>
+    </span>`;
+  stack.appendChild(row);
+
+  row.querySelectorAll<HTMLElement>("[data-knock]").forEach((b) => {
+    b.addEventListener("click", async () => {
+      const { respondToKnock } = await import("./party");
+      respondToKnock(userId, b.dataset.knock === "in");
+      dismissKnock(userId);
+    });
+  });
+}
+
+export function dismissKnock(userId?: string): void {
+  const stack = document.getElementById("partyKnocks");
+  if (!stack) return;
+  if (userId) stack.querySelector(`[data-uid="${CSS.escape(userId)}"]`)?.remove();
+  else stack.replaceChildren();
+  if (!stack.childElementCount) stack.remove();
+}
+
+/** Drop any request that is no longer in the host's waiting list. */
+export function reconcileKnocks(stillWaiting: Set<string>): void {
+  const stack = document.getElementById("partyKnocks");
+  if (!stack) return;
+  for (const row of [...stack.querySelectorAll<HTMLElement>("[data-uid]")]) {
+    if (!stillWaiting.has(row.dataset.uid || "")) row.remove();
+  }
+  if (!stack.childElementCount) stack.remove();
+}

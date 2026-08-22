@@ -118,6 +118,23 @@ function corsHeaders(req: Request): Record<string, string> {
 // over chat.
 const REACTIONS = ["laugh", "love", "shock", "sad", "fire", "clap"];
 
+// Why someone was removed, softest first, and whether it shuts the door behind
+// them. Removal was one undifferentiated act that always meant "never come
+// back" -- so a host with a guest whose connection kept dying had the same
+// blunt instrument as one dealing with someone behaving badly, and the person
+// on the other end was told nothing at all about which had just happened.
+//
+// An allowlist here rather than free text from the host, for the same reason
+// reactions are: this string is shown to another person under veedeeoh's name,
+// and a box the host can type anything into is a box for abuse. The ban is
+// derived from the reason server-side so the two can never disagree.
+const KICK_REASONS: Record<string, { text: string; ban: boolean }> = {
+  technical: { text: "Connection trouble", ban: false },
+  space:     { text: "Making room for someone else", ban: false },
+  fit:       { text: "Not the right fit for this party", ban: true },
+  conduct:   { text: "Behaviour in the party", ban: true },
+};
+
 const IDLE_CLOSE_MS = 5 * 60 * 1000;
 const ALARM_EVERY_MS = 60 * 1000;
 
@@ -252,11 +269,13 @@ export class Party extends DurableObject<Env> {
     if (msg?.type === "admit" || msg?.type === "refuse") {
       if (!att.isHost) return;           // only the host decides
       const target = String(msg.userId || "");
+      const closing = new Set<WebSocket>();
       for (const sock of this.ctx.getWebSockets()) {
         const a = sock.deserializeAttachment() as Attachment | null;
         if (!a || a.isHost || a.userId !== target || a.approved) continue;
 
         if (msg.type === "refuse") {
+          closing.add(sock);
           try { sock.send(JSON.stringify({ type: "refused" })); sock.close(4003, "refused"); } catch {}
           continue;
         }
@@ -280,7 +299,7 @@ export class Party extends DurableObject<Env> {
           if (state) sock.send(JSON.stringify({ type: "state", state, serverNow: Date.now() }));
         } catch {}
       }
-      this.broadcastPresence();
+      this.broadcastPresence(closing);
       return;
     }
 
@@ -290,20 +309,38 @@ export class Party extends DurableObject<Env> {
     if (msg?.type === "kick") {
       if (!att.isHost) return;
       const target = String(msg.userId || "");
+      const reason = KICK_REASONS[String(msg.reason || "")] ?? KICK_REASONS.fit!;
+
       if (target) {
-        const bans = (await this.ctx.storage.get<string[]>(BANNED_KEY)) ?? [];
-        if (!bans.includes(target)) {
-          await this.ctx.storage.put(BANNED_KEY, [...bans, target].slice(-200));
+        // Only the harder reasons close the door. A guest dropped for a bad
+        // connection who then cannot get back in has been punished for their
+        // wifi, which is not what the host meant.
+        if (reason.ban) {
+          const bans = (await this.ctx.storage.get<string[]>(BANNED_KEY)) ?? [];
+          if (!bans.includes(target)) {
+            await this.ctx.storage.put(BANNED_KEY, [...bans, target].slice(-200));
+          }
         }
+        // Admission is revoked either way: coming back means asking again,
+        // which is what gives the host the chance to say no a second time.
         const list = (await this.ctx.storage.get<string[]>(ADMITTED_KEY)) ?? [];
         await this.ctx.storage.put(ADMITTED_KEY, list.filter((u) => u !== target));
       }
+
+      const closing = new Set<WebSocket>();
       for (const sock of this.ctx.getWebSockets()) {
         const a = sock.deserializeAttachment() as Attachment | null;
         if (!a || a.isHost || a.userId !== target) continue;
-        try { sock.send(JSON.stringify({ type: "removed" })); sock.close(4004, "removed"); } catch {}
+        closing.add(sock);
+        try {
+          sock.send(JSON.stringify({
+            type: "removed", reason: String(msg.reason || "fit"),
+            text: reason.text, canReturn: !reason.ban,
+          }));
+          sock.close(4004, "removed");
+        } catch { /* already gone */ }
       }
-      this.broadcastPresence();
+      this.broadcastPresence(closing);
       return;
     }
 
@@ -443,7 +480,9 @@ export class Party extends DurableObject<Env> {
     // reconnecting, and the idle alarm will close the room if they are not.
     if (att?.isHost) this.broadcast({ type: "away" }, ws, true);
 
-    this.broadcastPresence();
+    // Excluded for the same reason as a kick: this socket is on its way out but
+    // may still be listed, and counting it leaves a ghost in the roster.
+    this.broadcastPresence(new Set([ws]));
   }
 
   /** Closes a party that everyone has left. Runs on a timer rather than on the
@@ -503,10 +542,20 @@ export class Party extends DurableObject<Env> {
     }
   }
 
-  private broadcastPresence(): void {
+  /** @param closing sockets this request has just closed.
+   *
+   *  THE REASON THIS PARAMETER EXISTS. close() does not remove a socket from
+   *  getWebSockets() synchronously, so a roster built immediately after a kick
+   *  still contains the person who was kicked. The name therefore stayed on the
+   *  host's list until some later event rebuilt it -- which, in practice, meant
+   *  removing somebody else. The host pressed the button, nothing happened, and
+   *  the only evidence it had worked arrived minutes later.
+   */
+  private broadcastPresence(closing?: Set<WebSocket>): void {
     const waiting: Array<{ userId: string; name: string }> = [];
     const watching: Array<{ userId: string; name: string }> = [];
     for (const ws of this.ctx.getWebSockets()) {
+      if (closing?.has(ws)) continue;
       const a = ws.deserializeAttachment() as Attachment | null;
       if (!a || a.isHost) continue;
       (a.approved ? watching : waiting).push({ userId: a.userId, name: a.name });
