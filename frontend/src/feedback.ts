@@ -30,10 +30,34 @@ function record(level: string, args: unknown[]): void {
   } catch {}
 }
 
+/** True when the current call originated in OUR code rather than a browser
+ *  extension.
+ *
+ *  Extensions log into the page's console, so a user with a crypto wallet
+ *  installed files a bug report that is mostly MetaMask's ObjectMultiplex
+ *  chatter with the real error buried somewhere inside it. The stack tells us
+ *  where the call came from: extension frames carry a chrome-extension:// or
+ *  moz-extension:// origin, or a bare contentscript.js.
+ *
+ *  Fails OPEN -- if there is no stack, or nothing recognisable in it, the entry
+ *  is kept. Losing a genuine error is far worse than keeping some noise. */
+function isOurs(): boolean {
+  const stack = new Error().stack || "";
+  if (!stack) return true;
+  const frames = stack.split("\n").slice(2);
+  const ext = frames.some((f) => /chrome-extension:\/\/|moz-extension:\/\/|safari-web-extension:\/\/|contentscript\.js/.test(f));
+  if (!ext) return true;
+  // Mixed stack: an extension wrapping our code still counts as ours.
+  return frames.some((f) => f.includes("/assets/") || f.includes(location.origin));
+}
+
 export function installConsoleCapture(): void {
   for (const level of ["error", "warn"] as const) {
     const original = console[level].bind(console);
-    console[level] = (...args: unknown[]) => { record(level, args); original(...args); };
+    console[level] = (...args: unknown[]) => {
+      if (isOurs()) record(level, args);
+      original(...args);
+    };
   }
   window.addEventListener("error", (e) => record("error", [e.message]));
   window.addEventListener("unhandledrejection", (e: PromiseRejectionEvent) =>
@@ -41,10 +65,22 @@ export function installConsoleCapture(): void {
 }
 
 function currentView(): string {
-  for (const [id, name] of [["homeView", "home"], ["showsView", "shows"], ["moviesView", "movies"], ["kidsView", "kids"]] as const) {
+  // Kept in step with the panels in index.html. It listed four views while the
+  // app had eight, so any report filed from search, settings, a party or a
+  // category grid arrived saying "unknown" -- on the field most likely to
+  // narrow down where a bug lives.
+  const views = [
+    ["homeView", "home"], ["showsView", "shows"], ["moviesView", "movies"],
+    ["kidsView", "kids"], ["partyView", "party"], ["searchView", "search"],
+    ["settingsView", "settings"], ["categoryView", "category"],
+  ] as const;
+  for (const [id, name] of views) {
     const el = document.getElementById(id);
     if (el && !el.hasAttribute("hidden")) return name;
   }
+  // The player sits over everything, so report it only when nothing else is up.
+  const p = document.getElementById("vodPlayerOverlay");
+  if (p && !p.hasAttribute("hidden")) return "player";
   return "unknown";
 }
 
