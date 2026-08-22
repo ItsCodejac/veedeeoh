@@ -585,10 +585,15 @@ app.post('/auth/email-hook', async (c: Context) => {
 
   try {
     await authEmail.sendAuthEmail(JSON.parse(raw));
-    // Supabase expects an empty 200. Anything else is treated as a failure,
-    // which is what we want when the send genuinely failed -- the user sees an
-    // error instead of a silent nothing.
-    return c.body(null, 200);
+    // AN EMPTY JSON OBJECT, not an empty body. The documentation says "an
+    // empty response with a status code of 200", and a bare 200 with no
+    // Content-Type is what that reads like -- but Supabase rejects it with
+    // hook_payload_invalid_content_type and fails the whole auth request,
+    // AFTER the mail has already gone out. The user sees an error for an email
+    // that was in fact sent. Found by triggering a real password reset;
+    // nothing short of that would have shown it, because the signature check,
+    // the send and the status code were all already correct.
+    return c.json({}, 200);
   } catch (e: any) {
     console.error('[auth-email] send failed:', e?.message);
     return c.json({ error: e?.message || 'send failed' }, 500);
