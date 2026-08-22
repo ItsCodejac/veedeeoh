@@ -1587,6 +1587,21 @@
           height: 210px;
         }
       }
+    
+      .hero-purpose {
+        max-width: 620px; margin: 20px auto 28px;
+        font-size: 15px; line-height: 1.65; color: var(--dim, rgba(255,255,255,.62));
+      }
+      .hero-purpose strong { color: #fff; font-weight: 700; }
+
+      .about-section { max-width: 780px; margin: 0 auto; padding: 72px 24px; }
+      .about-body p {
+        margin: 0 0 16px; font-size: 15.5px; line-height: 1.7;
+        color: var(--dim, rgba(255,255,255,.66));
+      }
+      .about-body p:last-child { margin-bottom: 0; }
+      .about-body strong { color: #fff; }
+      .about-body a { color: var(--accent); }
     </style>
   </head>
   <body>
@@ -1595,6 +1610,7 @@
     <nav>
       <a href="#" class="logo">veedeeoh<span>.</span></a>
       <ul class="nav-links">
+        <li><a href="#about">About</a></li>
         <li><a href="#catalog">Catalog</a></li>
         <li><a href="#features">Features</a></li>
         <li><a href="#pricing">Pricing</a></li>
@@ -1636,6 +1652,18 @@
         </div>
         <h1>All your movies &amp; TV shows. <span class="hero-gradient-text">One place.</span></h1>
         <p class="hero-subtitle">Thousands of free movies and TV shows, gathered into one clean app. No switching between services, on every device in your household.</p>
+        <!-- Names the app and states what it does, in plain text and in one
+             sentence. Google's OAuth verification rejected this page twice: once
+             because it did not explain the application's purpose, and once
+             because the app name on the consent screen appeared nowhere on it --
+             the headline is a tagline and the only "veedeeoh" was the styled
+             wordmark in the nav. Both are the same omission. -->
+        <p class="hero-purpose">
+          <strong>veedeeoh</strong> is a streaming app that brings together the free,
+          ad-supported and public-domain catalogues of Pluto TV, Tubi and the Internet
+          Archive, so you can search them, resume across devices and watch together in
+          sync instead of opening three apps to find one film.
+        </p>
 
         <div class="hero-cta">
           <button class="btn btn-accent" id="heroTrialBtn">Start free trial</button>
@@ -1643,6 +1671,35 @@
         </div>
         <p class="hero-trust">7 days free, then $4/mo for 3 profiles. Cancel anytime.</p>
 
+      </div>
+    </section>
+
+    <!-- About. Exists for a human reviewer as much as for a visitor: it states
+         the app name, what the application does, who it is for and what it does
+         not do, without marketing language wrapped around it. -->
+    <section class="about-section" id="about">
+      <h2 class="section-title">About veedeeoh</h2>
+      <div class="about-body">
+        <p>
+          <strong>veedeeoh</strong> is a web application for finding and watching films and
+          television that are already free to watch. It does not host or licence any video.
+          When you press play, the stream comes from the provider that holds it &mdash; Pluto TV,
+          Tubi or the Internet Archive &mdash; directly to your browser, advertising included,
+          exactly as those services deliver it.
+        </p>
+        <p>
+          What veedeeoh adds is everything around the video: one search across all three
+          catalogues, up to three household profiles with their own watchlists and parental
+          rating limits, resume-where-you-left-off across devices, a kids mode restricted to
+          age-rated titles, and watch parties that keep a group in sync on the same film.
+        </p>
+        <p>
+          Accounts exist so those profiles, watchlists and resume points follow you between
+          devices. Signing in with Google gives veedeeoh your name and email address for that
+          purpose and nothing else. It is never used for advertising, never sold, and can be
+          exported or deleted from Settings at any time. See our
+          <a href="/privacy.html">Privacy Policy</a> and <a href="/terms.html">Terms of Service</a>.
+        </p>
       </div>
     </section>
 
