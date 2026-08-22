@@ -53,7 +53,9 @@ export async function renderReferral(el: HTMLElement): Promise<void> {
     ${breakdown}`,
     isPartner
       ? "Negotiated partner terms. The rate is snapshotted onto each referral when it is made, so a later change never rewrites what you already earned."
-      : "Anyone who joins a watch party you host is credited to you too, without this link. Payouts are made by hand while the programme is in beta.");
+      : "Anyone who joins a watch party you host is credited to you too, without this link. "
+        + "A referral is yours for 90 days; once they subscribe it is yours for good. "
+        + "Payouts are made by hand while the programme is in beta.");
 
   void renderHostChannel(el);
 
