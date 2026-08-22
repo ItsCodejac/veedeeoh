@@ -283,7 +283,6 @@ app.get('/cron/trial-emails', async (c: Context) => {
     process.env.SUPABASE_SERVICE_ROLE_KEY || '',
     { auth: { persistSession: false, autoRefreshToken: false } }
   );
-  const email = await import('../backend/email');
 
   const now = Date.now();
   const day = 86_400_000;
@@ -306,8 +305,8 @@ app.get('/cron/trial-emails', async (c: Context) => {
     if (!stage || r.trial_email_sent === stage) continue;
 
     try {
-      if (stage === 'ended') await email.sendTrialEndedEmail(r.email);
-      else await email.sendTrialEndingEmail(r.email, days);
+      if (stage === 'ended') await emailHelper.sendTrialEndedEmail(r.email);
+      else await emailHelper.sendTrialEndingEmail(r.email, days);
       await sb.from('profiles').update({ trial_email_sent: stage }).eq('id', r.id);
       sent.push(`${r.email}:${stage}`);
     } catch (e: any) {
@@ -494,7 +493,10 @@ app.post('/account/delete', async (c: Context) => {
     return c.json({ error: 'confirmation did not match the account email' }, 400);
   }
 
-  const billing = await import('../backend/billing');
+  // Uses the module-level import. A dynamic import('../backend/billing') here
+  // resolved fine locally and threw ERR_MODULE_NOT_FOUND on Vercel, because the
+  // extensionless specifier is not traced into the serverless bundle -- so the
+  // delete endpoint 500'd in production while passing every local check.
   const cancel = await billing.cancelForDeletion(user.id);
 
   const { createClient } = await import('@supabase/supabase-js');
