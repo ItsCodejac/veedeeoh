@@ -131,10 +131,46 @@ class VodPlayer {
     }
 
     this.player = created;
+    this.mountBufferSpinner(created);
     this.applyPrefs(created);
     this.style();
     this.wire();
     this.showBump();
+  }
+
+  /** Brand spinner for mid-stream stalls.
+   *
+   *  The ident bump covers the FIRST play only; a rebuffer twenty minutes in
+   *  showed nothing at all, which reads as the player having died. Uses loader 3
+   *  ("buffering") from the brand package rather than a generic spinner, so a
+   *  stall still looks like veedeeoh.
+   *
+   *  Delayed by 400ms: most rebuffers resolve faster than that, and a spinner
+   *  that flashes on every seek is worse than no spinner. */
+  private mountBufferSpinner(p: any): void {
+    const el = document.createElement("div");
+    el.className = "vdBuffer";
+    el.innerHTML = `
+      <svg viewBox="0 0 40 40" aria-hidden="true">
+        <circle cx="20" cy="20" r="16" fill="none" stroke="#20232A" stroke-width="4"></circle>
+        <circle cx="20" cy="20" r="16" fill="none" stroke="var(--accent, #c5f04e)" stroke-width="4"
+                stroke-linecap="round" stroke-dasharray="34 100"></circle>
+      </svg>`;
+    this.overlay.appendChild(el);
+
+    let t: number | null = null;
+    const show = () => {
+      if (t !== null) return;
+      t = window.setTimeout(() => el.classList.add("on"), 400);
+    };
+    const hide = () => {
+      if (t !== null) { clearTimeout(t); t = null; }
+      el.classList.remove("on");
+    };
+    p.addEventListener("waiting", show, { signal: this.ac.signal });
+    p.addEventListener("playing", hide, { signal: this.ac.signal });
+    p.addEventListener("seeked", hide, { signal: this.ac.signal });
+    p.addEventListener("error", hide, { signal: this.ac.signal });
   }
 
   /** Apply the viewer's saved playback preferences.

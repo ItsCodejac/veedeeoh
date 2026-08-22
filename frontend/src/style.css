@@ -4206,3 +4206,15 @@ body.party-guest { background: #06070a; }
   background: rgba(6,7,10,0.94); border: 1px solid rgba(197,240,78,0.35);
   pointer-events: auto; font-family: var(--display); font-size: 13px; color: #fff;
 }
+
+/* Buffering spinner — loader 3 from the brand package. Shares vdSpin with the
+   other loaders rather than defining a second rotation. */
+@keyframes vdSpin { to { transform: rotate(360deg); } }
+.vdBuffer {
+  position: absolute; inset: 0; z-index: 12;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none; opacity: 0; transition: opacity .18s ease;
+}
+.vdBuffer.on { opacity: 1; }
+.vdBuffer svg { width: 46px; height: 46px; animation: vdSpin .9s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .vdBuffer svg { animation-duration: 2.4s; } }
