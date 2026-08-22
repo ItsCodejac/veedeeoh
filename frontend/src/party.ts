@@ -267,7 +267,10 @@ export async function joinParty(joinCode: string): Promise<void> {
     // apply -- the argument is optional, so nothing failed to compile and the
     // guest silently kept a one-episode list.
     void openVodPlayer(asPartyChannel(item, url, streams), party.stream_idx || 0, 0)
-      .then(() => setPartyViewerMode(true));
+      .then(async () => {
+        setPartyViewerMode(true);
+        (await import("./party-reactions")).mountReactions();
+      });
   }, { once: true });
 
   await connect(joinCode, false);
@@ -315,6 +318,7 @@ async function connect(joinCode: string, isHost: boolean): Promise<void> {
       case "pending":   emit({}, "veedeeoh:party-pending"); showToast("Waiting for the host to let you in"); break;
       case "admitted":  emit({}, "veedeeoh:party-admitted"); showToast("You're in"); break;
       case "start":     emit({}, "veedeeoh:party-start"); break;
+      case "react":     emit({ kind: msg.kind, name: msg.name }, "veedeeoh:party-react"); break;
       case "away":      if (!isHost) showHostAway(true); break;
       case "back":      if (!isHost) showHostAway(false); break;
       case "refused":   showToast("The host did not let you in"); break;
@@ -429,6 +433,7 @@ export function endParty(): void {
 
 export function disconnect(): void {
   stopMetering();
+  void import("./party-reactions").then((m) => m.unmountReactions()).catch(() => {});
   partyStartedAt = 0;
   peakViewers = 0;
   stopPartySync();
@@ -624,6 +629,7 @@ export async function resumeHosting(joinCode: string): Promise<boolean> {
 
   const { mountHostLobby } = await import("./party-setup");
   mountHostLobby(joinCode, partyLink(joinCode));
+  (await import("./party-reactions")).mountReactions();
   // Already started, by definition -- the room existed before this. Re-announce
   // so anyone who joined while the host was away is let through rather than
   // left in a green room waiting on someone who has already begun.
@@ -755,4 +761,23 @@ export function socialUrl(platform: string | null, handle: string | null): strin
     case "instagram": return `https://instagram.com/${h}`;
     default:          return null;
   }
+}
+
+
+// -------------------------------------------------------------- reactions ---
+
+/** The vocabulary, mirrored from the worker, which validates it again. A fixed
+ *  set is the whole reason this is reactions and not chat: nothing targeted can
+ *  be expressed, so there is nothing to moderate. */
+export const REACTIONS = [
+  { kind: "laugh", glyph: "\u{1F602}", label: "Funny" },
+  { kind: "love",  glyph: "\u{2764}\u{FE0F}", label: "Love it" },
+  { kind: "shock", glyph: "\u{1F631}", label: "No way" },
+  { kind: "sad",   glyph: "\u{1F622}", label: "Sad" },
+  { kind: "fire",  glyph: "\u{1F525}", label: "Fire" },
+  { kind: "clap",  glyph: "\u{1F44F}", label: "Applause" },
+] as const;
+
+export function sendReaction(kind: string): void {
+  try { socket?.send(JSON.stringify({ type: "react", kind })); } catch {}
 }

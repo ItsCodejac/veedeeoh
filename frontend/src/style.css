@@ -4601,3 +4601,56 @@ body.can-host .vodQuickBtn.partyAct { display: flex; }
 }
 .partySocial:hover { color: #fff; border-color: rgba(255,255,255,.4); }
 .psCheck.disabled { opacity: .55; }
+
+/* ---- Party reactions ---------------------------------------------------
+   Six fixed reactions instead of chat. A set this small cannot say anything
+   targeted, which is a property of the design rather than a moderation policy
+   anyone has to enforce. Nothing is stored. */
+#reactBar {
+  position: fixed; left: 50%; bottom: 88px; transform: translateX(-50%);
+  z-index: 9998; display: flex; gap: 6px; padding: 7px 9px;
+  background: rgba(6,7,10,.82); border: 1px solid rgba(255,255,255,.14);
+  border-radius: 999px; backdrop-filter: blur(10px);
+}
+#reactBar.collapsed { padding: 6px; }
+.reactBtn {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: none; border: none; cursor: pointer;
+  font-size: 19px; line-height: 1; color: #cfd6e0;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .12s ease, background .12s ease;
+}
+.reactBtn:hover { transform: scale(1.18); background: rgba(255,255,255,.1); }
+.reactBtn:active { transform: scale(.94); }
+.reactOff { font-size: 0; opacity: .5; }
+.reactOff:hover { opacity: 1; }
+
+/* Up the right edge, never over the middle of the picture. */
+#reactStage {
+  position: fixed; right: 26px; bottom: 130px; width: 130px; height: 46vh;
+  z-index: 9998; pointer-events: none; overflow: hidden;
+}
+.reactFloat {
+  position: absolute; bottom: 0; right: 0;
+  display: flex; align-items: center; gap: 7px;
+  animation: reactRise 2.6s cubic-bezier(.25,.6,.3,1) forwards;
+}
+.reactGlyph { font-size: 26px; line-height: 1; }
+.reactWho {
+  font-family: var(--display); font-size: 11.5px; font-weight: 700; color: #cfd6e0;
+  background: rgba(6,7,10,.7); padding: 2px 8px; border-radius: 999px;
+  max-width: 92px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+@keyframes reactRise {
+  0%   { opacity: 0; transform: translate(0, 10px) scale(.8); }
+  12%  { opacity: 1; transform: translate(0, 0) scale(1); }
+  100% { opacity: 0; transform: translate(var(--drift, 0), -42vh) scale(.9); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reactFloat { animation: reactFade 2.2s ease forwards; }
+  @keyframes reactFade { 0%,70% { opacity: 1; } 100% { opacity: 0; } }
+}
+@media (max-width: 620px) {
+  #reactBar { bottom: 76px; }
+  #reactStage { width: 96px; right: 12px; }
+}

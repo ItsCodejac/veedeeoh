@@ -101,6 +101,11 @@ function corsHeaders(req: Request): Record<string, string> {
 // indefinitely -- and once hosting is metered, silently spending the host's
 // credits on an empty room. Checked by alarm rather than a timer, because a
 // timer does not survive eviction.
+// The complete vocabulary. Deliberately small: a set this size cannot be used
+// to say anything targeted, which is the entire reason reactions were chosen
+// over chat.
+const REACTIONS = ["laugh", "love", "shock", "sad", "fire", "clap"];
+
 const IDLE_CLOSE_MS = 5 * 60 * 1000;
 const ALARM_EVERY_MS = 60 * 1000;
 
@@ -247,6 +252,22 @@ export class Party extends DurableObject<Env> {
     if (msg?.type === "away" || msg?.type === "back") {
       if (!att.isHost) return;
       this.broadcast({ type: msg.type }, ws, true);
+      return;
+    }
+
+    // Reactions. A FIXED SET, chosen from an allowlist here rather than trusted
+    // from the client: the whole safety property of reactions over chat is that
+    // nothing arbitrary can be expressed, and that only holds if the server
+    // decides what is expressible.
+    //
+    // Not persisted. A reaction is a moment, not a record -- there is nothing
+    // to moderate afterwards, nothing to leak, and a late joiner has no reason
+    // to see what people felt about a scene they missed.
+    if (msg?.type === "react") {
+      if (!att.approved) return;          // the lobby is not a room
+      const kind = String(msg.kind || "");
+      if (!REACTIONS.includes(kind)) return;
+      this.broadcast({ type: "react", kind, name: att.name }, undefined, true);
       return;
     }
 

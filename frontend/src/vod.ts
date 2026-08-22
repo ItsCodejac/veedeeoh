@@ -499,6 +499,7 @@ export async function startWatchParty(item: VodItem): Promise<boolean> {
     party.startPlayback();
     await openVodPlayer(asChannel(item, streams as any), 0);
     mountHostLobby(joinCode, link);
+    (await import("./party-reactions")).mountReactions();
     return true;
   } catch (e: any) {
     showToast(e?.message || "Couldn't start the party");
