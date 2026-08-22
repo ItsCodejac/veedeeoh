@@ -1449,6 +1449,14 @@ export async function renderHome(): Promise<void> {
     const pid = activeProfileUuid();
     if (pid) {
       try {
+        // Declared HERE, not reused from further down the function. `allItems`
+        // and `strip` are consts defined ~130 lines below; referencing them
+        // from this block hit the temporal dead zone, and the ReferenceError
+        // was swallowed by the catch below as a warning -- which silently
+        // disabled the whole merge, including the timecode sync that had been
+        // working before.
+        const catalogItems: VodItem[] = rails.flatMap((r) => r.items as VodItem[]);
+        const bareId = (id?: string) => (id || "").replace("vod:", "");
         const cloudHistory = await getWatchHistory(pid);
         cloudHistory.forEach(cloudRow => {
           if (cloudRow.completed) {
@@ -1472,7 +1480,7 @@ export async function renderHome(): Promise<void> {
           // Synthesised from the catalogue, without streams: a Pluto URL is
           // signed and expires in 24h, so a stored one would be stale anyway.
           // The card resolves on click, exactly like every other play path.
-          const item = allItems.find((i: VodItem) => strip(i.id) === cloudRow.content_id);
+          const item = catalogItems.find((i) => bareId(i.id) === cloudRow.content_id);
           if (!item) return;
           const pct = cloudRow.duration_secs
             ? (cloudRow.position_secs / cloudRow.duration_secs) * 100 : 0;
@@ -1497,7 +1505,11 @@ export async function renderHome(): Promise<void> {
         // was actually watched rather than landing at the end.
         resumeHistory.sort((a: any, b: any) => (b.time ? 1 : 0) - (a.time ? 1 : 0));
       } catch (e) {
-        console.warn("[vod] getWatchHistory failed", e);
+        // Loud on purpose: this block failing means Continue Watching quietly
+        // degrades to whatever this browser happens to have cached, which is
+        // indistinguishable from "the feature works" until you open a second
+        // browser.
+        console.error("[vod] cross-device resume merge FAILED", e);
       }
     }
 

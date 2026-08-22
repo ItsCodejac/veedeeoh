@@ -157,9 +157,6 @@ class VodPlayer {
    *  options(), with no prop to override it. Scoped to this player's root and
    *  to the exact string "0p", so it cannot touch anything else. */
   private fixQualityLabels(): void {
-    const root = this.root;
-    if (!root) return;
-
     const rank = (i: number, n: number): string => {
       if (n <= 1) return "Standard";
       const ladder = ["Highest", "High", "Medium", "Low", "Lowest"];
@@ -169,42 +166,44 @@ class VodPlayer {
     let patching = false;
 
     const relabel = () => {
-      // Our own writes retrigger the observer. Without this the first rewrite
-      // loops forever.
-      if (patching) return;
+      if (patching) return;   // our own writes retrigger the observer
+
+      // Vidstack's default video layout builds the settings menu with
+      // `portal: true`, which its own docs describe as "portals menu items into
+      // the document body". The radio group is therefore NOT inside the player
+      // element, and it is removed from the DOM entirely whenever the menu
+      // closes. Two earlier attempts observed the player root and so never saw
+      // it appear -- they looked right and did nothing.
+      const labels = document.querySelectorAll<HTMLElement>(".vds-radio-label");
+      if (!labels.length) return;   // menu closed: nothing mounted
+
       patching = true;
       try {
-        // Leaf elements only, matched on their OWN text. An earlier attempt
-        // tested a whole radio row, whose textContent is "0p3.32 Mbps" -- the
-        // label and the bitrate column concatenated with no separator -- so an
-        // anchored /^0p$/ never matched and the function returned having done
-        // nothing.
-        const leaves = root.querySelectorAll<HTMLElement>("*");
-        const zeroed: HTMLElement[] = [];
-        for (const el of leaves) {
-          if (el.childElementCount) continue;
-          const t = (el.textContent || "").trim();
-          if (t === "0p") zeroed.push(el);
-          // The menu HINT is a second unguarded template in the library:
-          // `quality().height + "p"`, rendered as "Auto (0p)".
-          else if (t.endsWith("(0p)")) el.textContent = t.slice(0, -5).trim();
-        }
+        const zeroed = Array.from(labels).filter((el) => el.textContent?.trim() === "0p");
         zeroed.forEach((el, i) => { el.textContent = rank(i, zeroed.length); });
+
+        // Second unguarded template in the library: the menu hint renders
+        // `quality().height + "p"`, giving "Auto (0p)". That one lives on the
+        // button inside the player, not in the portal.
+        for (const el of document.querySelectorAll<HTMLElement>(".vds-menu-hint, [data-part='hint']")) {
+          const t = (el.textContent || "").trim();
+          if (t.endsWith("(0p)")) el.textContent = t.slice(0, -4).replace(/\s*\($/, "").trim();
+        }
       } finally {
         patching = false;
       }
     };
 
-    // The menu is built lazily on first open, so there is nothing to rewrite
-    // until then. Coalesced into a microtask so a burst of DOM work is handled
-    // once rather than per node.
+    // Observing document.body, because that is where the menu is portaled to.
+    // The callback early-outs on a single querySelectorAll when the menu is
+    // closed, which is almost always, so this stays cheap during playback.
     let queued = false;
     const obs = new MutationObserver(() => {
       if (queued) return;
       queued = true;
       queueMicrotask(() => { queued = false; relabel(); });
     });
-    obs.observe(root, { childList: true, subtree: true, characterData: true });
+    obs.observe(document.body, { childList: true, subtree: true, characterData: true });
     this.ac.signal.addEventListener("abort", () => obs.disconnect());
   }
 
