@@ -3875,3 +3875,76 @@ body.kids-mode { --brand-accent: #ff9f1c; }
 .partyPickTitle { font-weight: 600; color: #fff; font-size: 13.5px; }
 .partyPickMeta { color: rgba(255,255,255,0.5); font-size: 11.5px; }
 .partyPickList { display: flex; flex-direction: column; gap: 2px; margin-top: 12px; }
+
+/* ---- brand loaders --------------------------------------------------------
+   Motion and proportions from the brand package
+   ("Video bump ident design 2/Brand Loaders.dc.html", loader 1 "App boot").
+   Kept as reusable pieces rather than one-off region markup, because the same
+   package also specifies a buffering spinner and rail skeleton that should
+   share these keyframes. */
+@keyframes vdShimmer { 0% { background-position: 130% 0; } 100% { background-position: -130% 0; } }
+@keyframes vdPulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 10px var(--accent), 0 0 34px rgba(198,245,58,0.4); }
+  50%      { transform: scale(1.4); box-shadow: 0 0 16px var(--accent), 0 0 60px rgba(198,245,58,0.67); }
+}
+@keyframes vdTrack {
+  0%   { transform: translateX(-100%); }
+  50%  { transform: translateX(0%); }
+  100% { transform: translateX(100%); }
+}
+
+.vdShimmerText {
+  background: linear-gradient(100deg, #2E3138 34%, #FFFFFF 47%, var(--accent) 53%, #2E3138 66%);
+  background-size: 260% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: vdShimmer 1.9s linear infinite;
+}
+.vdDot {
+  width: 13px; height: 13px; border-radius: 50%;
+  background: var(--accent);
+  animation: vdPulse 1.9s ease-in-out infinite;
+}
+.vdTrackBar {
+  width: 260px; height: 3px; border-radius: 2px;
+  background: #191B21; overflow: hidden;
+}
+.vdTrackBar > span {
+  display: block; width: 100%; height: 100%;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  animation: vdTrack 1.9s ease-in-out infinite;
+}
+
+/* Respect a stated preference for less motion: hold the loader still rather
+   than removing it, so the screen is not simply blank while work happens. */
+@media (prefers-reduced-motion: reduce) {
+  .vdShimmerText, .vdDot, .vdTrackBar > span { animation: none; }
+  .vdShimmerText { background: none; color: #fff; }
+}
+
+/* ---- region switch splash ---- */
+#regionSplash {
+  position: fixed; inset: 0; z-index: 99997;
+  background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity .42s ease;
+}
+#regionSplash.in { opacity: 1; }
+.regionSplashInner {
+  display: flex; flex-direction: column; align-items: center; gap: 30px;
+  padding: 0 24px; text-align: center;
+}
+.regionSplashMark {
+  display: flex; align-items: baseline; gap: 10px;
+  font-family: var(--brand);
+  font-size: clamp(40px, 9vw, 76px);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 1;
+}
+.regionSplashMark .sfx { color: var(--accent); }
+.regionSplashSub {
+  font-size: 13px; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: #8A8F98;
+}

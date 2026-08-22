@@ -1,5 +1,5 @@
 import "./style.css";
-import { fetchCatalog, fetchWatched } from "./api";
+import { fetchCatalog, fetchWatched, getActiveRegion } from "./api";
 import { state } from "./state";
 import { $, showToast, escapeHtml } from "./util";
 import { wireVodDetails, renderShows, renderMovies, wireSearchInputs, renderHome } from "./vod";
@@ -8,6 +8,31 @@ import { getActiveProfile } from "./profiles";
 
 // Playful multicolor kids identity, used for the brand + kids theme.
 const KIDS_WORDMARK = `veedeeoh<span style="color:#7ed957;">.</span><span style="color:#ff9f1c;">k</span><span style="color:#4dabf7;">i</span><span style="color:#ff6b6b;">d</span><span style="color:#a9e34b;">s</span>`;
+
+// The wordmark carries the current context: veedeeoh.kids on a child profile,
+// veedeeoh.uk when browsing another region's catalog, plain veedeeoh. at home.
+// Written once, because it was previously spelled out in four places and any
+// new variant had to be added to all of them or the header would disagree with
+// itself between a tab switch and a profile change.
+function applyWordmark(isKids: boolean): void {
+  const brand = document.getElementById("brand");
+  const mobileBrand = document.querySelector(".mobile-brand");
+
+  if (isKids) {
+    if (brand) brand.innerHTML = KIDS_WORDMARK;
+    if (mobileBrand) mobileBrand.innerHTML = `v<span style="color:#ff9f1c;">k</span>`;
+    return;
+  }
+
+  // US is the default catalog, so it gets no suffix -- a permanent ".us" would
+  // read as a badge on the normal state rather than a signal that something is
+  // different.
+  const code = getActiveRegion().toUpperCase();
+  const sfx = code === "US" ? "" : (REGION_NAMES[code]?.suffix || code.toLowerCase());
+
+  if (brand) brand.innerHTML = `veedeeoh<span>.</span>${escapeHtml(sfx)}`;
+  if (mobileBrand) mobileBrand.innerHTML = `v<span>.</span>${escapeHtml(sfx)}`;
+}
 
 // Branded ident, played on profile SELECTION (a user gesture, so audio is
 // allowed — cold-boot autoplay can't have sound). Normal or kids variant,
@@ -39,6 +64,60 @@ function playIdent(isKids: boolean, done: () => void): void {
   v.play().catch(() => { v.muted = true; v.play().catch(finish); }); // sound; fall back muted
 }
 
+// Region switch splash. Non-US catalogs are built live rather than served from
+// catalog_cache, so the swap takes seconds -- long enough that a silent blink
+// reads as a glitch. Reuses the boot-splash language and the veedeeoh.kids /
+// veedeeoh.party wordmark pattern, so the region becomes part of the brand
+// rather than a dropdown that flickers.
+const REGION_NAMES: Record<string, { name: string; suffix: string }> = {
+  US: { name: "United States", suffix: "us" },
+  GB: { name: "United Kingdom", suffix: "uk" },
+  CA: { name: "Canada", suffix: "ca" },
+  DE: { name: "Germany", suffix: "de" },
+  ES: { name: "Spain", suffix: "es" },
+  MX: { name: "Mexico", suffix: "mx" },
+  FR: { name: "France", suffix: "fr" },
+};
+
+function showRegionSplash(code: string): (subtitle?: string) => Promise<void> {
+  const meta = REGION_NAMES[code.toUpperCase()] || { name: code, suffix: code.toLowerCase() };
+  const shownAt = Date.now();
+
+  // Markup follows the "App boot" loader from the brand package
+  // (Video bump ident design 2/Brand Loaders.dc.html): shimmering wordmark,
+  // pulsing accent dot, sweeping track. Colours come from the CSS variables
+  // rather than the spec's literals so it tracks the app, not a snapshot.
+  const o = document.createElement("div");
+  o.id = "regionSplash";
+  o.innerHTML = `
+    <div class="regionSplashInner">
+      <div class="regionSplashMark">
+        <span class="vdShimmerText">veedeeoh</span><span class="sfx">.${escapeHtml(meta.suffix)}</span>
+        <span class="vdDot"></span>
+      </div>
+      <div class="regionSplashSub" id="regionSplashSub">Loading the ${escapeHtml(meta.name)} catalog</div>
+      <div class="vdTrackBar"><span></span></div>
+    </div>`;
+  document.body.appendChild(o);
+  requestAnimationFrame(() => o.classList.add("in"));
+
+  // Dismissal returns a promise so the caller can await the fade and keep the
+  // splash up for a floor duration. Without the floor a warm cache dismisses it
+  // in 80ms, which is the flicker this exists to remove.
+  return async (subtitle?: string) => {
+    if (subtitle) {
+      const sub = document.getElementById("regionSplashSub");
+      if (sub) sub.textContent = subtitle;
+    }
+    const held = Date.now() - shownAt;
+    const floor = subtitle ? 1500 : 1100;
+    if (held < floor) await new Promise((r) => setTimeout(r, floor - held));
+    o.classList.remove("in");
+    await new Promise((r) => setTimeout(r, 420));
+    o.remove();
+  };
+}
+
 // Paywall shown when a signed-in user has no active trial/subscription. Blocks
 // the app until they subscribe (Stripe Checkout) — the trial-expiry gate.
 // Fade out and remove the boot splash once the first real screen (Who's Watching,
@@ -58,15 +137,7 @@ function applyProfileChrome(profile: { name?: string; avatar_color?: string; is_
   document.body.classList.toggle("kids-mode", isKids);
 
   // Brand identity follows the profile.
-  const brand = document.getElementById("brand");
-  const mobileBrand = document.querySelector(".mobile-brand");
-  if (isKids) {
-    if (brand) brand.innerHTML = KIDS_WORDMARK;
-    if (mobileBrand) mobileBrand.innerHTML = `v<span style="color:#ff9f1c;">k</span>`;
-  } else {
-    if (brand) brand.innerHTML = `veedeeoh<span>.</span>`;
-    if (mobileBrand) mobileBrand.innerHTML = `v<span>.</span>`;
-  }
+  applyWordmark(isKids);
 
   // Kids: hide the adult browse tabs; parent: show them.
   ["tabShows", "tabMovies", "tabFavs"].forEach((id) => {
@@ -406,18 +477,9 @@ function wireSidebar(): void {
       if (el) el.setAttribute("hidden", "");
     });
 
-    // Dynamic Logo & Theme Shift
-    const brand = document.getElementById("brand");
-    const mobileBrand = document.querySelector(".mobile-brand");
-
+    // Dynamic Logo & Theme Shift.
     // In a kids profile the whole app wears the kids identity, on every tab.
-    if (activeTabId === "tabKids" || document.body.classList.contains("kids-mode")) {
-      if (brand) brand.innerHTML = KIDS_WORDMARK;
-      if (mobileBrand) mobileBrand.innerHTML = `v<span style="color:#ff9f1c;">k</span>`;
-    } else {
-      if (brand) brand.innerHTML = `veedeeoh<span>.</span>`;
-      if (mobileBrand) mobileBrand.innerHTML = `v<span>.</span>`;
-    }
+    applyWordmark(activeTabId === "tabKids" || document.body.classList.contains("kids-mode"));
     document.body.classList.remove("zzz-mode-active");
 
     if (activeTabId === "tabHome") {
@@ -655,20 +717,22 @@ function wireHeader(): void {
         vod.invalidateCatalogCache();
 
         // Only US is written to catalog_cache by the cron; other regions build
-        // live and take a few seconds. Say so rather than appearing frozen.
+        // live and take a few seconds. Cover the swap rather than blinking.
         sel.disabled = true;
-        const label = sel.options[sel.selectedIndex]?.text || val;
-        showToast(`Loading the ${label} catalog...`);
+        applyWordmark(document.body.classList.contains("kids-mode"));
+        const dismiss = showRegionSplash(val);
 
         $("showsRails")?.replaceChildren();
         $("moviesRails")?.replaceChildren();
         try {
           const rails = await vod.getVodRails();
           const titles = new Set(rails.flatMap((r) => r.items.map((i: any) => String(i.id)))).size;
+          // Render BEHIND the splash, so it lifts on a finished screen instead
+          // of on a half-built one.
           await renderHome();
-          showToast(`${label}: ${titles.toLocaleString()} titles`);
+          await dismiss(`${titles.toLocaleString()} titles`);
         } catch {
-          showToast("Couldn't load that region's catalog");
+          await dismiss("Couldn't load that catalog");
         } finally {
           sel.disabled = false;
         }
