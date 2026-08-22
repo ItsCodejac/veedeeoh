@@ -4,11 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Privacy Policy - veedeeoh.</title>
-    <meta name="description" content="veedeeoh privacy policy: what we collect, how we use it, the providers we share with, and your data rights." />
+    <meta name="description" content="veedeeoh privacy policy: exactly what data the app stores, which providers process it, how long it is kept, and how to export or delete it." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;800&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=Instrument+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet" />
     <style>
       :root {
         --bg: #06070a;
@@ -34,9 +34,7 @@
       }
       nav {
         position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
+        top: 0; left: 0; right: 0;
         z-index: 100;
         display: flex;
         align-items: center;
@@ -60,6 +58,7 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
+        gap: 8px;
         padding: 10px 22px;
         border-radius: 8px;
         font-family: var(--display);
@@ -72,11 +71,7 @@
         transition: all 0.2s ease;
       }
       .btn:hover { background: var(--accent-hover); transform: translateY(-1px); }
-      .content-wrapper {
-        max-width: 860px;
-        margin: 140px auto 100px;
-        padding: 0 24px;
-      }
+      .content-wrapper { max-width: 860px; margin: 140px auto 100px; padding: 0 24px; }
       h1 {
         font-family: var(--display);
         font-size: 42px;
@@ -84,25 +79,26 @@
         letter-spacing: -1px;
         margin-bottom: 12px;
       }
-      .last-updated {
-        font-size: 14px;
-        color: var(--dim);
-        margin-bottom: 40px;
-      }
+      .last-updated { font-size: 14px; color: var(--dim); margin-bottom: 40px; }
       h2 {
         font-family: var(--display);
         font-size: 24px;
         font-weight: 700;
         color: var(--accent);
-        margin-top: 36px;
+        margin-top: 44px;
         margin-bottom: 16px;
       }
-      p, li {
-        color: #c4d0e0;
-        font-size: 16px;
-        margin-bottom: 16px;
+      h3 {
+        font-family: var(--display);
+        font-size: 17px;
+        font-weight: 700;
+        color: #fff;
+        margin-top: 28px;
+        margin-bottom: 10px;
       }
+      p, li { color: #c4d0e0; font-size: 16px; margin-bottom: 16px; }
       ul { padding-left: 24px; }
+      a { color: var(--accent); }
       .card {
         background: var(--card-bg);
         border: 1px solid var(--border);
@@ -110,6 +106,68 @@
         padding: 28px;
         margin: 28px 0;
       }
+      .card h2 { margin-top: 0; }
+      .summary-list { list-style: none; padding-left: 0; margin: 0; }
+      .summary-list li {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        margin-bottom: 14px;
+      }
+      .summary-list li:last-child { margin-bottom: 0; }
+      .summary-list svg { flex: 0 0 auto; margin-top: 4px; color: var(--accent); }
+      .table-wrap { overflow-x: auto; margin: 20px 0 28px; }
+      table { border-collapse: collapse; width: 100%; min-width: 620px; font-size: 15px; }
+      th, td {
+        text-align: left;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--border);
+        vertical-align: top;
+        color: #c4d0e0;
+      }
+      th {
+        font-family: var(--display);
+        font-weight: 700;
+        color: #fff;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      td code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 13px;
+        color: var(--accent);
+      }
+      .notice {
+        border: 1px solid rgba(197, 240, 78, 0.3);
+        background: rgba(197, 240, 78, 0.06);
+        border-radius: 12px;
+        padding: 18px 22px;
+        margin: 24px 0;
+      }
+      .notice p:last-child { margin-bottom: 0; }
+      .review {
+        display: inline-block;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 13px;
+        color: #ffd166;
+        background: rgba(255, 209, 102, 0.1);
+        border: 1px dashed rgba(255, 209, 102, 0.4);
+        border-radius: 6px;
+        padding: 1px 7px;
+      }
+
+      /* INTERNAL REVIEW NOTES ARE NOT PUBLIC COPY.
+         These were being rendered to every visitor: a Terms page telling the
+         world which of its own clauses counsel has not signed off, including
+         the open question about provider terms of service. Hidden by default
+         and kept in the source, so the annotated document stays one file
+         rather than drifting from the published one. Append ?review=1 to see
+         them; docs/LEGAL-REVIEW.md is the copy for counsel. */
+      .review, .review-note { display: none; }
+      html.show-review .review { display: inline-block; }
+      html.show-review .review-note { display: block; }
+
       footer {
         border-top: 1px solid var(--border);
         padding: 40px 6%;
@@ -119,6 +177,10 @@
       }
       footer a { color: var(--dim); text-decoration: none; }
       footer a:hover { color: #fff; }
+      @media (max-width: 640px) {
+        h1 { font-size: 32px; }
+        .content-wrapper { margin-top: 110px; }
+      }
     </style>
   </head>
   <body>
@@ -129,64 +191,196 @@
 
     <div class="content-wrapper">
       <h1>Privacy Policy</h1>
-      <div class="last-updated">Last Updated: July 2026</div>
+      <div class="last-updated">Last updated: 22 August 2026</div>
 
       <div class="card">
-        <p>This Privacy Policy explains what information <strong>veedeeoh.</strong> ("veedeeoh," "we," "us") collects when you use the veedeeoh cloud service, how we use it, who we share it with, and the choices and rights you have. By creating an account you agree to this policy.</p>
+        <h2>The short version</h2>
+        <ul class="summary-list">
+          <li>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <span>We store your email address, the profiles you create for your household, what you have watched and how far into it you got, your favourites, and your subscription status.</span>
+          </li>
+          <li>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <span>We never see or store your card details. Stripe handles payment and we keep only a customer reference and your plan status.</span>
+          </li>
+          <li>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <span>We do not host the video. It streams from Pluto TV, Tubi and the Internet Archive straight to your browser, so those providers see your device and network the same way visiting their own sites would.</span>
+          </li>
+          <li>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <span>We do not sell your personal information, run advertising trackers, or use third-party analytics.</span>
+          </li>
+          <li>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <span>You can download everything on your account as a JSON file, and you can delete your account permanently, both from Settings, without emailing anyone.</span>
+          </li>
+        </ul>
       </div>
 
-      <h2>1. Information We Collect</h2>
+      <p>This policy explains what <strong>veedeeoh.</strong> ("veedeeoh", "we", "us") stores when you use the veedeeoh cloud service at veedeeoh.com, why, who processes it on our behalf, and what you can do about it. It covers the hosted cloud service only. If you self-host veedeeoh from the open-source repository, your installation talks to no veedeeoh servers and this policy does not apply to it.</p>
+
+      <p>The data controller for the personal data described in this policy is <strong>veedeeoh</strong>, the operator of this service, referred to throughout as "veedeeoh", "we" or "us".</p>
+
+      <div class="notice review-note">
+        <p><span class="review">[REVIEW: legal entity]</span> The data controller trades as veedeeoh. Still outstanding, and required by several privacy laws regardless of trading name: a postal address, the controller's country of establishment, and the legal form once the operator incorporates.</p>
+      </div>
+
+      <h2>1. What we store, table by table</h2>
+      <p>This section lists the actual records the service keeps, rather than a general description. Every table below lives in our Supabase Postgres database unless stated otherwise.</p>
+
+      <h3>Your account and sign-in</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Record</th><th>What is in it</th></tr></thead>
+          <tbody>
+            <tr><td><code>auth.users</code><br />(managed by Supabase)</td><td>Your email address, a salted hash of your password if you set one (we never receive the password itself), your Google account identifier if you sign in with Google, and any passkeys you enrol, stored as a public key credential with the nickname you gave it. Also your email confirmation state and active sessions.</td></tr>
+            <tr><td><code>profiles</code></td><td>One row per account: your email, plan tier and expiry, seat count, Stripe customer and subscription references, watch party credit balances and lifetime counters, and a marker recording which trial reminder email you were last sent.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Your household</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Record</th><th>What is in it</th></tr></thead>
+          <tbody>
+            <tr><td><code>household_profiles</code></td><td>Each "who is watching" profile: its name, avatar colour or avatar image URL, whether it is a kids profile, the set of content ratings it is allowed to see, and, if you set a parental PIN, a salted SHA-256 hash of that PIN. The PIN itself is never stored or transmitted in the clear.</td></tr>
+            <tr><td><code>household_members</code>, <code>household_invites</code></td><td>Who else is on your account, and the email address and token for invitations you have sent that have not yet been accepted.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>What you watch</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Record</th><th>What is in it</th></tr></thead>
+          <tbody>
+            <tr><td><code>watch_progress</code></td><td>Per profile: the title identifier, its name, your playback position in seconds, the runtime, and whether you finished it. This is what powers Continue Watching across your devices.</td></tr>
+            <tr><td><code>favorites</code></td><td>Per profile: the titles you added to My List, with their names and poster URLs.</td></tr>
+            <tr><td><code>collections</code>, <code>collection_items</code></td><td>Lists you build yourself, plus the platform-curated lists everyone sees. Your own lists are visible only to your household.</td></tr>
+            <tr><td><code>profile_exclusions</code></td><td>Titles you have hidden from a particular profile.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Watch parties</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Record</th><th>What is in it</th></tr></thead>
+          <tbody>
+            <tr><td><code>parties</code>, <code>party_joins</code></td><td>The parties you host or join: the join code, what was being watched, the seat limit, when it started and ended, and which accounts joined and when.</td></tr>
+            <tr><td>Sync service<br />(Cloudflare Durable Object)</td><td>While a party is live, a small state blob is relayed between participants: the title identifier, the stream index, the playback position in seconds, whether it is paused, and a timestamp. Each connected participant is tagged with their account identifier and the display name they are joining under. There is no chat, no voice, no video and no media of any kind passing through this service. Party state is discarded when the party ends.</td></tr>
+            <tr><td><code>party_credit_ledger</code>, <code>free_month_grants</code></td><td>Every credit granted, purchased or spent, and any free month a milestone earned you.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Referrals</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Record</th><th>What is in it</th></tr></thead>
+          <tbody>
+            <tr><td><code>referral_codes</code>, <code>referrals</code></td><td>Your referral code, and, if you arrived through someone else's code, a permanent record of who referred you, through which route (a link, a watch party, a household invite or a partner), and the commission rate agreed at that moment.</td></tr>
+            <tr><td><code>referral_earnings</code></td><td>For each payment made by someone you referred: the Stripe invoice reference, the gross amount, the rate, the commission owed, and whether it has been paid out.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Support and problem reports</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Record</th><th>What is in it</th></tr></thead>
+          <tbody>
+            <tr><td><code>feedback</code></td><td>When you use "Report a problem": the description you write, your account identifier and email, which profile was active and whether it was a kids profile, the page URL and view you were on, the app version, your browser user agent string, your window size, and a short tail of recent browser console messages. The console tail is filtered in your browser before it is sent, to strip anything that looks like an access token or API key, and each line is truncated. It can still contain incidental technical detail, so treat a report the way you would treat sending a screenshot.</td></tr>
+            <tr><td><code>beta_invites</code>, <code>waitlist</code></td><td>Email addresses submitted for the waitlist or issued a beta invite, and what the invite granted.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Stored in your browser, not on our servers</h3>
+      <p>The app keeps working state in your browser's local storage: your signed-in session and access token, your Supabase session, which profile is active, a cached copy of your household profiles, your region, subtitle and quality preferences, and small flags such as whether you dismissed the install prompt or acknowledged a ratings notice. Your session is also written to a first-party cookie so that a reload keeps you signed in. None of these are advertising cookies and none of them are read by anyone but veedeeoh.</p>
+
+      <h3>Technical information we necessarily see</h3>
+      <p>Our hosting providers process the ordinary technical information any web request carries: your IP address, the approximate country it maps to, and your browser type. We use the country to decide which regional catalogue to show you. We do not keep our own server access logs beyond what Vercel and Cloudflare retain as part of running the platform. <span class="review">[REVIEW: log retention] The exact retention period our hosting providers apply to request logs should be confirmed and stated.</span></p>
+
+      <h2>2. Why we process it</h2>
       <ul>
-        <li><strong>Account information.</strong> When you sign up (with Google, or with an email and password), we receive your email address, and for Google your name and profile picture. If you use a password, it is stored only as a salted hash by our authentication provider; we never see it.</li>
-        <li><strong>Household &amp; profiles.</strong> Profile names, avatars, and parental-control settings (kids designation, maturity limit, and PIN) that you create.</li>
-        <li><strong>Usage data.</strong> Your "My List," watch history, and playback progress, stored per profile so your experience syncs across devices.</li>
-        <li><strong>Billing data.</strong> Subscriptions are processed by Stripe. We store your subscription status, plan, and a Stripe customer identifier. <strong>We do not store your card number or full payment details.</strong> Those are handled directly by Stripe.</li>
-        <li><strong>Technical data.</strong> IP address, approximate region (used to show which content is available to you), device and browser type, and app preferences kept in your browser's local storage.</li>
+        <li>To run the service: signing you in, syncing your profiles, My List and Continue Watching across devices, and keeping watch parties in sync.</li>
+        <li>To operate parental controls, including kids profiles and per-profile rating limits.</li>
+        <li>To take payment, manage your plan and seats, apply credits and referral commissions, and prevent duplicate or fraudulent billing.</li>
+        <li>To send you service email you would expect: trial reminders, billing notices, invitations you asked us to send, and replies about a problem you reported.</li>
+        <li>To fix bugs you report, using the technical context attached to your report.</li>
       </ul>
+      <p>We do not sell personal information, we do not share it for cross-context behavioural advertising, and there is no advertising SDK, analytics script or session recorder in the app.</p>
+      <div class="notice review-note">
+        <p><span class="review">[REVIEW: lawful basis]</span> If this service is offered to people in the UK or EU, each purpose above needs a stated GDPR lawful basis (contract, legitimate interests, consent or legal obligation), and legitimate interests need a documented balancing test. That mapping is a legal judgement and has deliberately not been guessed at here.</p>
+      </div>
 
-      <h2>2. How We Use Your Information</h2>
+      <h2>3. Who processes data on our behalf</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Provider</th><th>What they handle</th></tr></thead>
+          <tbody>
+            <tr><td>Supabase</td><td>Authentication and the Postgres database holding every table listed above.</td></tr>
+            <tr><td>Stripe</td><td>Payment, subscriptions, credit top-ups and invoices. Stripe collects and holds your card details directly. We never receive them.</td></tr>
+            <tr><td>Vercel</td><td>Hosting for the web app and its server endpoints.</td></tr>
+            <tr><td>Cloudflare</td><td>The watch party sync service, and a relay for stream manifests that some providers do not allow a browser to fetch directly.</td></tr>
+            <tr><td>Resend</td><td>Delivery of transactional email. Resend sees your email address and the message content.</td></tr>
+            <tr><td>Google</td><td>Only if you choose to sign in with Google, in which case Google confirms your identity to us.</td></tr>
+            <tr><td>Google Fonts</td><td>Our pages load web fonts from Google's font service, which means your browser makes a request to Google when a veedeeoh page loads.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="review-note"><span class="review">[REVIEW: transfers and DPAs] Our database is hosted in the United States. If the service is offered in the UK or EU, the international transfer mechanism (Standard Contractual Clauses or an adequacy route) needs to be identified for each provider above, data processing agreements need to be in place and named, and the Google Fonts request in particular has been the subject of adverse EU rulings and may need to be self-hosted instead.</span></p>
+
+      <h2>4. Third-party content providers</h2>
+      <p>veedeeoh is an interface over free, ad-supported and public-domain catalogues. When you press play, your browser fetches the video from Pluto TV, Tubi or the Internet Archive. Those requests come from your device and network, so those providers can see your IP address, device type and what you played, exactly as they would if you used their own apps. Their handling of that information is governed by their own privacy policies, not this one. We do not pass them your veedeeoh account, your email address or your profile names.</p>
+
+      <h2>5. How long we keep it</h2>
+      <p>Account data, profiles, watch history, favourites and lists are kept for as long as your account exists. Deleting your account removes them, as described below. Watch party sync state is discarded when the party ends, although the record that a party happened stays in your account until the account is deleted. Billing records are retained by Stripe under its own retention rules and we may need to keep invoice and commission records for tax and accounting purposes after your account is gone.</p>
+      <p class="review-note"><span class="review">[REVIEW: retention periods] Specific retention periods need to be set and stated for problem reports, waitlist entries, invoices and referral earnings records, along with the tax retention period required in the operating jurisdiction. This policy currently says "as long as your account exists" because that is what the code does, not because it is the right answer.</span></p>
+
+      <h2>6. Your controls</h2>
       <ul>
-        <li>To provide and sync the service (profiles, My List, Continue Watching) across your devices.</li>
-        <li>To operate parental controls and enforce per-profile maturity limits.</li>
-        <li>To process your subscription, seats, and billing, and to prevent fraud.</li>
-        <li>To secure accounts, debug issues, and communicate service and billing notices (e.g., trial ending, payment failures).</li>
+        <li><strong>Export.</strong> Settings, then Account, then "Download my data" produces a JSON file containing your account record, your household profiles, your watch progress, your favourites, your collections, your referrals and your watch parties. <span class="review">[REVIEW: export completeness] The export does not currently include problem reports you have filed, your credit ledger, your referral earnings, hidden-title exclusions, collection contents or party join records. Whether that is adequate for a data portability request is a legal question.</span></li>
+        <li><strong>Delete.</strong> Settings, then Account, then the delete option. You must retype your email address to confirm. Deletion cancels any active subscription, then removes your login and every record that hangs off it, including profiles, watch history, favourites, parties and referrals, followed by your account row. It cannot be undone.</li>
+        <li><strong>Correct.</strong> Profile names, avatars, ratings limits and PINs are all editable in Settings.</li>
+        <li><strong>Sign out everywhere.</strong> Available in Settings, which ends every active session including the current one.</li>
       </ul>
-      <p>We do not sell your personal information, and we do not use it for cross-site advertising.</p>
-
-      <h2>3. Service Providers We Share Data With</h2>
-      <p>We share the minimum necessary data with providers who help us run veedeeoh:</p>
-      <ul>
-        <li><strong>Supabase</strong>: authentication and database (your account, profiles, and usage data).</li>
-        <li><strong>Stripe</strong>: payment processing and subscription management.</li>
-        <li><strong>Vercel</strong>: application hosting and content delivery.</li>
-        <li><strong>Google</strong>: only if you choose "Sign in with Google."</li>
-      </ul>
-      <p>veedeeoh aggregates links to publicly available, free and ad-supported content from third-party sources. Video plays directly between your device and those third parties' networks; their handling of your device data is governed by their own privacy policies.</p>
-
-      <h2>4. Cookies &amp; Local Storage</h2>
-      <p>We use cookies and browser local storage to keep you signed in and to remember essential preferences (such as active profile, volume, and playback position). These are required for the service to function; we do not use third-party advertising or cross-site tracking cookies.</p>
-
-      <h2>5. Data Retention</h2>
-      <p>We keep your account and usage data for as long as your account is active. When you delete your account, we delete your personal data from our systems within a reasonable period, except where we must retain limited records to comply with legal, tax, or fraud-prevention obligations.</p>
-
-      <h2>6. Your Rights &amp; Choices</h2>
-      <p>Depending on where you live (including under the GDPR and CCPA), you may have the right to access, correct, export, or delete your personal data, and to object to or restrict certain processing. You can manage your profiles and cancel your subscription from your account, and you may request data export or account deletion by contacting us at <a href="mailto:support@veedeeoh.com" style="color: var(--accent);">support@veedeeoh.com</a>. We will not discriminate against you for exercising these rights.</p>
+      <p>Depending on where you live you may also have rights to access, correct, delete, restrict or object to processing, to data portability, and to complain to a supervisory authority. Email <a href="mailto:support@veedeeoh.com">support@veedeeoh.com</a> and we will action requests we cannot serve through the buttons above. We will not treat you differently for exercising a right.</p>
+      <p class="review-note"><span class="review">[REVIEW: rights and requests] Response deadlines, an identity verification procedure, an authorised agent route, an appeals route where state law requires one, and the supervisory authority or state attorney general contact details all need to be added by counsel for the jurisdictions being served.</span></p>
 
       <h2>7. Children</h2>
-      <p>veedeeoh is intended for adults. "Kids" profiles are created and controlled by the adult account holder, who is responsible for supervising their household's use. We do not knowingly collect personal information directly from children under 13. If you believe a child has provided us personal information, contact us and we will delete it.</p>
+      <p>veedeeoh accounts are for adults. Kids profiles are created and controlled by the adult account holder, who chooses which ratings each profile may see and may set a PIN on adult profiles. A kids profile is a viewing mode inside your account, not a separate account: it has no email address, no login and no sign-up flow, and a child never provides us information directly. Unrated content is treated as adult content by default rather than being shown to a kids profile.</p>
+      <p>We do not knowingly collect personal information directly from children under 13. If you believe a child has provided us information, email us and we will remove it.</p>
+      <p class="review-note"><span class="review">[REVIEW: children's privacy law] Whether COPPA, the UK Age Appropriate Design Code, or state minor-protection laws apply to a household product with kids profiles is a legal determination. It affects what this section must say and whether verifiable parental consent is required.</span></p>
 
       <h2>8. Security</h2>
-      <p>We use standard security measures, including encryption in transit, hashed passwords, and row-level access controls, to protect your data. No method of transmission or storage is 100% secure, but we work to protect your information and to notify you of material breaches as required by law.</p>
+      <p>Data is encrypted in transit. Passwords are hashed by our authentication provider and never reach us. Parental PINs are stored only as a salted hash. Database access is governed by row-level security policies, so one account cannot read another's rows even through a crafted request, and endpoints that touch your data act with your own credentials rather than an administrative key. A parental PIN is a "keep honest kids out" control on a shared device, not cryptographic protection, and should not be relied on as one.</p>
+      <p>No system is perfectly secure. <span class="review">[REVIEW: breach notification] Statutory breach notification timelines and the commitment this policy should make need to be set by counsel.</span></p>
 
-      <h2>9. Changes to This Policy</h2>
-      <p>We may update this policy from time to time. Material changes will be reflected by the "Last Updated" date above and, where appropriate, communicated to you.</p>
+      <h2>9. Changes</h2>
+      <p>We may update this policy. The "last updated" date at the top always reflects the current version, and we will tell you about material changes through the app or by email before they take effect.</p>
 
       <h2>10. Contact</h2>
-      <p>Questions about this policy or your data? Email <a href="mailto:support@veedeeoh.com" style="color: var(--accent);">support@veedeeoh.com</a>.</p>
+      <p>Questions about this policy or your data: <a href="mailto:support@veedeeoh.com">support@veedeeoh.com</a>. <span class="review">[REVIEW: contact and DPO] A postal address is required by several privacy laws, and whether a Data Protection Officer or an EU or UK representative must be appointed needs to be assessed.</span></p>
+
+      <p style="margin-top: 48px; font-size: 14px; color: var(--dim);">See also the <a href="/terms.html">Terms of Service</a>.</p>
     </div>
 
     <footer>
-      <p>&copy; 2026 veedeeoh. All rights reserved. &middot; <a href="/privacy.html">Privacy Policy</a> &middot; <a href="/terms.html">Terms of Service</a></p>
+      <p>&copy; 2026 veedeeoh. All rights reserved. &middot; <a href="/privacy.html">Privacy Policy</a> &middot; <a href="/terms.html">Terms of Service</a> &middot; <a href="/landing.html">Home</a></p>
     </footer>
+  
+    <script>
+      // Reveals the annotations for whoever is working on this document. A
+      // query flag rather than a build flag, so the published page and the
+      // annotated one can never be different documents.
+      if (location.search.indexOf('review=1') !== -1) {
+        document.documentElement.classList.add('show-review');
+      }
+    </script>
   </body>
 </html>

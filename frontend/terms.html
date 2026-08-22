@@ -3,12 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Terms of Service & Disclaimer - veedeeoh.</title>
-    <meta name="description" content="veedeeoh terms of service: subscriptions, acceptable use, third-party content, and your rights." />
+    <title>Terms of Service - veedeeoh.</title>
+    <meta name="description" content="veedeeoh terms of service: what the service is, what a subscription costs, how watch party credits and referrals work, and the rules for using it." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;800&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=Instrument+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet" />
     <style>
       :root {
         --bg: #06070a;
@@ -34,9 +34,7 @@
       }
       nav {
         position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
+        top: 0; left: 0; right: 0;
         z-index: 100;
         display: flex;
         align-items: center;
@@ -60,6 +58,7 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
+        gap: 8px;
         padding: 10px 22px;
         border-radius: 8px;
         font-family: var(--display);
@@ -72,11 +71,7 @@
         transition: all 0.2s ease;
       }
       .btn:hover { background: var(--accent-hover); transform: translateY(-1px); }
-      .content-wrapper {
-        max-width: 860px;
-        margin: 140px auto 100px;
-        padding: 0 24px;
-      }
+      .content-wrapper { max-width: 860px; margin: 140px auto 100px; padding: 0 24px; }
       h1 {
         font-family: var(--display);
         font-size: 42px;
@@ -84,25 +79,26 @@
         letter-spacing: -1px;
         margin-bottom: 12px;
       }
-      .last-updated {
-        font-size: 14px;
-        color: var(--dim);
-        margin-bottom: 40px;
-      }
+      .last-updated { font-size: 14px; color: var(--dim); margin-bottom: 40px; }
       h2 {
         font-family: var(--display);
         font-size: 24px;
         font-weight: 700;
         color: var(--accent);
-        margin-top: 36px;
+        margin-top: 44px;
         margin-bottom: 16px;
       }
-      p, li {
-        color: #c4d0e0;
-        font-size: 16px;
-        margin-bottom: 16px;
+      h3 {
+        font-family: var(--display);
+        font-size: 17px;
+        font-weight: 700;
+        color: #fff;
+        margin-top: 28px;
+        margin-bottom: 10px;
       }
+      p, li { color: #c4d0e0; font-size: 16px; margin-bottom: 16px; }
       ul { padding-left: 24px; }
+      a { color: var(--accent); }
       .card {
         background: var(--card-bg);
         border: 1px solid var(--border);
@@ -110,6 +106,63 @@
         padding: 28px;
         margin: 28px 0;
       }
+      .card h2 { margin-top: 0; }
+      .summary-list { list-style: none; padding-left: 0; margin: 0; }
+      .summary-list li {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        margin-bottom: 14px;
+      }
+      .summary-list li:last-child { margin-bottom: 0; }
+      .summary-list svg { flex: 0 0 auto; margin-top: 4px; color: var(--accent); }
+      .table-wrap { overflow-x: auto; margin: 20px 0 28px; }
+      table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 15px; }
+      th, td {
+        text-align: left;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--border);
+        vertical-align: top;
+        color: #c4d0e0;
+      }
+      th {
+        font-family: var(--display);
+        font-weight: 700;
+        color: #fff;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .notice {
+        border: 1px solid rgba(197, 240, 78, 0.3);
+        background: rgba(197, 240, 78, 0.06);
+        border-radius: 12px;
+        padding: 18px 22px;
+        margin: 24px 0;
+      }
+      .notice p:last-child { margin-bottom: 0; }
+      .review {
+        display: inline-block;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 13px;
+        color: #ffd166;
+        background: rgba(255, 209, 102, 0.1);
+        border: 1px dashed rgba(255, 209, 102, 0.4);
+        border-radius: 6px;
+        padding: 1px 7px;
+      }
+
+      /* INTERNAL REVIEW NOTES ARE NOT PUBLIC COPY.
+         These were being rendered to every visitor: a Terms page telling the
+         world which of its own clauses counsel has not signed off, including
+         the open question about provider terms of service. Hidden by default
+         and kept in the source, so the annotated document stays one file
+         rather than drifting from the published one. Append ?review=1 to see
+         them; docs/LEGAL-REVIEW.md is the copy for counsel. */
+      .review, .review-note { display: none; }
+      html.show-review .review { display: inline-block; }
+      html.show-review .review-note { display: block; }
+
       footer {
         border-top: 1px solid var(--border);
         padding: 40px 6%;
@@ -119,6 +172,10 @@
       }
       footer a { color: var(--dim); text-decoration: none; }
       footer a:hover { color: #fff; }
+      @media (max-width: 640px) {
+        h1 { font-size: 32px; }
+        .content-wrapper { margin-top: 110px; }
+      }
     </style>
   </head>
   <body>
@@ -129,51 +186,155 @@
 
     <div class="content-wrapper">
       <h1>Terms of Service</h1>
-      <div class="last-updated">Last Updated: July 2026</div>
+      <div class="last-updated">Last updated: 22 August 2026</div>
 
       <div class="card">
-        <p>These Terms of Service ("Terms") govern your use of <strong>veedeeoh.</strong> ("veedeeoh," "we," "us"). By creating an account or using the service you agree to these Terms. If you do not agree, do not use veedeeoh.</p>
+        <h2>The short version</h2>
+        <ul class="summary-list">
+          <li>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <span>veedeeoh is an interface over free, ad-supported and public-domain catalogues from Pluto TV, Tubi and the Internet Archive. We do not own, host or licence that content, and we cannot promise any particular title stays available.</span>
+          </li>
+          <li>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <span>Cloud access is 4 US dollars a month and includes three seats. Extra seats are 2 dollars a month each. It renews automatically until you cancel.</span>
+          </li>
+          <li>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <span>Hosting a watch party spends credits. Subscribers get an allowance each month and can top up for 1 dollar. Credits are not money and are not refundable.</span>
+          </li>
+          <li>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <span>One account is for one household. Do not resell it or share it beyond the seats you pay for.</span>
+          </li>
+          <li>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <span>You can cancel and delete your account yourself at any time, from Settings.</span>
+          </li>
+        </ul>
       </div>
 
-      <h2>1. What veedeeoh Is</h2>
-      <p>veedeeoh is a unified interface that aggregates links to publicly available, free and ad-supported streaming content and public-domain archives from third-party providers. We do not host, upload, or re-transmit that content; it plays directly from the providers' own networks. Content selection and availability are set by those providers and may change or become unavailable at any time.</p>
+      <p>These Terms govern your use of the veedeeoh cloud service at veedeeoh.com. By ticking the agreement box at sign-up, or by continuing to use the service, you accept them. If you do not accept them, do not use veedeeoh. Self-hosting veedeeoh from the open-source repository is covered by that project's licence, not by these Terms.</p>
 
-      <h2>2. Accounts &amp; Households</h2>
+      <p>These Terms are between you and <strong>veedeeoh</strong>, the operator of this
+      service, referred to throughout as "veedeeoh", "we" or "us".</p>
+
+      <div class="notice review-note">
+        <p><span class="review">[REVIEW: legal entity]</span> The operator trades as veedeeoh. Counsel needs to confirm that the trading name alone is sufficient to identify the counterparty in each jurisdiction served, whether a trading-name registration is required where the operator is established, and to add the legal form and registered address once the operator incorporates. A postal address for legal notices is still outstanding and is required regardless.</p>
+      </div>
+
+      <h2>1. What veedeeoh is, and what it is not</h2>
+      <p>veedeeoh is a single interface over catalogues that are already free to watch. When you press play, the video streams from the provider that holds it, directly to your browser. We do not host it, store it, transcode it, re-encode it or re-transmit it, and we do not remove or replace the advertising those providers insert. A small number of playlist files pass through a relay of ours purely because the provider does not send the browser headers that would let it fetch them directly.</p>
+      <p>We do not licence any of the content and we do not choose what is in those catalogues. Titles appear, disappear, and change region by region entirely at the providers' discretion. Nothing in these Terms is a promise that a particular title, source or stream will be there tomorrow.</p>
+      <div class="notice review-note">
+        <p><span class="review">[REVIEW: provider terms of service]</span> The service reaches Pluto TV and Tubi through their internal APIs rather than a published partner interface, and identifies itself with browser-style headers when doing so. Whether that is consistent with those providers' terms of service, and what the exposure is if it is not, is the single most consequential legal question about this product and needs a specific answer before launch. It is described honestly in the technical notes accompanying this document.</p>
+      </div>
+
+      <h2>2. Eligibility and your account</h2>
       <ul>
-        <li>You must be at least 18 to create an account. You are responsible for the activity under your account and for keeping your login secure.</li>
-        <li>A subscription covers one household. You may invite members up to your plan's seat limit; you are responsible for those you invite.</li>
-        <li>You agree to provide accurate information and not to share access beyond your household or your purchased seats.</li>
+        <li>You must be at least 18 to create an account. <span class="review">[REVIEW: age of majority] This age needs to match the age of majority and the contracting age in every jurisdiction being served.</span></li>
+        <li>You are responsible for everything done through your account, and for keeping your password or passkey secure. Tell us promptly if you think someone else has access.</li>
+        <li>Give us an email address that reaches you. Trial reminders, billing failures and security notices go there.</li>
+        <li>We may suspend or close an account that breaches these Terms, or where we are required to.</li>
       </ul>
 
-      <h2>3. Subscriptions, Billing &amp; Cancellation</h2>
+      <h2>3. Households, profiles and seats</h2>
+      <p>A subscription covers one household. Within it you can create viewing profiles, invite household members up to your seat limit, and set what each profile is allowed to watch.</p>
       <ul>
-        <li>Paid plans start at <strong>$4/month for 3 profile seats</strong>, with additional seats at <strong>$2/month each</strong>. Payment is processed by Stripe.</li>
-        <li>Subscriptions <strong>renew automatically</strong> each billing period until cancelled. You can cancel anytime from your account; access continues until the end of the current paid period.</li>
-        <li>Any free trial converts to a paid subscription unless cancelled before it ends.</li>
-        <li>Except where required by law, payments are non-refundable. We may change pricing with advance notice; changes apply to the next billing period.</li>
+        <li>Profiles are viewing modes, not accounts. Household members you invite get their own login and count against your seats.</li>
+        <li>Kids profiles restrict what can be played, using the rating information the content providers supply. Content with no rating is treated as adult and withheld from kids profiles by default.</li>
+        <li>A parental PIN keeps a profile switch behind a prompt. It is a household convenience, not a security control, and it will not stop a determined or technically capable child.</li>
+        <li>Rating information comes from third parties and can be missing, wrong or inconsistent between the systems it comes from. You remain responsible for supervising what your household watches. We do not warrant that any filter is complete or accurate.</li>
+        <li>You are responsible for the people you invite, and for not sharing access beyond your household or beyond the seats you have paid for.</li>
       </ul>
 
-      <h2>4. Acceptable Use</h2>
-      <p>You agree not to: resell or redistribute the service; scrape, copy, or download content except as the interface allows; circumvent security, access controls, or seat limits; or use veedeeoh for any unlawful purpose. We may suspend or terminate accounts that violate these Terms.</p>
+      <h2>4. Subscriptions, billing and cancellation</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Item</th><th>Terms</th></tr></thead>
+          <tbody>
+            <tr><td>Cloud subscription</td><td>4 US dollars per month, including 3 seats. Each additional seat is 2 US dollars per month, charged on the same subscription.</td></tr>
+            <tr><td>Free trial</td><td>New accounts start with a 7-day free trial. Unless you cancel before it ends, it becomes a paid subscription automatically.</td></tr>
+            <tr><td>Renewal</td><td>Monthly, automatically, until cancelled.</td></tr>
+            <tr><td>Payment</td><td>Handled by Stripe. Card details go to Stripe, never to us.</td></tr>
+            <tr><td>Failed payment</td><td>Stripe retries. Access continues for a short grace period while it does; if the payment still fails, access ends.</td></tr>
+            <tr><td>Cancelling</td><td>From Settings, at any time. Access continues to the end of the period you have already paid for.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Except where the law says otherwise, payments already made are not refundable, including for a period you did not use. We may change prices with advance notice, and a change applies from your next billing period.</p>
+      <div class="notice review-note">
+        <p><span class="review">[REVIEW: automatic renewal and refunds]</span> Automatic renewal disclosure rules (for example California's Automatic Renewal Law and comparable state and EU rules) prescribe specific wording, placement, consent capture and a cancellation mechanism. The EU and UK also give consumers a statutory withdrawal right that a blanket "no refunds" clause cannot override. Both need counsel's wording. Also confirm whether sales tax or VAT applies and whether Stripe Tax should be collecting it.</p>
+      </div>
 
-      <h2>5. Third-Party Content &amp; Copyright</h2>
-      <p>All titles, artwork, metadata, trademarks, and video streams accessed through veedeeoh belong to their respective owners. veedeeoh claims no ownership of third-party content. If you believe content accessible through veedeeoh infringes your rights, contact us at <a href="mailto:support@veedeeoh.com" style="color: var(--accent);">support@veedeeoh.com</a> with the details required for a copyright notice, and we will respond appropriately, including removing links where warranted.</p>
+      <h2>5. Watch party credits</h2>
+      <p>Hosting a watch party spends credits. One credit is ten minutes of hosting time, measured on the clock and unaffected by how many people are watching. Subscribers receive a monthly allowance which rolls over up to a ceiling; anything above that ceiling is lost rather than banked. You can buy a top-up of 24 credits for 1 US dollar as a one-off payment.</p>
+      <ul>
+        <li>Credits are a feature of the service, not currency, not stored value and not property. They have no cash value, cannot be transferred, sold or exchanged, and are not redeemable for money.</li>
+        <li>Unspent credits, including purchased ones, are forfeited when your account is closed or deleted.</li>
+        <li>Joining a party costs nothing. Only the host spends credits.</li>
+        <li>Hosting requires an active subscription.</li>
+      </ul>
+      <div class="notice review-note">
+        <p><span class="review">[REVIEW: credits as stored value]</span> Prepaid credits bought with real money can fall under gift card, stored value or unclaimed property rules in some US states, which can restrict expiry and forfeiture. The forfeiture-on-closure and rollover-ceiling rules above need to be checked against those.</p>
+      </div>
 
-      <h2>6. Disclaimers</h2>
-      <p>veedeeoh is provided "as is" and "as available," without warranties of any kind. We do not guarantee that any particular title, source, or stream will be available, uninterrupted, or error-free, as this depends on third-party providers outside our control.</p>
+      <h2>6. Referrals</h2>
+      <p>You can invite people using your referral code. If someone signs up through it, you may earn a share of what they pay, at the rate recorded when the referral was made, for the period recorded at the same time. Attribution is first touch and permanent: the first referrer on an account is the only one it ever has.</p>
+      <ul>
+        <li>Earnings accrue only on payments that actually clear, and are reversed if a payment is refunded or charged back.</li>
+        <li>Self-referral, referring accounts you control, and signing people up without their knowledge are not permitted and forfeit the earnings involved.</li>
+        <li>We may change rates for future referrals, close the programme, or withhold earnings we believe were obtained in breach of these Terms.</li>
+      </ul>
+      <div class="notice review-note">
+        <p><span class="review">[REVIEW: referral payouts]</span> Payouts are currently made manually rather than through an automated system. Counsel needs to decide how earnings are paid, the minimum threshold, what happens to unpaid balances when an account closes, whether tax reporting obligations (for example US Form 1099) are triggered, and whether the programme needs separate affiliate terms. Advertising rules also require referrers to disclose the relationship when they promote the service.</p>
+      </div>
 
-      <h2>7. Limitation of Liability</h2>
-      <p>To the maximum extent permitted by law, veedeeoh and its operators will not be liable for indirect, incidental, or consequential damages, or for any loss arising from third-party content or service interruptions. Our total liability for any claim is limited to the amount you paid us in the twelve months before the claim.</p>
+      <h2>7. Acceptable use</h2>
+      <p>Do not: resell, sublicence or commercially redistribute access to the service; share your account beyond your household or your paid seats; download, record, rip or redistribute content reached through the app, except as the interface itself offers; scrape or bulk-extract the catalogue; work around security, access controls, rating limits, seat limits or credit limits; attack, overload or probe the service; or use veedeeoh for anything unlawful.</p>
+      <p>Watch parties are for people you know. Do not use a party to broadcast content publicly or commercially, and do not use the service to harass anyone.</p>
 
-      <h2>8. Termination</h2>
-      <p>You may stop using veedeeoh and delete your account at any time. We may suspend or terminate access for violations of these Terms or where required by law.</p>
+      <h2>8. Content ownership and copyright</h2>
+      <p>Titles, artwork, metadata, trademarks and streams reached through veedeeoh belong to their respective owners. veedeeoh claims no ownership of any of it. The veedeeoh name, wordmark and interface are ours.</p>
+      <p>If you believe something reachable through veedeeoh infringes your rights, write to <a href="mailto:support@veedeeoh.com">support@veedeeoh.com</a> with enough detail to identify the work and the material, and we will act on it, including removing the link where warranted.</p>
+      <div class="notice review-note">
+        <p><span class="review">[REVIEW: DMCA safe harbour]</span> To rely on the DMCA safe harbour, a designated agent must be registered with the US Copyright Office and named here with a full address, a compliant notice-and-takedown procedure must be published, and a repeat infringer policy must be adopted. None of that exists yet, and it is worth deciding whether the safe harbour is even the right frame given we host nothing.</p>
+      </div>
 
-      <h2>9. Changes &amp; Contact</h2>
-      <p>We may update these Terms from time to time; the "Last Updated" date reflects the latest version, and continued use constitutes acceptance. Questions? Email <a href="mailto:support@veedeeoh.com" style="color: var(--accent);">support@veedeeoh.com</a>.</p>
+      <h2>9. Availability and disclaimers</h2>
+      <p>The service is provided as it is and as available, without warranties of any kind, express or implied, to the fullest extent the law allows. We do not warrant that the service will be uninterrupted, that any title will play, that a stream will be free of errors, or that rating and parental control information will be accurate or complete. Much of that depends on third-party providers we do not control.</p>
+      <p class="review-note"><span class="review">[REVIEW: consumer warranties] Consumer protection law in the UK, EU, Australia and several US states restricts how far warranties can be disclaimed against consumers. This clause needs a carve-out counsel is happy with.</span></p>
+
+      <h2>10. Limitation of liability</h2>
+      <p>To the maximum extent the law allows, veedeeoh and the people who operate it are not liable for indirect, incidental, special, consequential or punitive damages, nor for loss of data, profits or goodwill, nor for anything arising from third-party content or from a provider changing or withdrawing it. Our total liability for any claim is limited to the amount you paid us in the twelve months before the claim arose.</p>
+      <p class="review-note"><span class="review">[REVIEW: liability carve-outs] Death, personal injury, fraud and certain statutory rights cannot be excluded in many jurisdictions. The cap and its carve-outs need counsel's wording.</span></p>
+
+      <h2>11. Termination</h2>
+      <p>You may stop using veedeeoh at any time, cancel from Settings, and delete your account from Settings. Deleting cancels your subscription and permanently removes your data, as described in the <a href="/privacy.html">Privacy Policy</a>. We may suspend or terminate access for a breach of these Terms, for non-payment, or where the law requires it. Sections that by their nature should survive termination do so, including content ownership, disclaimers, limitation of liability and the governing law clause.</p>
+
+      <h2>12. Changes to these Terms</h2>
+      <p>We may update these Terms. The "last updated" date reflects the current version, and we will give notice of material changes through the app or by email before they take effect. Continuing to use the service after a change takes effect means you accept it.</p>
+
+      <h2>13. Governing law and disputes</h2>
+      <p class="review-note"><span class="review">[REVIEW: governing law, venue and dispute resolution] Governing law, the courts or arbitral forum, whether an arbitration agreement and class action waiver are wanted, whether a small claims carve-out and an informal dispute period are included, and the mandatory consumer protections that override any of it in the UK and EU, all need to be decided by counsel. This document deliberately states none of them rather than inventing them.</span></p>
+
+      <h2>14. Contact</h2>
+      <p><a href="mailto:support@veedeeoh.com">support@veedeeoh.com</a>. <span class="review">[REVIEW: notices] A postal address for legal notices is required.</span></p>
+
+      <p style="margin-top: 48px; font-size: 14px; color: var(--dim);">See also the <a href="/privacy.html">Privacy Policy</a>.</p>
     </div>
 
     <footer>
-      <p>&copy; 2026 veedeeoh. All rights reserved. &middot; <a href="/privacy.html">Privacy Policy</a> &middot; <a href="/terms.html">Terms of Service</a></p>
+      <p>&copy; 2026 veedeeoh. All rights reserved. &middot; <a href="/privacy.html">Privacy Policy</a> &middot; <a href="/terms.html">Terms of Service</a> &middot; <a href="/landing.html">Home</a></p>
     </footer>
+  
+    <script>
+      // Reveals the annotations for whoever is working on this document. A
+      // query flag rather than a build flag, so the published page and the
+      // annotated one can never be different documents.
+      if (location.search.indexOf('review=1') !== -1) {
+        document.documentElement.classList.add('show-review');
+      }
+    </script>
   </body>
 </html>
