@@ -108,22 +108,52 @@ export function renderParty(el: HTMLElement): void {
     catch { showToast(`Party code ${c}`); }
   });
 
-  el.querySelector("#partyLeaveBtn")?.addEventListener("click", () => {
-    disconnect();
-    showToast("Left the party");
+  el.querySelector("#partyReturnBtn")?.addEventListener("click", async (e) => {
+    const c = activePartyCode();
+    if (!c) return;
+    const b = e.currentTarget as HTMLButtonElement;
+    b.disabled = true; b.textContent = "Opening…";
+    // Re-resolves the title and reopens the player. Heavier than reusing the
+    // last channel, but the last channel is gone once the player is destroyed,
+    // and these are the same paths a fresh join or resume already exercises.
+    if (recentParty()?.role === "host") await resumeHosting(c);
+    else await joinParty(c);
+    b.disabled = false;
+  });
+
+  el.querySelector("#partyLeaveBtn")?.addEventListener("click", async () => {
+    const host = recentParty()?.role === "host";
+    if (host) {
+      // A host leaving is a host ENDING it. Quietly dropping the socket would
+      // strand everyone still watching with nobody driving.
+      if (!confirm("End the party for everyone?")) return;
+      const { closeParty } = await import("./party");
+      await closeParty(activePartyCode() || "");
+      showToast("Party ended");
+    } else {
+      disconnect();
+      forgetParty();
+      showToast("Left the party");
+    }
     renderParty(el);
   });
 }
 
 function activeCard(code: string): string {
+  // Closing the player does not leave the party -- the socket stays open, which
+  // is right, but this card then showed a code and no way back to the video.
+  // The host had it worst: still connected, still driving playback nobody could
+  // see, with only "Leave party" on offer.
+  const host = recentParty()?.role === "host";
   return `
     <section class="partyCard partyActive">
-      <h2>You are in a party</h2>
+      <h2>${host ? "You are hosting" : "You are in a party"}</h2>
       <div class="partyCodeBig">${escapeHtml(code)}</div>
-      <p class="partyHint">${viewers ? `${viewers} watching` : "Waiting for people to join"}</p>
+      <p class="partyHint">${viewers ? `${viewers} watching` : host ? "Waiting for people to join" : "Connected"}</p>
       <div class="partyRow">
+        <button id="partyReturnBtn" class="partyBtn primary">Back to the party</button>
         <button id="partyCopyBtn" class="partyBtn">Copy invite link</button>
-        <button id="partyLeaveBtn" class="partyBtn danger">Leave party</button>
+        <button id="partyLeaveBtn" class="partyBtn danger">${host ? "End party" : "Leave party"}</button>
       </div>
     </section>`;
 }
