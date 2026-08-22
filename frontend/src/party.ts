@@ -11,7 +11,7 @@ import { getSupabase } from "./auth";
 import { getActiveProfile } from "./profiles";
 import { allowedRatingsFor } from "./db";
 import { showToast } from "./util";
-import { openVodPlayer, setPartyEmitter, applyPartyState, type PartyPlaybackState } from "./vodplayer";
+import { openVodPlayer, setPartyEmitter, applyPartyState, setPartyViewerMode, resyncToHost, type PartyPlaybackState } from "./vodplayer";
 
 const WORKER_URL = (import.meta.env.VITE_PARTY_WORKER_URL as string) || "";
 
@@ -178,7 +178,11 @@ export async function joinParty(joinCode: string): Promise<void> {
 
   window.addEventListener("veedeeoh:party-start", () => {
     closeLobby();
-    void openVodPlayer(asPartyChannel(item, url), party.stream_idx || 0, 0);
+    void openVodPlayer(asPartyChannel(item, url), party.stream_idx || 0, 0).then(() => {
+      // The host drives. Leaving a viewer their own transport controls only
+      // lets them desync with no way back, which is exactly what happened.
+      setPartyViewerMode(true);
+    });
   }, { once: true });
 
   await connect(joinCode, false);
@@ -210,7 +214,13 @@ async function connect(joinCode: string, isHost: boolean): Promise<void> {
     let msg: any;
     try { msg = JSON.parse(String(e.data)); } catch { return; }
     switch (msg?.type) {
-      case "state":     if (!isHost) applyPartyState(msg.state as PartyPlaybackState); break;
+      case "state":
+        if (!isHost) {
+          lastHostState = msg.state as PartyPlaybackState;
+          applyPartyState(lastHostState);
+          showResync(false);
+        }
+        break;
       case "presence":  emit({ viewers: msg.viewers }, "veedeeoh:party-presence"); break;
       case "roster":    emit({ watching: msg.watching, waiting: msg.waiting }, "veedeeoh:party-roster"); break;
       case "knock":     showToast(`${msg.name} wants to join`); break;
@@ -260,6 +270,9 @@ export function endParty(): void {
 
 export function disconnect(): void {
   stopMetering();
+  showResync(false);
+  setPartyViewerMode(false);
+  lastHostState = null;
   setPartyEmitter(null);
   try { socket?.close(); } catch {}
   socket = null;
@@ -376,4 +389,32 @@ function showJoining(code: string): () => void {
     el.classList.remove("in");
     setTimeout(() => el.remove(), 380);
   };
+}
+
+
+// ------------------------------------------------------- viewer resync ---
+
+let lastHostState: PartyPlaybackState | null = null;
+let resyncEl: HTMLElement | null = null;
+
+// A viewer whose browser refused to autoplay is stuck: the host is playing, the
+// viewer is paused, and every heartbeat that follows is applied to a player
+// that will not start. The only thing that can fix it is a real click, so ask
+// for one.
+if (typeof window !== "undefined") {
+  window.addEventListener("veedeeoh:party-blocked", () => showResync(true, "Tap to join the party"));
+}
+
+function showResync(on: boolean, label = "Out of sync — resync"): void {
+  if (!on) { resyncEl?.remove(); resyncEl = null; return; }
+  if (resyncEl) return;
+
+  resyncEl = document.createElement("button");
+  resyncEl.id = "partyResync";
+  resyncEl.textContent = label;
+  resyncEl.addEventListener("click", () => {
+    if (lastHostState) resyncToHost(lastHostState);
+    showResync(false);
+  });
+  document.body.appendChild(resyncEl);
 }

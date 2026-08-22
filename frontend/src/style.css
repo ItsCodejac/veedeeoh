@@ -4426,3 +4426,25 @@ body.party-guest { background: #06070a; }
 .prBtn.small { padding: 5px 11px; font-size: 12px; }
 .prBtn.text { background: none; border: none; color: rgba(255,255,255,.45); font-weight: 600; }
 .prBtn.text:hover { color: #ff8f8f; }
+
+/* ---- Party viewer ------------------------------------------------------
+   The host drives playback, so a viewer's transport controls could only take
+   them out of sync with no way back -- which is what happened in testing.
+   Volume, captions and fullscreen stay: those are personal, not shared. */
+.party-viewer .vds-play-button,
+.party-viewer .vds-seek-button,
+.party-viewer .vds-time-slider,
+.party-viewer .vds-slider.vds-time-slider,
+.party-viewer .vds-chapter-title { display: none !important; }
+/* Vidstack's gesture layer toggles play on tap; in a party that is the same
+   desync by another route. */
+.party-viewer media-gesture[action="toggle:paused"] { display: none !important; }
+
+#partyResync {
+  position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%);
+  z-index: 10002;
+  padding: 11px 20px; border-radius: 999px;
+  background: var(--accent); color: #06070a; border: none;
+  font-family: var(--display); font-weight: 800; font-size: 13.5px;
+  cursor: pointer; box-shadow: 0 8px 26px rgba(0,0,0,.6);
+}

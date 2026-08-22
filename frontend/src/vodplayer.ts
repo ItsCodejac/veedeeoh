@@ -309,6 +309,10 @@ class VodPlayer {
   /** Escape hatch for the party sync layer only. */
   raw(): any { return this.player; }
 
+  /** The player's own wrapper, for state classes that must not leak to the
+   *  whole document when two players briefly overlap. */
+  rootEl(): HTMLElement | null { return this.root; }
+
   private emitParty = (): void => {
     if (!partyEmit || applyingRemote || !this.player) return;
     partyEmit({ positionSecs: this.player.currentTime ?? 0, paused: !!this.player.paused });
@@ -715,16 +719,85 @@ export function setPartyEmitter(fn: ((s: PartyPlaybackState) => void) | null): v
 /** Viewer side: reconcile against the host. Tolerates 2s of drift so ordinary
  *  buffering does not cause a seek storm, and suppresses the echo so applying a
  *  remote state never emits it straight back. */
+// How far a viewer may drift before anything is done about it, and how far
+// before a hard seek is the only option. Between the two, the correction is a
+// playback-rate nudge.
+const DRIFT_NUDGE_S = 0.6;
+const DRIFT_SEEK_S = 6;
+
+/** Apply the host's playback state to a viewer.
+ *
+ *  The first version hard-assigned currentTime whenever drift exceeded two
+ *  seconds. After any seek the media buffers, currentTime lags, and five
+ *  seconds later the next heartbeat measured that lag as fresh drift and seeked
+ *  again -- a correction loop that presents as stuttering and then freezing.
+ *  It also swallowed a rejected play(), so a viewer whose browser blocked
+ *  autoplay sat paused forever with nothing on screen explaining it and no way
+ *  to recover.
+ *
+ *  Now: ignore drift while the player is already seeking; nudge small drift by
+ *  varying playback rate, which is inaudible and self-correcting; hard-seek
+ *  only when genuinely far out. A rejected play() surfaces to the UI instead of
+ *  being discarded.
+ */
 export function applyPartyState(s: PartyPlaybackState): void {
   const p = current?.raw();
   if (!p) return;
   applyingRemote = true;
   try {
-    if (Math.abs((p.currentTime ?? 0) - s.positionSecs) > 2) p.currentTime = s.positionSecs;
-    if (s.paused && !p.paused) p.pause();
-    else if (!s.paused && p.paused) void p.play()?.catch?.(() => {});
+    // A seek in flight has not landed yet, so its position means nothing.
+    // Measuring against it is what produced the loop.
+    if (!p.seeking) {
+      const drift = s.positionSecs - (p.currentTime ?? 0);
+      const mag = Math.abs(drift);
+
+      if (mag > DRIFT_SEEK_S) {
+        p.currentTime = s.positionSecs;
+        p.playbackRate = 1;
+      } else if (mag > DRIFT_NUDGE_S) {
+        // +/-5% closes a couple of seconds over the next heartbeat without a
+        // jump, and without the audible artefacts of a bigger rate change.
+        p.playbackRate = 1 + Math.max(-0.05, Math.min(0.05, drift / 20));
+      } else if (p.playbackRate !== 1) {
+        p.playbackRate = 1;
+      }
+    }
+
+    if (s.paused && !p.paused) {
+      p.pause();
+    } else if (!s.paused && p.paused) {
+      const r = p.play();
+      // Autoplay policy blocks playback that no gesture asked for. Silently
+      // ignoring the rejection is what left a viewer stuck and confused.
+      if (r?.catch) {
+        r.catch(() => {
+          window.dispatchEvent(new CustomEvent("veedeeoh:party-blocked"));
+        });
+      }
+    }
   } catch { /* player torn down mid-apply */ }
   applyingRemote = false;
+}
+
+/** Put the player into viewer mode: the host drives, so transport controls
+ *  would only let a viewer desync themselves with no way back. Volume,
+ *  captions and fullscreen stay -- those are personal, not shared. */
+export function setPartyViewerMode(on: boolean): void {
+  const root = current?.rootEl();
+  if (root) root.classList.toggle("party-viewer", on);
+  document.body.classList.toggle("party-viewer", on);
+}
+
+/** Jump straight to the host's position and resume. The escape hatch for a
+ *  viewer who has drifted or been blocked, which previously did not exist. */
+export function resyncToHost(s: PartyPlaybackState): void {
+  const p = current?.raw();
+  if (!p) return;
+  try {
+    p.currentTime = s.positionSecs;
+    p.playbackRate = 1;
+    if (!s.paused) void p.play()?.catch?.(() => {});
+  } catch { /* torn down */ }
 }
 
 let current: VodPlayer | null = null;
