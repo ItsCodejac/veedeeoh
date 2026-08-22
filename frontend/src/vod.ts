@@ -1461,8 +1461,41 @@ export async function renderHome(): Promise<void> {
             if (cloudRow.duration_secs) {
               localItem.percentage = (cloudRow.position_secs / cloudRow.duration_secs) * 100;
             }
+            return;
           }
+
+          // No local row: this was watched on another device. Cloud rows used to
+          // be dropped here, so Continue Watching only ever showed what THIS
+          // browser had played -- the rail was device-local while pretending to
+          // be an account feature.
+          //
+          // Synthesised from the catalogue, without streams: a Pluto URL is
+          // signed and expires in 24h, so a stored one would be stale anyway.
+          // The card resolves on click, exactly like every other play path.
+          const item = allItems.find((i: VodItem) => strip(i.id) === cloudRow.content_id);
+          if (!item) return;
+          const pct = cloudRow.duration_secs
+            ? (cloudRow.position_secs / cloudRow.duration_secs) * 100 : 0;
+          if (pct >= 95) return;
+          resumeHistory.push({
+            itemId: cloudRow.content_id,
+            title: cloudRow.title || item.title,
+            poster: item.poster,
+            banner: item.banner,
+            genre: item.genre,
+            maturity: (item as any).maturity,
+            time: cloudRow.position_secs,
+            duration: cloudRow.duration_secs,
+            percentage: pct,
+            streamIdx: 0,
+            streams: null,
+            vodItem: item,
+          });
         });
+
+        // Newest first, so a title picked up on another device sorts by when it
+        // was actually watched rather than landing at the end.
+        resumeHistory.sort((a: any, b: any) => (b.time ? 1 : 0) - (a.time ? 1 : 0));
       } catch (e) {
         console.warn("[vod] getWatchHistory failed", e);
       }
@@ -1512,8 +1545,25 @@ export async function renderHome(): Promise<void> {
           <span class="showcaseTitle">${escapeHtml(item.title)}</span>
           <span class="showcaseMeta">${escapeHtml(item.episodeTitle || "Movie")}</span>
         `;
-        card.onclick = () => {
-          resumeVodPlayback(item);
+        card.onclick = async () => {
+          // Rows synced from another device carry no streams; resolve them the
+          // same way a normal play does, then open at the saved position.
+          if (item.streams?.length) { resumeVodPlayback(item); return; }
+          const v = item.vodItem;
+          if (!v) { showToast("Couldn't resume that title"); return; }
+          card.classList.add("loading");
+          try {
+            const url = v.url || (v.pluto_path ? await fetchPlutoStream(v.pluto_path) : null);
+            if (!url) { showToast("Couldn't resume that title"); return; }
+            await openVodPlayer(
+              asChannel(v, [{ url, quality: null, source: v.genre || "movie" }]),
+              0, item.time || 0,
+            );
+          } catch {
+            showToast("Couldn't resume that title");
+          } finally {
+            card.classList.remove("loading");
+          }
         };
         continueScroller.append(card);
       });

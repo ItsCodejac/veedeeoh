@@ -166,27 +166,45 @@ class VodPlayer {
       return ladder[Math.round((i * (ladder.length - 1)) / (n - 1))]!;
     };
 
-    const relabel = () => {
-      const items = Array.from(root.querySelectorAll<HTMLElement>("[role=menuitemradio]"))
-        .filter((el) => /^0p$/.test(el.textContent?.trim().split("\n")[0]?.trim() || ""));
-      // Nothing to do on a source that reports real heights.
-      if (!items.length) return;
+    let patching = false;
 
-      const zeroed = Array.from(root.querySelectorAll<HTMLElement>("[role=menuitemradio]"))
-        .filter((el) => (el.textContent || "").trim().startsWith("0p"));
-      zeroed.forEach((el, i) => {
-        for (const node of Array.from(el.querySelectorAll("*")).concat([el])) {
-          if (node.childElementCount === 0 && node.textContent?.trim() === "0p") {
-            node.textContent = rank(i, zeroed.length);
-          }
+    const relabel = () => {
+      // Our own writes retrigger the observer. Without this the first rewrite
+      // loops forever.
+      if (patching) return;
+      patching = true;
+      try {
+        // Leaf elements only, matched on their OWN text. An earlier attempt
+        // tested a whole radio row, whose textContent is "0p3.32 Mbps" -- the
+        // label and the bitrate column concatenated with no separator -- so an
+        // anchored /^0p$/ never matched and the function returned having done
+        // nothing.
+        const leaves = root.querySelectorAll<HTMLElement>("*");
+        const zeroed: HTMLElement[] = [];
+        for (const el of leaves) {
+          if (el.childElementCount) continue;
+          const t = (el.textContent || "").trim();
+          if (t === "0p") zeroed.push(el);
+          // The menu HINT is a second unguarded template in the library:
+          // `quality().height + "p"`, rendered as "Auto (0p)".
+          else if (t.endsWith("(0p)")) el.textContent = t.slice(0, -5).trim();
         }
-      });
+        zeroed.forEach((el, i) => { el.textContent = rank(i, zeroed.length); });
+      } finally {
+        patching = false;
+      }
     };
 
-    // The menu is built lazily when it is first opened, so there is nothing to
-    // rewrite until then.
-    const obs = new MutationObserver(relabel);
-    obs.observe(root, { childList: true, subtree: true });
+    // The menu is built lazily on first open, so there is nothing to rewrite
+    // until then. Coalesced into a microtask so a burst of DOM work is handled
+    // once rather than per node.
+    let queued = false;
+    const obs = new MutationObserver(() => {
+      if (queued) return;
+      queued = true;
+      queueMicrotask(() => { queued = false; relabel(); });
+    });
+    obs.observe(root, { childList: true, subtree: true, characterData: true });
     this.ac.signal.addEventListener("abort", () => obs.disconnect());
   }
 
