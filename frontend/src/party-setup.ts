@@ -548,34 +548,69 @@ export function showPartyEnded(opts: {
           : "The host closed it. You can keep watching on your own."}</p>
       `}
 
-      <div class="peRow">
-        <button class="prBtn primary" id="peKeep">${opts.host ? "Back to browsing" : "Keep watching this"}</button>
-        <button class="prBtn" id="peHome">Home</button>
-      </div>
+      <div class="peRow" id="peActions"></div>
 
       <div id="peUpsell"></div>
     </div>`;
   document.body.appendChild(el);
   requestAnimationFrame(() => el.classList.add("in"));
 
+  const close = () => { el.classList.remove("in"); setTimeout(() => el.remove(), 300); };
+  void renderEndedActions(el.querySelector<HTMLElement>("#peActions")!, opts, close);
   void renderEndedUpsell(el.querySelector<HTMLElement>("#peUpsell")!, opts.host);
 
-  const close = () => { el.classList.remove("in"); setTimeout(() => el.remove(), 300); };
+}
 
-  // A viewer may well want to finish the film alone, so "keep watching" leaves
-  // the player up rather than tearing it down. The host is done with it.
-  el.querySelector("#peKeep")!.addEventListener("click", async () => {
-    close();
-    if (opts.host) {
-      const { closeVodPlayer } = await import("./vodplayer");
-      closeVodPlayer();
-    }
-  });
-  el.querySelector("#peHome")!.addEventListener("click", async () => {
-    close();
+/** Two actions, chosen by who this is and what they can actually do.
+ *
+ *  Not four. An ending screen is where someone wants an obvious next step, and
+ *  a menu is the opposite of that. The pair changes instead:
+ *
+ *  A LAPSED GUEST cannot browse, so "Home" was a lie -- it walked them into a
+ *  paywall. Joining another party is the only thing they can genuinely do, so
+ *  it becomes their second action rather than a nice extra.
+ */
+async function renderEndedActions(
+  box: HTMLElement,
+  opts: { host: boolean },
+  close: () => void,
+): Promise<void> {
+  if (!box) return;
+
+  let entitled = true;
+  try {
+    const { hasActiveAccess } = await import("./db");
+    entitled = await hasActiveAccess();
+  } catch { /* fail open: a browse button that works is better than one hidden */ }
+
+  const secondary = opts.host
+    ? { id: "peAnother", label: "Start another party" }
+    : entitled
+      ? { id: "peExplore", label: "Explore veedeeoh" }
+      : { id: "peAnother", label: "Join another party" };
+
+  box.innerHTML = `
+    <button class="prBtn primary" id="peKeep">${opts.host ? "Explore veedeeoh" : "Keep watching this"}</button>
+    <button class="prBtn" id="${secondary.id}">${escapeHtml(secondary.label)}</button>`;
+
+  const shutPlayer = async () => {
     const { closeVodPlayer } = await import("./vodplayer");
     closeVodPlayer();
-    location.hash = "#home";
+  };
+
+  // A viewer may well want to finish the film alone, so this leaves the player
+  // up for them. The host is done with it.
+  box.querySelector("#peKeep")!.addEventListener("click", async () => {
+    close();
+    if (opts.host) { await shutPlayer(); location.hash = "#home"; }
+  });
+
+  box.querySelector("#peExplore")?.addEventListener("click", async () => {
+    close(); await shutPlayer(); location.hash = "#home";
+  });
+
+  box.querySelector("#peAnother")?.addEventListener("click", async () => {
+    close(); await shutPlayer(); location.hash = "#party";
   });
 }
 
