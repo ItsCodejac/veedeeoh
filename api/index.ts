@@ -4,6 +4,7 @@ import * as vod from '../backend/vod';
 import * as store from '../backend/store';
 import * as billing from '../backend/billing';
 import * as emailHelper from '../backend/email';
+import * as authEmail from '../backend/auth-email';
 
 const app = new Hono().basePath('/api');
 
@@ -552,6 +553,45 @@ app.post('/billing/webhook', async (c: Context) => {
     return c.json({ received: true });
   } catch (e: any) {
     return c.json({ error: `webhook error: ${e?.message}` }, 400);
+  }
+});
+
+// Supabase Send Email Hook.
+//
+// Supabase posts the authentication email here instead of sending it over
+// SMTP, which never once reached Resend. Everything else this product emails
+// already goes out over Resend's HTTP API without trouble, so this hands the
+// message to the path that works. With the hook enabled, email confirmation
+// can be switched back on.
+app.post('/auth/email-hook', async (c: Context) => {
+  const secret = process.env.SEND_EMAIL_HOOK_SECRET || '';
+  if (!secret) {
+    console.error('[auth-email] SEND_EMAIL_HOOK_SECRET is not set');
+    return c.json({ error: 'hook not configured' }, 500);
+  }
+
+  // RAW body: the signature covers the exact bytes Supabase sent, and
+  // re-serialising parsed JSON changes them.
+  const raw = await c.req.text();
+  const check = authEmail.verifyHook(raw, {
+    id: c.req.header('webhook-id'),
+    timestamp: c.req.header('webhook-timestamp'),
+    signature: c.req.header('webhook-signature'),
+  }, secret);
+  if (!check.ok) {
+    console.warn('[auth-email] rejected:', check.reason);
+    return c.json({ error: 'invalid signature' }, 401);
+  }
+
+  try {
+    await authEmail.sendAuthEmail(JSON.parse(raw));
+    // Supabase expects an empty 200. Anything else is treated as a failure,
+    // which is what we want when the send genuinely failed -- the user sees an
+    // error instead of a silent nothing.
+    return c.body(null, 200);
+  } catch (e: any) {
+    console.error('[auth-email] send failed:', e?.message);
+    return c.json({ error: e?.message || 'send failed' }, 500);
   }
 });
 
