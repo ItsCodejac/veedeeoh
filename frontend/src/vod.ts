@@ -1741,6 +1741,11 @@ export async function renderHome(): Promise<void> {
         const kidRailWorthy = (i: VodItem) =>
           KID_GENRES.test((i.genre || "").trim()) && i.ambient !== true;
 
+        // Sorted only by artwork, the filler came back as fourteen near-identical
+        // nursery-rhyme compilations. Demoting these is what surfaces Sesame
+        // Street and Clifford instead.
+        const COMPILATION = /songs|rhymes|nursery|lullab|compilation|non-stop|& more|top \d+/i;
+
         // On a kids profile the whole catalog is already gated, so splitting
         // would just produce one rail and one empty one.
         if (document.body.classList.contains("kids-mode")) {
