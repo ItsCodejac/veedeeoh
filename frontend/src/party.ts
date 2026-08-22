@@ -143,6 +143,9 @@ export async function createParty(opts: PartyOptions): Promise<{ joinCode: strin
   if (!res.ok) throw new Error("Couldn't start the party channel");
 
   saveHostToken(joinCode, token);
+  partyTitle = opts.title;
+  partyStartedAt = 0;
+  peakViewers = 0;
   rememberParty(joinCode, opts.title, "host");
 
   return { joinCode, link: partyLink(joinCode) };
@@ -230,7 +233,9 @@ export async function joinParty(joinCode: string): Promise<void> {
   // early arrival watched alone. The player opens on the host's start signal --
   // or immediately, if the worker reports the party already running, which is
   // what a late joiner gets.
-  rememberParty(joinCode, item.title || "a watch party", "guest");
+  partyTitle = item.title || "a watch party";
+  partyStartedAt = Date.now();
+  rememberParty(joinCode, partyTitle, "guest");
 
   const { showGuestLobby } = await import("./party-setup");
   const closeLobby = showGuestLobby(item, joinCode);
@@ -288,7 +293,10 @@ async function connect(joinCode: string, isHost: boolean): Promise<void> {
           showResync(false);
         }
         break;
-      case "presence":  emit({ viewers: msg.viewers }, "veedeeoh:party-presence"); break;
+      case "presence":
+        peakViewers = Math.max(peakViewers, msg.viewers || 0);
+        emit({ viewers: msg.viewers }, "veedeeoh:party-presence");
+        break;
       case "roster":    emit({ watching: msg.watching, waiting: msg.waiting }, "veedeeoh:party-roster"); break;
       case "knock":     showToast(`${msg.name} wants to join`); break;
       case "pending":   emit({}, "veedeeoh:party-pending"); showToast("Waiting for the host to let you in"); break;
@@ -298,11 +306,21 @@ async function connect(joinCode: string, isHost: boolean): Promise<void> {
       case "back":      if (!isHost) showHostAway(false); break;
       case "refused":   showToast("The host did not let you in"); break;
       case "removed":   showToast("The host removed you from the party"); disconnect(); break;
-      case "closed":
-        showToast(msg.reason === "idle" ? "The party timed out" : "The host ended the party");
+      case "closed": {
+        // Was a toast and nothing else, so the film kept playing and a viewer
+        // could not tell "the party ended" from "the host paused".
+        const reason = msg.reason;
         forgetParty();
         disconnect();
+        void import("./party-setup").then((m) => m.showPartyEnded({
+          host: false,
+          title: partyTitle || "the party",
+          code: joinCode,
+          watchedSecs: partyStartedAt ? (Date.now() - partyStartedAt) / 1000 : 0,
+          reason,
+        }));
         break;
+      }
       case "removed":
         // Removed by the host: do not offer to walk back in.
         forgetParty();
@@ -379,12 +397,27 @@ export function kickViewer(userId: string): void {
 
 /** Host ends the party for everyone, rather than leaving it to time out. */
 export function endParty(): void {
+  const secs = partyStartedAt ? (Date.now() - partyStartedAt) / 1000 : 0;
+  const code = currentCode || "";
+  const peak = peakViewers;
+  const title = partyTitle;
+
   try { socket?.send(JSON.stringify({ type: "end" })); } catch {}
   disconnect();
+  forgetParty();
+
+  // The host was running something; tell them how it went rather than just
+  // leaving the film playing as though nothing happened.
+  void import("./party-setup").then((m) => m.showPartyEnded({
+    host: true, title: title || "your party", code,
+    watchedSecs: secs, peakViewers: peak,
+  }));
 }
 
 export function disconnect(): void {
   stopMetering();
+  partyStartedAt = 0;
+  peakViewers = 0;
   stopPartySync();
   stopWatchingVisibility();
   showHostAway(false);
@@ -418,6 +451,11 @@ export async function hostExisting(joinCode: string): Promise<void> {
 // profiles.party_credits directly.
 
 let meterTimer: number | null = null;
+// For the host's end-of-party summary. Tracked here because the party outlives
+// any one player instance -- a host can close and reopen the video mid-party.
+let partyStartedAt = 0;
+let peakViewers = 0;
+let partyTitle = "";
 const METER_MINUTES = 10;
 
 /** True if the account may start a party at all. Checked before the first
@@ -434,6 +472,7 @@ export async function hasHostingCredit(): Promise<{ ok: boolean; exempt: boolean
 }
 
 function startMetering(joinCode: string): void {
+  partyStartedAt = partyStartedAt || Date.now();
   stopMetering();
   void charge(joinCode);                                     // the first block is due now
   meterTimer = window.setInterval(() => void charge(joinCode), METER_MINUTES * 60_000);

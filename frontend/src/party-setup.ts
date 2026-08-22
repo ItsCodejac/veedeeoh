@@ -500,3 +500,118 @@ function render(): void {
     });
   });
 }
+
+
+// -------------------------------------------------------------- ended ------
+
+/** What everyone sees when a party finishes.
+ *
+ *  Ending used to close the socket and nothing else: the film carried on
+ *  playing for the host AND for every viewer, so the only signal that the party
+ *  was over was that it silently stopped syncing. Worse for a viewer, who had
+ *  no way to tell "the party ended" from "the host paused".
+ *
+ *  The host gets a summary because they were running something and deserve to
+ *  know how it went; a viewer gets the exit and a way back to browsing.
+ */
+export function showPartyEnded(opts: {
+  host: boolean;
+  title: string;
+  code: string;
+  watchedSecs: number;
+  peakViewers?: number;
+  reason?: string;
+}): void {
+  document.getElementById("partyEnded")?.remove();
+
+  const mins = Math.max(1, Math.round(opts.watchedSecs / 60));
+  const dur = mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins} min`;
+
+  const el = document.createElement("div");
+  el.id = "partyEnded";
+  el.innerHTML = `
+    <div class="peInner">
+      <div class="peMark">veedeeoh<span class="dot">.</span><span class="sfx">party</span></div>
+      <h1 class="peTitle">${opts.host ? "Party ended" : "The party ended"}</h1>
+      <p class="peSub">${escapeHtml(opts.title)}</p>
+
+      ${opts.host ? `
+        <div class="peStats">
+          <div><b>${escapeHtml(dur)}</b><span>Watched</span></div>
+          <div><b>${opts.peakViewers ?? 0}</b><span>Most watching</span></div>
+          <div><b>${escapeHtml(opts.code)}</b><span>Party code</span></div>
+        </div>
+        <p class="peNote">Hosting used about ${Math.max(1, Math.ceil(mins / 10))} credit${Math.ceil(mins / 10) === 1 ? "" : "s"}.</p>
+      ` : `
+        <p class="peNote">${opts.reason === "idle"
+          ? "It timed out after everyone left."
+          : "The host closed it. You can keep watching on your own."}</p>
+      `}
+
+      <div class="peRow">
+        <button class="prBtn primary" id="peKeep">${opts.host ? "Back to browsing" : "Keep watching this"}</button>
+        <button class="prBtn" id="peHome">Home</button>
+      </div>
+
+      <div id="peUpsell"></div>
+    </div>`;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add("in"));
+
+  void renderEndedUpsell(el.querySelector<HTMLElement>("#peUpsell")!, opts.host);
+
+  const close = () => { el.classList.remove("in"); setTimeout(() => el.remove(), 300); };
+
+  // A viewer may well want to finish the film alone, so "keep watching" leaves
+  // the player up rather than tearing it down. The host is done with it.
+  el.querySelector("#peKeep")!.addEventListener("click", async () => {
+    close();
+    if (opts.host) {
+      const { closeVodPlayer } = await import("./vodplayer");
+      closeVodPlayer();
+    }
+  });
+  el.querySelector("#peHome")!.addEventListener("click", async () => {
+    close();
+    const { closeVodPlayer } = await import("./vodplayer");
+    closeVodPlayer();
+    location.hash = "#home";
+  });
+}
+
+
+/** Conversion prompt on the ended screen.
+ *
+ *  This is the highest-intent moment a party guest will ever have: they just
+ *  finished something they chose to watch with people they know. Deliberately
+ *  quiet though -- below the real actions, no colour competing with them, and
+ *  absent entirely for anyone already paying. A hard sell over the end of a
+ *  film someone enjoyed is how you lose the goodwill the film just earned.
+ */
+async function renderEndedUpsell(box: HTMLElement, isHost: boolean): Promise<void> {
+  if (!box) return;
+  try {
+    const { hasActiveAccess, trialDaysLeft, getAccount, startCheckout } = await import("./db");
+
+    if (await hasActiveAccess()) {
+      // On a trial, and only near the end. Someone on day one does not need
+      // reminding, and a subscriber needs nothing at all.
+      const days = await trialDaysLeft();
+      const acct = await getAccount();
+      if (days === null || days > 3 || !String(acct?.tier || "").startsWith("trial")) return;
+      box.innerHTML = `<p class="peUpsell">${days <= 1 ? "Your trial ends tomorrow" : `${days} days left in your trial`}.
+        <button class="peLink" id="peSub">Keep your profiles and lists</button></p>`;
+    } else if (!isHost) {
+      // A lapsed guest: they can follow party links forever but cannot browse.
+      // Say exactly that, because it is true and it is the actual difference.
+      box.innerHTML = `<p class="peUpsell">You can always join a party you are invited to.
+        <button class="peLink" id="peSub">Watch anything, any time &mdash; $4/mo</button></p>`;
+    } else {
+      return;
+    }
+
+    box.querySelector("#peSub")?.addEventListener("click", async () => {
+      try { await startCheckout(); } catch { showToast("Couldn't start checkout"); }
+    });
+  } catch { box.innerHTML = ""; }
+}
