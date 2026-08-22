@@ -453,9 +453,23 @@ app.post('/account/delete', async (c: Context) => {
   const { error } = await admin.auth.admin.deleteUser(user.id);
   if (error) return c.json({ error: error.message }, 500);
 
+  // profiles has NO foreign key to auth.users -- orphan rows exist in this
+  // database today, which proves it. So deleting the auth user does NOT cascade
+  // the account row, and it would have been left behind holding the email, the
+  // tier and the Stripe customer id. A deletion that leaves the personal data
+  // is not a deletion. Explicit, and after the auth delete so a failure here
+  // cannot strand a live user without a login.
+  const { error: profErr } = await admin.from('profiles').delete().eq('id', user.id);
+  if (profErr) console.error('[account] profile row not removed after delete', profErr);
+
   // Reported rather than swallowed: if Stripe refused, the user needs to know
   // to check, because their account is now gone and they cannot look it up.
-  return c.json({ ok: true, subscriptionCanceled: cancel.canceled, billingError: cancel.error ?? null });
+  return c.json({
+    ok: true,
+    subscriptionCanceled: cancel.canceled,
+    billingError: cancel.error ?? null,
+    profileRemoved: !profErr,
+  });
 });
 
 app.post('/billing/webhook', async (c: Context) => {
