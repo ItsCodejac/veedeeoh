@@ -388,8 +388,12 @@ function setupParentControls(item: VodItem): void {
 // kids profiles rather than merely hidden -- and the server checks again.
 async function setupWatchPartyButton(item: VodItem): Promise<void> {
   document.getElementById("vdPartyBtn")?.remove();
-  const party = await import("./party");
-  if (!(await party.canHost())) return;
+  // Rendered OPTIMISTICALLY and withdrawn if the check says no, rather than
+  // awaited first. canHost() calls auth.getUser(), which is a round trip to
+  // Supabase and not something the account cache covers, so awaiting it left a
+  // visible second of the detail view with a button missing that was about to
+  // appear. A kids profile is known synchronously and never gets one.
+  if (getActiveProfile()?.is_kids) return;
 
   const anchorBtn = document.getElementById("vdParentBtn")
     || document.getElementById("vdMyListBtn")
@@ -408,6 +412,22 @@ async function setupWatchPartyButton(item: VodItem): Promise<void> {
     try { await startWatchParty(item); }
     finally { btn.disabled = false; }
   };
+
+  // Warm the chunks the click needs. They are lazy imports, so the first press
+  // paid for a network fetch before anything appeared on screen -- which is
+  // what made the button feel unresponsive rather than slow.
+  void import("./party-setup");
+  void import("./party");
+
+  // Now confirm. A lapsed or signed-out account loses the button a moment after
+  // it appears, which is the right trade: hosting is gated server-side by RLS
+  // as well, so an optimistic button cannot become an optimistic party.
+  void (async () => {
+    try {
+      const party = await import("./party");
+      if (!(await party.canHost())) btn.remove();
+    } catch { btn.remove(); }
+  })();
 }
 
 /** Create a party for a title, open it, and take the host seat.
@@ -415,7 +435,11 @@ async function setupWatchPartyButton(item: VodItem): Promise<void> {
  *  Shared by the detail-view button and the picker in veedeeoh.party, so both
  *  entry points get the same setup sheet and the same stream resolution. */
 export async function startWatchParty(item: VodItem): Promise<boolean> {
-  const { openPartySetup, mountHostLobby } = await import("./party-setup");
+  const { openPartySetup, mountHostLobby, partyTransition } = await import("./party-setup");
+  // Hand off from the catalogue to the party surface deliberately, instead of
+  // leaving the detail overlay sitting there while a chunk loads and a sheet
+  // fades in on top of it.
+  await partyTransition();
   const setup = await openPartySetup(item);
   if (!setup) return false;
 

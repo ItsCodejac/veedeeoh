@@ -19,6 +19,38 @@ export interface PartySetup {
   requireApproval: boolean;
 }
 
+/** The handoff from the catalogue into the party surface.
+ *
+ *  Clicking Watch Party used to leave the detail overlay on screen while a lazy
+ *  chunk loaded and the sheet faded in over the top of it -- nothing said the
+ *  press had registered, so it read as unresponsive rather than as a
+ *  transition. This wipes the catalogue away first, on the veedeeoh.party mark,
+ *  and hands over to the setup sheet.
+ *
+ *  Kept to ~520ms on purpose. Long enough to read as deliberate, short enough
+ *  that it never becomes the thing standing between a host and their party.
+ */
+export function partyTransition(): Promise<void> {
+  return new Promise((resolve) => {
+    // The detail overlay must go BEFORE the wipe covers the screen, or it is
+    // still sitting underneath when the setup sheet opens.
+    document.getElementById("vodDetailsOverlay")?.setAttribute("hidden", "");
+
+    const el = document.createElement("div");
+    el.id = "partyWipe";
+    el.innerHTML = `
+      <div class="pwMark">veedeeoh<span class="dot">.</span><span class="sfx">party</span></div>`;
+    document.body.appendChild(el);
+    requestAnimationFrame(() => el.classList.add("in"));
+
+    setTimeout(() => {
+      el.classList.add("out");
+      setTimeout(() => el.remove(), 320);
+      resolve();
+    }, 520);
+  });
+}
+
 /** Resolves with the chosen settings, or null if the host backed out. */
 export function openPartySetup(item: VodItem): Promise<PartySetup | null> {
   return new Promise((resolve) => {

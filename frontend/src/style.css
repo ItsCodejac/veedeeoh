@@ -4353,3 +4353,30 @@ body.party-guest { background: #06070a; }
 .ppBtn.subtle:hover { color: #ff8f8f; border-color: rgba(255,107,107,.35); }
 .ppBtn.danger { border-color: rgba(255,107,107,.4); color: #ff8f8f; }
 .ppBtn.wide { width: 100%; padding: 10px; }
+
+/* Catalogue -> party handoff. A wipe rather than the region splash's fade, so
+   the two brand moments read as different actions rather than the same one. */
+#partyWipe {
+  position: fixed; inset: 0; z-index: 10001;
+  background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path .42s cubic-bezier(.65,0,.35,1), opacity .3s ease;
+}
+#partyWipe.in { clip-path: inset(0 0 0 0); }
+#partyWipe.out { opacity: 0; }
+.pwMark {
+  font-family: var(--brand);
+  font-size: clamp(32px, 7vw, 58px);
+  font-weight: 800; letter-spacing: -0.045em; line-height: 1;
+  color: #fff;
+  opacity: 0; transform: translateY(8px);
+  transition: opacity .3s ease .16s, transform .3s ease .16s;
+}
+#partyWipe.in .pwMark { opacity: 1; transform: none; }
+.pwMark .dot, .pwMark .sfx { color: var(--accent); }
+@media (prefers-reduced-motion: reduce) {
+  #partyWipe { transition: opacity .2s ease; clip-path: none; opacity: 0; }
+  #partyWipe.in { opacity: 1; }
+  .pwMark { transition: none; opacity: 1; transform: none; }
+}
