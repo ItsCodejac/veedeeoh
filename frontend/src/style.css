@@ -1510,6 +1510,12 @@ select { max-width: 190px; }
   display: flex;
   align-items: center;
 }
+/* An explicit `display` beats the UA stylesheet's [hidden] { display: none },
+   so the code that sets `selectContainer.hidden = true` for movies had no
+   effect and every film rendered an empty season dropdown. */
+#vdSelectorContainer[hidden] {
+  display: none;
+}
 #vdSeasonSelect {
   background: var(--panel2);
   border: 1px solid #2c3242;

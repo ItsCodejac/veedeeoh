@@ -1672,7 +1672,23 @@ export async function renderHome(): Promise<void> {
       if (popular.length) {
         const byId = new Map<string, VodItem>();
         [...uniqueMovies, ...uniqueTv].forEach(i => byId.set(strip(i.id), i));
-        const items = popular.map(p => byId.get(p.content_id)).filter(Boolean) as VodItem[];
+
+        // Watch progress is recorded per EPISODE ("<series>:s1e4"), but the
+        // catalog only holds the series. Matching raw ids therefore dropped
+        // every episode play on the floor -- seven episodes of one show read as
+        // seven misses instead of the strongest signal in the table. Roll them
+        // up to the series and sum the plays.
+        const plays = new Map<string, number>();
+        for (const p of popular) {
+          const ep = /^(.+?):s\d+e\d+$/i.exec(strip(p.content_id));
+          const key = ep?.[1] ?? strip(p.content_id);
+          plays.set(key, (plays.get(key) || 0) + (p.plays || 1));
+        }
+
+        const items = [...plays.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .map(([id]) => byId.get(id))
+          .filter(Boolean) as VodItem[];
 
         const kidSafe = (i: VodItem) => {
           const m = tvMaturity(i.rating);
