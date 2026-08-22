@@ -9,6 +9,7 @@ import type { VodItem } from "./types";
 import { escapeHtml, showToast } from "./util";
 import {
   activePartyCode, disconnect, joinParty, partyEnabled, partyLink, recentParty, forgetParty,
+  resumeHosting,
 } from "./party";
 
 let viewers = 0;
@@ -73,11 +74,27 @@ export function renderParty(el: HTMLElement): void {
   };
   el.querySelector("#partyJoinBtn")!.addEventListener("click", join);
 
-  el.querySelector("#partyRejoin")?.addEventListener("click", () => {
+  el.querySelector("#partyRejoin")?.addEventListener("click", async (e) => {
     const last = recentParty();
-    if (last) void joinParty(last.code);
+    if (!last) return;
+    const b = e.currentTarget as HTMLButtonElement;
+    b.disabled = true; b.textContent = "Reconnecting…";
+    // A host resumes control of their own room; a guest rejoins someone else's.
+    // Same button, different action, because to the user it is the same thing.
+    if (last.role === "host") await resumeHosting(last.code);
+    else await joinParty(last.code);
+    b.disabled = false;
   });
-  el.querySelector("#partyForget")?.addEventListener("click", () => {
+  el.querySelector("#partyForget")?.addEventListener("click", async () => {
+    const last = recentParty();
+    // For a HOST this button says "End it", so it has to actually end the
+    // party. Forgetting it locally would leave the room running with guests
+    // sitting in it and nobody able to reach the controls.
+    if (last?.role === "host") {
+      if (!confirm("End this party? Anyone still in it will be disconnected.")) return;
+      const { closeParty } = await import("./party");
+      await closeParty(last.code);
+    }
     forgetParty();
     renderParty(el);
   });
@@ -177,14 +194,21 @@ function pickRow(item: VodItem): HTMLElement {
 function rejoinCard(): string {
   const last = recentParty();
   if (!last) return "";
+  const host = last.role === "host";
   return `
     <section class="partyCard partyActive">
-      <h2>Rejoin your party</h2>
-      <p class="partyHint">You were watching <strong>${escapeHtml(last.title)}</strong> in party
-        <span class="partyCodeInline">${escapeHtml(last.code)}</span>.</p>
+      <h2>${host ? "Your party is still running" : "Rejoin your party"}</h2>
+      <p class="partyHint">
+        ${host
+          ? `You were hosting <strong>${escapeHtml(last.title)}</strong> in party
+             <span class="partyCodeInline">${escapeHtml(last.code)}</span>.
+             Anyone still in there is waiting on you.`
+          : `You were watching <strong>${escapeHtml(last.title)}</strong> in party
+             <span class="partyCodeInline">${escapeHtml(last.code)}</span>.`}
+      </p>
       <div class="partyRow">
-        <button id="partyRejoin" class="partyBtn primary">Rejoin</button>
-        <button id="partyForget" class="partyBtn">Not now</button>
+        <button id="partyRejoin" class="partyBtn primary">${host ? "Resume hosting" : "Rejoin"}</button>
+        <button id="partyForget" class="partyBtn">${host ? "End it" : "Not now"}</button>
       </div>
     </section>`;
 }

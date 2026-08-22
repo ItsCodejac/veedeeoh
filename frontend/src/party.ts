@@ -29,10 +29,10 @@ function code6(): string {
 // and the code is not shown anywhere once the player is open.
 const LAST_PARTY_KEY = "veedeeoh_last_party";
 
-interface LastParty { code: string; title: string; at: number }
+export interface LastParty { code: string; title: string; at: number; role: "host" | "guest" }
 
-export function rememberParty(code: string, title: string): void {
-  try { localStorage.setItem(LAST_PARTY_KEY, JSON.stringify({ code, title, at: Date.now() })); } catch {}
+export function rememberParty(code: string, title: string, role: "host" | "guest" = "guest"): void {
+  try { localStorage.setItem(LAST_PARTY_KEY, JSON.stringify({ code, title, role, at: Date.now() })); } catch {}
 }
 
 export function forgetParty(): void {
@@ -48,7 +48,7 @@ export function recentParty(): LastParty | null {
     if (!raw) return null;
     const p = JSON.parse(raw) as LastParty;
     if (!p?.code || Date.now() - (p.at || 0) > 6 * 3600_000) { forgetParty(); return null; }
-    return p;
+    return { ...p, role: p.role === "host" ? "host" : "guest" };
   } catch { return null; }
 }
 
@@ -97,7 +97,18 @@ function hostToken(): string {
   return Array.from(b).map((x) => x.toString(16).padStart(2, "0")).join("");
 }
 
+// localStorage, not sessionStorage. This is the ONLY thing that proves a
+// connection is the host's, so keeping it per-tab meant closing the tab
+// permanently forfeited control of a party that is still running -- the host
+// could not even rejoin their own room.
 const tokenKey = (joinCode: string) => `veedeeoh_party_host_${joinCode}`;
+
+function saveHostToken(joinCode: string, token: string): void {
+  try { localStorage.setItem(tokenKey(joinCode), token); } catch {}
+}
+function readHostToken(joinCode: string): string | null {
+  try { return localStorage.getItem(tokenKey(joinCode)); } catch { return null; }
+}
 
 export async function createParty(opts: PartyOptions): Promise<{ joinCode: string; link: string }> {
   const { data: u } = await getSupabase().auth.getUser();
@@ -131,8 +142,8 @@ export async function createParty(opts: PartyOptions): Promise<{ joinCode: strin
   });
   if (!res.ok) throw new Error("Couldn't start the party channel");
 
-  // Kept locally so the host survives a reload without losing the controls.
-  try { sessionStorage.setItem(tokenKey(joinCode), token); } catch {}
+  saveHostToken(joinCode, token);
+  rememberParty(joinCode, opts.title, "host");
 
   return { joinCode, link: partyLink(joinCode) };
 }
@@ -201,7 +212,7 @@ export async function joinParty(joinCode: string): Promise<void> {
   // early arrival watched alone. The player opens on the host's start signal --
   // or immediately, if the worker reports the party already running, which is
   // what a late joiner gets.
-  rememberParty(joinCode, item.title || "a watch party");
+  rememberParty(joinCode, item.title || "a watch party", "guest");
 
   const { showGuestLobby } = await import("./party-setup");
   const closeLobby = showGuestLobby(item, joinCode);
@@ -233,7 +244,7 @@ async function connect(joinCode: string, isHost: boolean): Promise<void> {
   // The token is the ONLY thing that makes a connection the host's. A guest
   // never receives it, so a guest cannot send one.
   if (isHost) {
-    const t = sessionStorage.getItem(tokenKey(joinCode));
+    const t = readHostToken(joinCode);
     if (t) qs.set("t", t);
   }
   socket = new WebSocket(`${base}?${qs.toString()}`);
@@ -456,4 +467,71 @@ function showResync(on: boolean, label = "Out of sync — resync"): void {
     showResync(false);
   });
   document.body.appendChild(resyncEl);
+}
+
+
+/** Walk a host back into a party they closed out of.
+ *
+ *  A host who shut the tab lost the room entirely: the token was per-tab, and
+ *  nothing offered it back. The party itself was still alive -- the Durable
+ *  Object only closes after five idle minutes -- so guests could still be
+ *  sitting in it with nobody driving.
+ */
+export async function resumeHosting(joinCode: string): Promise<boolean> {
+  if (!WORKER_URL) { showToast("Watch Party isn't configured yet"); return false; }
+  if (!readHostToken(joinCode)) {
+    forgetParty();
+    showToast("That party can't be resumed from this device");
+    return false;
+  }
+
+  const sb = getSupabase();
+  const { data: party } = await sb.from("parties")
+    .select("*").eq("join_code", joinCode).is("ended_at", null).maybeSingle();
+  if (!party) { forgetParty(); showToast("That party has already ended"); return false; }
+
+  const item = await lookupCatalogItem(party.content_id);
+  if (!item) { showToast("That title isn't in the catalog any more"); return false; }
+
+  const { resolveItemStream } = await import("./vod");
+  const url = await resolveItemStream(item);
+  if (!url) { showToast("That title can't be streamed right now"); return false; }
+
+  await openVodPlayer(asPartyChannel(item, url), party.stream_idx || 0, 0);
+  await hostExisting(joinCode);
+
+  const { mountHostLobby } = await import("./party-setup");
+  mountHostLobby(joinCode, partyLink(joinCode));
+  // Already started, by definition -- the room existed before this. Re-announce
+  // so anyone who joined while the host was away is let through rather than
+  // left in a green room waiting on someone who has already begun.
+  startPlayback();
+  return true;
+}
+
+
+/** End a party the host is not currently connected to.
+ *
+ *  endParty() only works over a live socket. A host who closed the tab has no
+ *  socket, so shutting the room down needs both halves: mark the row ended so
+ *  nobody can look it up and join, and connect briefly to tell the Durable
+ *  Object to disconnect whoever is still sitting in it. Without the second, the
+ *  room stays open until the idle alarm fires five minutes later.
+ */
+export async function closeParty(joinCode: string): Promise<void> {
+  try {
+    await getSupabase().from("parties")
+      .update({ ended_at: new Date().toISOString() })
+      .eq("join_code", joinCode);
+  } catch (e) { console.warn("[party] could not mark ended", e); }
+
+  const token = readHostToken(joinCode);
+  if (token && WORKER_URL) {
+    try {
+      await connect(joinCode, true);
+      endParty();
+    } catch { /* the row is already ended; the alarm will clear the object */ }
+  }
+  try { localStorage.removeItem(tokenKey(joinCode)); } catch {}
+  forgetParty();
 }
