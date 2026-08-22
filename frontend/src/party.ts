@@ -349,25 +349,9 @@ export async function joinParty(joinCode: string): Promise<void> {
   // joiner landed on "this title isn't available to stream right now".
   const vod = await import("./vod");
 
-  // A series guest needs the WHOLE episode list, not just one URL. streamIdx is
-  // an index into this array, so without it a host moving to episode 4 would
-  // send an index the viewer cannot resolve.
-  let streams: any[] | null = null;
-  if (item.series_id) {
-    const { fetchVodSeries } = await import("./api");
-    const eps = await fetchVodSeries(item.series_id).catch(() => [] as any[]);
-    if (eps.length) {
-      streams = [...eps]
-        .sort((a, b) => (a.season ?? 1) - (b.season ?? 1) || (a.number ?? 0) - (b.number ?? 0))
-        .map((ep) => ({
-          url: ep.url, quality: null,
-          source: `S${ep.season ?? "?"}E${ep.number ?? "?"} ${ep.title}`.slice(0, 48),
-        }));
-    }
-  }
-
-  const url = streams?.length ? null : await vod.resolveItemStream(item);
-  if (!streams?.length && !url) { veil(); showToast("That title can't be streamed right now"); return; }
+  const resolved = await viewerStreamsFor(item, vod);
+  if (!resolved) { veil(); showToast("That title can't be streamed right now"); return; }
+  const { streams, url } = resolved;
 
   // Do NOT open the player yet. A guest was dropped straight into the film the
   // instant they joined, so the host had no moment to gather anyone and an
@@ -444,7 +428,7 @@ async function connect(joinCode: string, isHost: boolean, resume = false): Promi
     try { msg = JSON.parse(String(e.data)); } catch { return; }
     switch (msg?.type) {
       case "state":
-        if (!isHost && msg.state) {
+        if (!isHost && msg.state && !switching) {
           lastHostState = msg.state as PartyPlaybackState;
           // How old the host's report is, measured entirely on the SERVER's
           // clock so the two devices never have to agree on the time. A state
@@ -465,6 +449,9 @@ async function connect(joinCode: string, isHost: boolean, resume = false): Promi
       case "pending":   emit({}, "veedeeoh:party-pending"); showToast("Waiting for the host to let you in"); break;
       case "admitted":  emit({}, "veedeeoh:party-admitted"); showToast("You're in"); break;
       case "start":     emit({}, "veedeeoh:party-start"); break;
+      case "switch":
+        if (!isHost) void followSwitch(String(msg.contentId || ""), Number(msg.streamIdx) || 0, String(msg.title || ""));
+        break;
       case "react":     emit({ kind: msg.kind, name: msg.name }, "veedeeoh:party-react"); break;
       case "away":      if (!isHost) showHostAway(true); break;
       case "back":      if (!isHost) showHostAway(false); break;
@@ -660,6 +647,7 @@ export function disconnect(): void {
   stopWatchingVisibility();
   showHostAway(false);
   if (syncPoll !== null) { clearInterval(syncPoll); syncPoll = null; }
+  void import("./party-setup").then((m) => m.dismissWrap()).catch(() => {});
   clearResync();
   setPartyViewerMode(false);
   lastHostState = null;
@@ -738,6 +726,145 @@ async function charge(joinCode: string): Promise<void> {
   if (c && !c.exempt && c.balance === 1) {
     showToast("10 minutes of hosting left");
   }
+}
+
+/** What THIS viewer will play for a title. Each viewer resolves their own: a
+ *  Pluto JWT is per-session and expires, so the host's cannot be shared, which
+ *  is why only the content id ever travels between them.
+ *
+ *  A series needs the WHOLE episode list rather than one url -- streamIdx is an
+ *  index into it, so without the list a host moving to episode four sends a
+ *  number the viewer cannot resolve. Ordered by season then episode, matching
+ *  resolvePartyStreams exactly; the two orderings have to agree or the room
+ *  watches two different things.
+ */
+async function viewerStreamsFor(
+  item: any, vod: typeof import("./vod"),
+): Promise<{ streams: any[] | null; url: string | null } | null> {
+  let streams: any[] | null = null;
+  if (item.series_id) {
+    const { fetchVodSeries } = await import("./api");
+    const eps = await fetchVodSeries(item.series_id).catch(() => [] as any[]);
+    if (eps.length) {
+      streams = [...eps]
+        .sort((a, b) => (a.season ?? 1) - (b.season ?? 1) || (a.number ?? 0) - (b.number ?? 0))
+        .map((ep) => ({
+          url: ep.url, quality: null,
+          source: `S${ep.season ?? "?"}E${ep.number ?? "?"} ${ep.title}`.slice(0, 48),
+        }));
+    }
+  }
+  const url = streams?.length ? null : await vod.resolveItemStream(item);
+  if (!streams?.length && !url) return null;
+  return { streams, url };
+}
+
+// ------------------------------------------------------- moving the room on ---
+//
+// A party used to mean one title for its whole life. The content id was fixed
+// when the room was created and only the episode index moved, so a film ending
+// ended the evening: the socket stayed open with nothing playing, and the only
+// way on was to end the party and rebuild it -- losing the room, and everyone
+// in it, to do it.
+
+/** Host: move everyone to something else. */
+export async function switchPartyTo(item: any, streamIdx = 0): Promise<boolean> {
+  if (socket?.readyState !== WebSocket.OPEN) { showToast("Not connected to the party"); return false; }
+  const code = currentCode;
+  if (!code) return false;
+
+  const vod = await import("./vod");
+  const streams = await vod.resolvePartyStreams(item);
+  if (!streams) return false;
+  const idx = Math.max(0, Math.min(streamIdx, streams.length - 1));
+
+  // The row, so a late joiner and the public directory follow the room rather
+  // than the title it opened on an hour ago.
+  await getSupabase().from("parties")
+    .update({ content_id: String(item.id), stream_idx: idx, title: item.title })
+    .eq("join_code", code)
+    .then(({ error }) => { if (error) console.warn("[party] switch not recorded", error); });
+
+  partyTitle = item.title;
+  rememberParty(code, item.title, "host");
+
+  try {
+    socket.send(JSON.stringify({
+      type: "switch", contentId: String(item.id), streamIdx: idx, title: item.title,
+    }));
+  } catch { showToast("Couldn't tell the party"); return false; }
+
+  const { openVodPlayer } = await import("./vodplayer");
+  await openVodPlayer(vod.asChannel(item, streams as any), idx);
+  setPartyViewerMode(false);
+  (await import("./party-setup")).dismissWrap();
+  (await import("./party-reactions")).mountReactions();
+  return true;
+}
+
+// The title finished and there is nothing after it. Both sides get told; only
+// the host gets a way to choose. Registered once at module scope rather than
+// per-party, and a no-op when there is no party running.
+if (typeof window !== "undefined") {
+  window.addEventListener("veedeeoh:party-title-ended", () => {
+    if (!currentCode) return;
+    void import("./party-setup").then((m) =>
+      m.showWrap(recentParty()?.role === "host", partyTitle || ""));
+  });
+}
+
+/** Set while a viewer is swapping titles. Heartbeats for the NEW title keep
+ *  arriving while the old player is still on screen, and applying them would
+ *  seek the film being replaced back to zero -- visible, and pointless, since
+ *  that player is about to be torn down. */
+let switching = false;
+
+/** Viewer: follow the host to a new title. */
+async function followSwitch(contentId: string, streamIdx: number, title: string): Promise<void> {
+  switching = true;
+  try {
+    await doFollowSwitch(contentId, streamIdx, title);
+  } finally {
+    switching = false;
+  }
+}
+
+async function doFollowSwitch(contentId: string, streamIdx: number, title: string): Promise<void> {
+  const item = await lookupCatalogItem(contentId);
+  if (!item) { showToast("The host moved to something that isn't in your catalog"); return; }
+
+  // THE SAME GATE THE JOIN USES. A guest admitted to something mild must not be
+  // carried into something they are not allowed to watch just because the host
+  // changed the channel -- a rating limit that only applies at the door is not
+  // a rating limit.
+  const profile = getActiveProfile();
+  const allowed = allowedRatingsFor(profile);
+  if (allowed) {
+    const rating = String(item.rating || "").toUpperCase();
+    if (!rating || !allowed.has(rating)) {
+      showToast(`The host moved to something outside ${profile.name}'s rating limits`);
+      const { closeVodPlayer } = await import("./vodplayer");
+      closeVodPlayer();
+      disconnect();
+      forgetParty();
+      return;
+    }
+  }
+
+  const vod = await import("./vod");
+  const resolved = await viewerStreamsFor(item, vod);
+  if (!resolved) { showToast("That title can't be streamed right now"); return; }
+
+  partyTitle = item.title || title || "a watch party";
+  rememberParty(currentCode || "", partyTitle, "guest");
+
+  const { openVodPlayer } = await import("./vodplayer");
+  setPartyViewerMode(true);
+  await openVodPlayer(asPartyChannel(item, resolved.url, resolved.streams), streamIdx, 0);
+  setPartyViewerMode(true);
+  (await import("./party-reactions")).mountReactions();
+  (await import("./party-setup")).dismissWrap();
+  showToast(`Now watching ${partyTitle}`);
 }
 
 // ------------------------------------------------------------------ lookup ---

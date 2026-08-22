@@ -357,6 +357,44 @@ export class Party extends DurableObject<Env> {
       return;
     }
 
+    // ---- the host moves the room on to something else ----------------------
+    //
+    // Everything else about a party assumed one title for its whole life: the
+    // content id was fixed when the room was created and only the episode index
+    // ever moved. A film ending therefore ended the evening -- the socket stayed
+    // open with nothing playing and no way to choose together, so the only way
+    // on was to end the party and rebuild it, losing the room and the people in
+    // it to do it.
+    //
+    // The content id travels here, and ONLY here. Ordinary playback heartbeats
+    // still omit it: a viewer resolves their own stream for a title, because a
+    // Pluto URL is signed per session, so what has to be shared is which title
+    // it is -- not how the host is watching it.
+    if (msg?.type === "switch") {
+      if (!att.isHost) return;
+      const contentId = String(msg.contentId || "");
+      if (!contentId) return;
+
+      // Position resets rather than carrying over. The old position means
+      // nothing in a different title, and anything but zero would seek every
+      // viewer into the middle of something they have not started.
+      const state: PartyState = {
+        contentId,
+        streamIdx: Number(msg.streamIdx) || 0,
+        positionSecs: 0,
+        paused: false,
+        updatedAt: Date.now(),
+      };
+      await this.ctx.storage.put(STATE_KEY, state);
+      this.broadcast({
+        type: "switch",
+        contentId,
+        streamIdx: state.streamIdx,
+        title: String(msg.title || "").slice(0, 120),
+      }, ws, true);
+      return;
+    }
+
     // Host opens the doors. Until this lands, an approved guest sits in the
     // lobby holding a socket and receives no playback state at all.
     if (msg?.type === "start") {
@@ -379,8 +417,12 @@ export class Party extends DurableObject<Env> {
     // than trusted, so a modified client cannot hijack playback for everyone.
     if (msg?.type !== "state" || !att.isHost || !msg.state) return;
 
+    // The heartbeat omits contentId deliberately -- viewers resolve their own
+    // stream -- so it must not blank the one a switch put there, or the stored
+    // state stops saying what the room is watching one beat after it changed.
+    const prev = await this.ctx.storage.get<PartyState>(STATE_KEY);
     const state: PartyState = {
-      contentId: String(msg.state.contentId || ""),
+      contentId: String(msg.state.contentId || prev?.contentId || ""),
       streamIdx: Number(msg.state.streamIdx) || 0,
       positionSecs: Number(msg.state.positionSecs) || 0,
       paused: !!msg.state.paused,

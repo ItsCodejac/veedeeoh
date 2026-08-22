@@ -216,7 +216,10 @@ function resumeHistoryKey(): string {
   return `tvlc_resume_history_${id}`;
 }
 
-function getResumeHistory(): any[] {
+/** Exported for the party picker, which offers "carry on with" as its default
+ *  state rather than an empty search box. Read-only use of the same rows the
+ *  Continue Watching rail is built from. */
+export function getResumeHistory(): any[] {
   try { return JSON.parse(localStorage.getItem(resumeHistoryKey()) || "[]"); } catch { return []; }
 }
 
@@ -289,7 +292,9 @@ export function wireVodDetails(): void {
   });
 }
 
-function asChannel(item: VodItem, streams: Stream[]): any {
+/** Exported so a host switching the party to another title builds the same
+ *  channel shape as one starting a party with it. */
+export function asChannel(item: VodItem, streams: Stream[]): any {
   return {
     id: `vod:${item.id}`,
     name: item.title,
@@ -434,7 +439,47 @@ async function setupWatchPartyButton(item: VodItem): Promise<void> {
  *
  *  Shared by the detail-view button and the picker in veedeeoh.party, so both
  *  entry points get the same setup sheet and the same stream resolution. */
-export async function startWatchParty(item: VodItem): Promise<boolean> {
+/** Every stream a party may need for one title, in the ONE order host and
+ *  viewers must agree on.
+ *
+ *  Pluto titles carry only a path and mint a signed URL on click, so a host has
+ *  to resolve one here or the party starts on a black screen. A SERIES carries
+ *  no playable url of its own -- roughly a third of the catalogue -- so
+ *  resolveItemStream returns nothing for it and hosting used to fail outright
+ *  with "that title can't be hosted"; its episodes are fetched on demand, each
+ *  with a direct url, exactly as the detail view does.
+ *
+ *  Extracted because the host needs it twice now: once to start a party, and
+ *  again every time the room moves on to something else.
+ *
+ *  @returns null when nothing playable came back, having already said so.
+ */
+export async function resolvePartyStreams(item: VodItem): Promise<any[] | null> {
+  const existing = (item as any).streams as any[] | undefined;
+  if (existing?.length) return existing;
+
+  if (item.series_id) {
+    const eps = await fetchVodSeries(item.series_id).catch(() => [] as VodEpisode[]);
+    if (!eps.length) { showToast("Couldn't load episodes for that show"); return null; }
+    const ordered = [...eps].sort((a, b) =>
+      (a.season ?? 1) - (b.season ?? 1) || (a.number ?? 0) - (b.number ?? 0));
+    return ordered.map((ep) => ({
+      url: ep.url,
+      quality: null,
+      source: `S${ep.season ?? "?"}E${ep.number ?? "?"} ${ep.title}`.slice(0, 48),
+      id: `vod:${item.id}:s${ep.season ?? 1}e${ep.number ?? 0}`,
+    }));
+  }
+
+  const url = await resolveItemStream(item);
+  if (!url) { showToast("That title can't be hosted right now"); return null; }
+  return [{ url, quality: null, source: item.genre || "Party" }];
+}
+
+/** @param startIdx which episode to open on. The picker resolves this from
+ *  where the host left off, so "carry on with that show" no longer means
+ *  starting it again from S1E1. */
+export async function startWatchParty(item: VodItem, startIdx = 0): Promise<boolean> {
   const { openPartySetup, mountHostLobby, showHostLobby, partyTransition } = await import("./party-setup");
   // Hand off from the catalogue to the party surface deliberately, instead of
   // leaving the detail overlay sitting there while a chunk loads and a sheet
@@ -456,33 +501,17 @@ export async function startWatchParty(item: VodItem): Promise<boolean> {
     // Pluto titles carry only a path and mint a signed URL on click, so the
     // host has to resolve one here. Without this the player opened with no
     // streams at all and the party started on a black screen.
-    let streams = (item as any).streams as any[] | undefined;
-    if (!streams?.length) {
-      // A SERIES carries no playable url of its own -- roughly a third of the
-      // catalogue -- so resolveItemStream returns nothing for it and hosting
-      // failed with "that title can't be hosted". Episodes are fetched on
-      // demand and each carries a direct url, exactly as the detail view does.
-      if (item.series_id) {
-        const eps = await fetchVodSeries(item.series_id).catch(() => [] as VodEpisode[]);
-        if (!eps.length) { showToast("Couldn't load episodes for that show"); return false; }
-        const ordered = [...eps].sort((a, b) =>
-          (a.season ?? 1) - (b.season ?? 1) || (a.number ?? 0) - (b.number ?? 0));
-        streams = ordered.map((ep) => ({
-          url: ep.url,
-          quality: null,
-          source: `S${ep.season ?? "?"}E${ep.number ?? "?"} ${ep.title}`.slice(0, 48),
-          id: `vod:${item.id}:s${ep.season ?? 1}e${ep.number ?? 0}`,
-        }));
-      } else {
-        const url = await resolveItemStream(item);
-        if (!url) { showToast("That title can't be hosted right now"); return false; }
-        streams = [{ url, quality: null, source: item.genre || "Party" }];
-      }
-    }
+    const streams = await resolvePartyStreams(item);
+    if (!streams) return false;
+
+    // Clamped: the index came from a resume row or an episode list that may no
+    // longer match a catalogue that has since changed underneath it, and an
+    // out-of-range index would open the party on nothing.
+    const idx = Math.max(0, Math.min(startIdx, (streams?.length || 1) - 1));
 
     const { joinCode, link } = await party.createParty({
       contentId: String(item.id),
-      streamIdx: 0,
+      streamIdx: idx,
       title: item.title,
       seatLimit: setup.seatLimit,
       requireApproval: setup.requireApproval,
@@ -497,7 +526,7 @@ export async function startWatchParty(item: VodItem): Promise<boolean> {
     await showHostLobby(item, joinCode, link, setup.seatLimit);
 
     party.startPlayback();
-    await openVodPlayer(asChannel(item, streams as any), 0);
+    await openVodPlayer(asChannel(item, streams as any), idx);
     mountHostLobby(joinCode, link);
     (await import("./party-reactions")).mountReactions();
     return true;

@@ -724,8 +724,17 @@ class VodPlayer {
 
     on("ended", () => {
       markWatched(this.ch.streams?.[this.idx]?.id);
-      if (this.idx + 1 < (this.ch.streams?.length || 0)) this.load(this.idx + 1);
-      else closeVodPlayer();
+      if (this.idx + 1 < (this.ch.streams?.length || 0)) { this.load(this.idx + 1); return; }
+
+      // In a party, closing the player drops everyone back on the catalogue
+      // separately -- which for a viewer is indistinguishable from the party
+      // ending, so people left rather than waited. Hold the player open and let
+      // the party decide what to offer instead.
+      if (partyEmit || document.body.classList.contains("party-viewer")) {
+        window.dispatchEvent(new CustomEvent("veedeeoh:party-title-ended"));
+        return;
+      }
+      closeVodPlayer();
     });
   }
 

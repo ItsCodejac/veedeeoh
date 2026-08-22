@@ -3917,6 +3917,60 @@ body.kids-mode { --brand-accent: #ff9f1c; }
 .partyPickMeta { color: rgba(255,255,255,0.5); font-size: 11.5px; }
 .partyPickList { display: flex; flex-direction: column; gap: 2px; margin-top: 12px; }
 
+/* The picker's own chrome. The default state is a set of short, named groups
+   rather than an empty box, so it needs headings and a scroll bound -- three
+   groups of six is more than fits a card. */
+.partyPicker { margin-top: 12px; }
+.pkSearch { position: relative; }
+.pkSearchIcon {
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  color: rgba(255,255,255,0.4); pointer-events: none;
+}
+.pkInput { width: 100%; padding-left: 36px; }
+.pkBody { margin-top: 10px; max-height: 46vh; overflow-y: auto; }
+/* The default scrollbar is a bright slab against this palette, and the picker
+   is the one place it is always on screen. */
+.pkBody { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.18) transparent; }
+.pkBody::-webkit-scrollbar { width: 8px; }
+.pkBody::-webkit-scrollbar-track { background: transparent; }
+.pkBody::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,.16); border-radius: 999px;
+  border: 2px solid transparent; background-clip: content-box;
+}
+.pkBody::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.3); background-clip: content-box; }
+.pkGroup + .pkGroup { margin-top: 14px; }
+.pkGroupName {
+  margin: 0 0 4px; padding: 0 8px;
+  font-family: var(--display); font-size: 11px; font-weight: 800;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: rgba(255,255,255,0.42);
+}
+.pkList { display: flex; flex-direction: column; gap: 2px; }
+.pkSeason {
+  margin: 12px 0 4px; padding: 0 8px;
+  font-family: var(--display); font-size: 11.5px; font-weight: 800;
+  color: rgba(255,255,255,0.5);
+}
+.pkBack {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: none; border: none; cursor: pointer; padding: 4px 8px;
+  color: #c5f04e; font: inherit; font-weight: 700; font-size: 12.5px;
+}
+.pkBack:hover { text-decoration: underline; }
+.pkEp {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; text-align: left; background: none; border: none;
+  border-radius: 8px; padding: 9px 10px; cursor: pointer;
+  color: rgba(255,255,255,0.86); font: inherit; font-size: 13px;
+}
+.pkEp:hover { background: rgba(255,255,255,0.07); }
+.pkEp.resume { background: rgba(197,240,78,0.10); color: #fff; }
+.pkEp em {
+  font-style: normal; flex: none;
+  font-family: var(--display); font-size: 10.5px; font-weight: 800;
+  letter-spacing: .1em; text-transform: uppercase; color: #c5f04e;
+}
+
 /* ---- brand loaders --------------------------------------------------------
    Motion and proportions from the brand package
    ("Video bump ident design 2/Brand Loaders.dc.html", loader 1 "App boot").
@@ -4687,3 +4741,45 @@ body.can-host .vodQuickBtn.partyAct { display: flex; }
   #reactBar:not(.placed) { bottom: 76px; }
   #reactStage { width: 96px; right: 12px; }
 }
+
+/* ---- moving a party on to the next thing --------------------------------
+   Both of these sit OVER the player rather than replacing it: backing out of
+   either should leave the room exactly as it was. */
+
+#partyNextSheet {
+  position: fixed; inset: 0; z-index: 10050;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(4,5,8,.72); backdrop-filter: blur(6px);
+  padding: 20px;
+}
+.pnCard {
+  width: min(560px, 100%); max-height: 84vh; overflow: hidden;
+  display: flex; flex-direction: column;
+  background: #0d1017; border: 1px solid rgba(255,255,255,.12);
+  border-radius: 16px; padding: 20px 20px 22px;
+  box-shadow: 0 24px 70px rgba(0,0,0,.6);
+}
+.pnCard.busy { opacity: .6; pointer-events: none; }
+.pnHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.pnHead h2 { margin: 0; font-family: var(--display); font-size: 19px; font-weight: 800; color: #fff; }
+.pnClose {
+  background: none; border: none; cursor: pointer; line-height: 1;
+  font-size: 26px; color: rgba(255,255,255,.55); padding: 0 4px;
+}
+.pnClose:hover { color: #fff; }
+.pnPicker { margin-top: 6px; min-height: 0; }
+.pnPicker .pkBody { max-height: 56vh; }
+
+#partyWrapEnd {
+  position: fixed; inset: 0; z-index: 10040;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(4,5,8,.86); padding: 20px;
+}
+.pwCard { text-align: center; max-width: 460px; }
+.pwKicker {
+  margin: 0 0 6px; font-family: var(--display); font-size: 11px; font-weight: 800;
+  letter-spacing: .18em; text-transform: uppercase; color: #c5f04e;
+}
+.pwCard h2 { margin: 0 0 10px; font-family: var(--display); font-size: 26px; font-weight: 800; color: #fff; }
+.pwHint { margin: 0 0 20px; color: rgba(255,255,255,.62); font-size: 14px; line-height: 1.5; }
+.pwRow { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }

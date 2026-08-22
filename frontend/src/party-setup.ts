@@ -518,6 +518,7 @@ function render(): void {
         <div class="ppRow"><span class="ppMuted">Hosting uses</span><span>1 credit / 10 min</span></div>
       </div>
 
+      <button class="ppBtn wide" id="ppNext">Change what's playing</button>
       <button class="ppBtn danger wide" id="ppEnd">End party for everyone</button>
     </div>`;
 
@@ -526,6 +527,11 @@ function render(): void {
   lobby.querySelector("#ppCopy")?.addEventListener("click", async () => {
     try { await navigator.clipboard.writeText(linkRef); showToast("Invite link copied"); }
     catch { showToast(`Party code ${joinCodeRef}`); }
+  });
+
+  lobby.querySelector("#ppNext")?.addEventListener("click", () => {
+    expanded = false; render();
+    void showNextPicker();
   });
 
   lobby.querySelector("#ppEnd")?.addEventListener("click", async () => {
@@ -726,3 +732,95 @@ async function renderEndedEarnings(root: HTMLElement, partyId: string): Promise<
       You earn a share of everything they pay, for a year.`;
   } catch { /* a missing number is better than a wrong one */ }
 }
+
+// ---------------------------------------------------------------------------
+// Moving the room on
+// ---------------------------------------------------------------------------
+//
+// A party was one title and then it was over: the film ended, the player shut,
+// and everyone was returned to the catalogue individually with the socket still
+// open behind them. To watch a second thing together the host had to end the
+// party and build a new one, which means re-sharing the link and losing whoever
+// does not come back. These two sheets are the difference between an evening and
+// a single showing.
+
+/** Host: pick the next thing, mid-party. Sits over the player rather than
+ *  replacing it, so backing out leaves the room exactly as it was. */
+export async function showNextPicker(): Promise<void> {
+  document.getElementById("partyNextSheet")?.remove();
+
+  const sheet = document.createElement("div");
+  sheet.id = "partyNextSheet";
+  sheet.innerHTML = `
+    <div class="pnCard" role="dialog" aria-modal="true" aria-label="Choose what to watch next">
+      <div class="pnHead">
+        <h2>What's next</h2>
+        <button class="pnClose" aria-label="Close">&times;</button>
+      </div>
+      <p class="partyHint">Everyone in the party moves with you.</p>
+      <div class="pnPicker"></div>
+    </div>`;
+  document.body.appendChild(sheet);
+
+  const close = () => sheet.remove();
+  sheet.querySelector(".pnClose")!.addEventListener("click", close);
+  sheet.addEventListener("click", (e) => { if (e.target === sheet) close(); });
+
+  const { mountPicker } = await import("./party-picker");
+  mountPicker(sheet.querySelector<HTMLElement>(".pnPicker")!, async (pick) => {
+    const card = sheet.querySelector<HTMLElement>(".pnCard")!;
+    card.classList.add("busy");
+    const { switchPartyTo } = await import("./party");
+    const ok = await switchPartyTo(pick.item, pick.streamIdx);
+    card.classList.remove("busy");
+    if (ok) { close(); dismissWrap(); }
+  });
+}
+
+let wrapEl: HTMLElement | null = null;
+
+/** Shown to everyone when the title finishes and there is nothing after it.
+ *
+ *  Before this the player simply closed. For the host that was survivable; for
+ *  a viewer it was indistinguishable from the party ending, so people left. */
+export function showWrap(isHost: boolean, title: string): void {
+  dismissWrap();
+  wrapEl = document.createElement("div");
+  wrapEl.id = "partyWrapEnd";
+  wrapEl.innerHTML = `
+    <div class="pwCard">
+      <p class="pwKicker">That's a wrap</p>
+      <h2>${escapeHtml(title || "That's the end")}</h2>
+      <p class="pwHint">${isHost
+        ? "Pick something else and everyone comes with you."
+        : "Still here. Waiting for the host to pick the next one."}</p>
+      ${isHost ? `
+        <div class="pwRow">
+          <button class="partyBtn primary" id="pwNext">Pick something else</button>
+          <button class="partyBtn danger" id="pwEnd">End party</button>
+        </div>` : `
+        <div class="pwRow">
+          <button class="partyBtn" id="pwLeave">Leave party</button>
+        </div>`}
+    </div>`;
+  document.body.appendChild(wrapEl);
+
+  wrapEl.querySelector("#pwNext")?.addEventListener("click", () => void showNextPicker());
+  wrapEl.querySelector("#pwEnd")?.addEventListener("click", async () => {
+    if (!confirm("End the party for everyone?")) return;
+    const { endParty } = await import("./party");
+    endParty();
+    dismissWrap();
+    unmountHostLobby();
+  });
+  wrapEl.querySelector("#pwLeave")?.addEventListener("click", async () => {
+    const { disconnect, forgetParty } = await import("./party");
+    disconnect();
+    forgetParty();
+    dismissWrap();
+    const { closeVodPlayer } = await import("./vodplayer");
+    closeVodPlayer();
+  });
+}
+
+export function dismissWrap(): void { wrapEl?.remove(); wrapEl = null; }
