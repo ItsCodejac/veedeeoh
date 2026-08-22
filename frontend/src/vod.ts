@@ -404,15 +404,14 @@ async function setupWatchPartyButton(item: VodItem): Promise<void> {
 /** Create a party for a title, open it, and take the host seat.
  *
  *  Shared by the detail-view button and the picker in veedeeoh.party, so both
- *  entry points get the same stream resolution and the same prompts. */
+ *  entry points get the same setup sheet and the same stream resolution. */
 export async function startWatchParty(item: VodItem): Promise<boolean> {
+  const { openPartySetup, mountHostLobby } = await import("./party-setup");
+  const setup = await openPartySetup(item);
+  if (!setup) return false;
+
   const party = await import("./party");
   try {
-    const seatsRaw = prompt("How many people can join? Leave blank for no limit.");
-    if (seatsRaw === null) return false;
-    const seatLimit = seatsRaw.trim() ? Math.max(1, parseInt(seatsRaw, 10) || 0) : null;
-    const password = prompt("Password to join? Leave blank for none.")?.trim() || null;
-
     // Pluto titles carry only a path and mint a signed URL on click, so the
     // host has to resolve one here. Without this the player opened with no
     // streams at all and the party started on a black screen.
@@ -427,12 +426,13 @@ export async function startWatchParty(item: VodItem): Promise<boolean> {
       contentId: String(item.id),
       streamIdx: 0,
       title: item.title,
-      seatLimit,
-      password,
+      seatLimit: setup.seatLimit,
+      requireApproval: setup.requireApproval,
     });
 
     await openVodPlayer(asChannel(item, streams as any), 0);
-    party.hostExisting(joinCode, seatLimit);
+    await party.hostExisting(joinCode);
+    mountHostLobby(joinCode, link);
 
     try { await navigator.clipboard.writeText(link); showToast("Party link copied \u2014 share it"); }
     catch { showToast(`Party code ${joinCode}`); }

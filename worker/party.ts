@@ -10,6 +10,14 @@
 // receiving the host's -- Pluto JWTs are per-session and expire in 24h, so a
 // shared URL would break for every viewer at once.
 //
+// HOST IDENTITY IS PROVEN, NOT CLAIMED. This used to read `?host=1` and believe
+// it, so anyone holding a join code could connect as the host and drive
+// playback for the whole room. The host now initialises the party over HTTP
+// with a secret it generated, before the link is shared, and every later host
+// connection must present the same secret. Init is one-shot: the first caller
+// binds the party and a second init is refused, which closes the race where an
+// attacker who learned the code could claim it first.
+//
 // USES THE HIBERNATION API. Two reasons, one of them correctness:
 //   1. A Durable Object can be evicted at any time. Holding clients and state in
 //      plain instance fields loses both on eviction. Hibernation forces state
@@ -40,12 +48,31 @@ interface Env {
 interface Attachment {
   isHost: boolean;
   userId: string;
+  name: string;
+  /** Set once the host lets them in. A pending socket is connected but receives
+   *  no state, so it cannot watch along while it waits. */
+  approved: boolean;
+}
+
+interface Config {
+  seatLimit: number | null;
+  hostUserId: string;
+  hostToken: string;
+  requireApproval: boolean;
+  createdAt: number;
 }
 
 const STATE_KEY = "state";
 const CONFIG_KEY = "config";
 
-// Must extend DurableObject for the hibernation handlers to be invoked.
+// How long an idle party lives before it closes itself. A host who shuts the
+// laptop without ending the party would otherwise leave the object alive
+// indefinitely -- and once hosting is metered, silently spending the host's
+// credits on an empty room. Checked by alarm rather than a timer, because a
+// timer does not survive eviction.
+const IDLE_CLOSE_MS = 5 * 60 * 1000;
+const ALARM_EVERY_MS = 60 * 1000;
+
 export class Party extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -53,6 +80,30 @@ export class Party extends DurableObject<Env> {
 
   async fetch(req: Request): Promise<Response> {
     const url = new URL(req.url);
+
+    // ---- host binds the party, before the link is shared -------------------
+    if (url.pathname.endsWith("/init")) {
+      if (req.method !== "POST") return new Response("POST only", { status: 405 });
+      const body = await req.json().catch(() => null) as any;
+      const token = String(body?.hostToken || "");
+      if (token.length < 20) return new Response("bad token", { status: 400 });
+
+      const existing = await this.ctx.storage.get<Config>(CONFIG_KEY);
+      // One-shot. A second init cannot re-bind a party to a different host,
+      // which is what would let someone steal a room mid-session.
+      if (existing) return new Response("already initialised", { status: 409 });
+
+      const seats = Number(body?.seatLimit);
+      await this.ctx.storage.put<Config>(CONFIG_KEY, {
+        seatLimit: Number.isFinite(seats) && seats > 0 ? seats : null,
+        hostUserId: String(body?.hostUserId || ""),
+        hostToken: token,
+        requireApproval: body?.requireApproval !== false,
+        createdAt: Date.now(),
+      });
+      await this.ctx.storage.setAlarm(Date.now() + ALARM_EVERY_MS);
+      return Response.json({ ok: true });
+    }
 
     if (url.pathname.endsWith("/state")) {
       const state = await this.ctx.storage.get<PartyState>(STATE_KEY);
@@ -63,49 +114,84 @@ export class Party extends DurableObject<Env> {
       return new Response("expected websocket", { status: 426 });
     }
 
-    const isHost = url.searchParams.get("host") === "1";
+    const config = await this.ctx.storage.get<Config>(CONFIG_KEY);
+    if (!config) return new Response("party not started", { status: 404 });
+
+    const token = url.searchParams.get("t") || "";
     const userId = url.searchParams.get("uid") || "";
-    const seatParam = Number(url.searchParams.get("seats"));
-    const seatLimit = Number.isFinite(seatParam) && seatParam > 0 ? seatParam : null;
+    const name = (url.searchParams.get("name") || "Guest").slice(0, 40);
 
-    // Config is written by the host's connection and survives eviction.
-    if (isHost) await this.ctx.storage.put(CONFIG_KEY, { seatLimit, hostUserId: userId });
-    const config = await this.ctx.storage.get<{ seatLimit: number | null }>(CONFIG_KEY);
+    // The ONLY way to be the host: present the secret the party was bound with.
+    // Constant-time is unnecessary here (the token is 256 bits of randomness and
+    // an attacker gets no oracle), but the comparison must be against the stored
+    // value rather than a client-supplied flag.
+    const isHost = token !== "" && token === config.hostToken;
 
-    // Seat limits are enforced HERE because this is the only component that
-    // knows the live connection count. A row count in Postgres cannot.
-    if (!isHost && config?.seatLimit != null && this.viewerCount() >= config.seatLimit) {
+    if (!isHost && config.seatLimit != null && this.viewerCount() >= config.seatLimit) {
       return new Response("party full", { status: 409 });
     }
 
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair) as [WebSocket, WebSocket];
 
-    // acceptWebSocket, not accept: this hands the socket to the runtime so the
-    // object can be evicted while the connection stays open.
     this.ctx.acceptWebSocket(server);
-    // Role travels on the attachment rather than a socket tag: attachments are
-    // documented and survive eviction, and tag filtering is not.
-    server.serializeAttachment({ isHost, userId } satisfies Attachment);
 
-    // A late joiner lands at the right position immediately, mid-film.
-    const state = await this.ctx.storage.get<PartyState>(STATE_KEY);
-    if (state) server.send(JSON.stringify({ type: "state", state }));
+    // A guest starts UNAPPROVED when the host asked for approval. They hold an
+    // open socket but receive no state, so waiting in the lobby is not a way to
+    // watch for free.
+    const approved = isHost || !config.requireApproval;
+    server.serializeAttachment({ isHost, userId, name, approved } satisfies Attachment);
+
+    if (approved) {
+      const state = await this.ctx.storage.get<PartyState>(STATE_KEY);
+      if (state) server.send(JSON.stringify({ type: "state", state }));
+    } else {
+      server.send(JSON.stringify({ type: "pending" }));
+      this.sendToHost({ type: "knock", userId, name });
+    }
+
     this.broadcastPresence();
-
     return new Response(null, { status: 101, webSocket: client });
   }
 
-  // Hibernation delivers messages here rather than to an addEventListener
-  // closure, because no closure survives eviction.
   async webSocketMessage(ws: WebSocket, raw: string | ArrayBuffer): Promise<void> {
     const att = ws.deserializeAttachment() as Attachment | null;
     let msg: any;
     try { msg = JSON.parse(typeof raw === "string" ? raw : new TextDecoder().decode(raw)); } catch { return; }
+    if (!att) return;
+
+    // ---- host admits or refuses a waiting guest ----------------------------
+    if (msg?.type === "admit" || msg?.type === "refuse") {
+      if (!att.isHost) return;           // only the host decides
+      const target = String(msg.userId || "");
+      for (const sock of this.ctx.getWebSockets()) {
+        const a = sock.deserializeAttachment() as Attachment | null;
+        if (!a || a.isHost || a.userId !== target || a.approved) continue;
+
+        if (msg.type === "refuse") {
+          try { sock.send(JSON.stringify({ type: "refused" })); sock.close(4003, "refused"); } catch {}
+          continue;
+        }
+        sock.serializeAttachment({ ...a, approved: true });
+        const state = await this.ctx.storage.get<PartyState>(STATE_KEY);
+        try {
+          sock.send(JSON.stringify({ type: "admitted" }));
+          if (state) sock.send(JSON.stringify({ type: "state", state }));
+        } catch {}
+      }
+      this.broadcastPresence();
+      return;
+    }
+
+    if (msg?.type === "end") {
+      if (!att.isHost) return;
+      await this.closeParty("ended by host");
+      return;
+    }
 
     // Only the host drives playback. A viewer sending state is ignored rather
     // than trusted, so a modified client cannot hijack playback for everyone.
-    if (msg?.type !== "state" || !att?.isHost || !msg.state) return;
+    if (msg?.type !== "state" || !att.isHost || !msg.state) return;
 
     const state: PartyState = {
       contentId: String(msg.state.contentId || ""),
@@ -115,7 +201,9 @@ export class Party extends DurableObject<Env> {
       updatedAt: Date.now(),
     };
     await this.ctx.storage.put(STATE_KEY, state);
-    this.broadcast({ type: "state", state }, ws);
+    // Unapproved sockets are skipped: a guest in the lobby must not receive
+    // playback position, or the lobby becomes a free seat.
+    this.broadcast({ type: "state", state }, ws, true);
   }
 
   async webSocketClose(ws: WebSocket): Promise<void> {
@@ -123,28 +211,71 @@ export class Party extends DurableObject<Env> {
     this.broadcastPresence();
   }
 
-  /** Live sockets come from the runtime, not an in-memory Set, so the count is
-   *  correct on the first message after the object was evicted. Roles are read
-   *  back from each socket's attachment. */
+  /** Closes a party that everyone has left. Runs on a timer rather than on the
+   *  last disconnect, so a viewer who reloads does not kill the room. */
+  async alarm(): Promise<void> {
+    const live = this.ctx.getWebSockets().length;
+    if (live > 0) {
+      await this.ctx.storage.setAlarm(Date.now() + ALARM_EVERY_MS);
+      return;
+    }
+    const config = await this.ctx.storage.get<Config>(CONFIG_KEY);
+    const state = await this.ctx.storage.get<PartyState>(STATE_KEY);
+    const lastSeen = Math.max(state?.updatedAt ?? 0, config?.createdAt ?? 0);
+    if (Date.now() - lastSeen < IDLE_CLOSE_MS) {
+      await this.ctx.storage.setAlarm(Date.now() + ALARM_EVERY_MS);
+      return;
+    }
+    await this.closeParty("idle");
+  }
+
+  private async closeParty(reason: string): Promise<void> {
+    for (const ws of this.ctx.getWebSockets()) {
+      try { ws.send(JSON.stringify({ type: "closed", reason })); ws.close(1000, reason); } catch {}
+    }
+    await this.ctx.storage.deleteAlarm();
+    await this.ctx.storage.deleteAll();
+  }
+
+  /** Approved, non-host sockets. The lobby does not count toward the seat
+   *  limit -- a seat is a person watching, not a person waiting. */
   private viewerCount(): number {
     let n = 0;
     for (const ws of this.ctx.getWebSockets()) {
       const att = ws.deserializeAttachment() as Attachment | null;
-      if (!att?.isHost) n++;
+      if (att && !att.isHost && att.approved) n++;
     }
     return n;
   }
 
-  private broadcast(payload: unknown, except?: WebSocket): void {
+  private broadcast(payload: unknown, except?: WebSocket, approvedOnly = false): void {
     const data = JSON.stringify(payload);
     for (const ws of this.ctx.getWebSockets()) {
       if (ws === except) continue;
+      if (approvedOnly) {
+        const a = ws.deserializeAttachment() as Attachment | null;
+        if (!a?.approved) continue;
+      }
       try { ws.send(data); } catch { /* dropped; runtime will fire close */ }
     }
   }
 
+  private sendToHost(payload: unknown): void {
+    const data = JSON.stringify(payload);
+    for (const ws of this.ctx.getWebSockets()) {
+      const a = ws.deserializeAttachment() as Attachment | null;
+      if (a?.isHost) { try { ws.send(data); } catch {} }
+    }
+  }
+
   private broadcastPresence(): void {
+    const waiting: Array<{ userId: string; name: string }> = [];
+    for (const ws of this.ctx.getWebSockets()) {
+      const a = ws.deserializeAttachment() as Attachment | null;
+      if (a && !a.isHost && !a.approved) waiting.push({ userId: a.userId, name: a.name });
+    }
     this.broadcast({ type: "presence", viewers: this.viewerCount() });
+    if (waiting.length) this.sendToHost({ type: "waiting", waiting });
   }
 }
 

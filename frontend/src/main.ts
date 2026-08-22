@@ -498,8 +498,7 @@ async function boot(): Promise<void> {
   const partyCode = new URLSearchParams(location.search).get("party");
   if (partyCode) {
     const { joinParty } = await import("./party");
-    const pw = new URLSearchParams(location.search).get("pw") || undefined;
-    void joinParty(partyCode.toUpperCase(), pw);
+    void joinParty(partyCode.toUpperCase());
     history.replaceState({}, "", location.pathname);
   }
 

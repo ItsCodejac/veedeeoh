@@ -38,8 +38,6 @@ export function renderParty(el: HTMLElement): void {
         <div class="partyRow">
           <input id="partyCodeInput" class="partyInput" maxlength="6" autocomplete="off"
                  spellcheck="false" placeholder="ABC234" aria-label="Party code" />
-          <input id="partyPassInput" class="partyInput" type="password" autocomplete="off"
-                 placeholder="Password (if any)" aria-label="Party password" />
           <button id="partyJoinBtn" class="partyBtn primary">Join</button>
         </div>
       </section>
@@ -71,7 +69,7 @@ export function renderParty(el: HTMLElement): void {
   const join = () => {
     const c = input.value.trim();
     if (c.length !== 6) { showToast("A party code is six characters"); return; }
-    void joinParty(c, el.querySelector<HTMLInputElement>("#partyPassInput")!.value || undefined);
+    void joinParty(c);
   };
   el.querySelector("#partyJoinBtn")!.addEventListener("click", join);
 
