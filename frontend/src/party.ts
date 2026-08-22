@@ -23,6 +23,35 @@ function code6(): string {
   return Array.from({ length: 6 }, () => A[Math.floor(Math.random() * A.length)]).join("");
 }
 
+// The party a guest is currently in, remembered across a reload or an
+// accidental close. Without this, someone who shut the tab had to go and find
+// the original invite message again to get back into a party still running --
+// and the code is not shown anywhere once the player is open.
+const LAST_PARTY_KEY = "veedeeoh_last_party";
+
+interface LastParty { code: string; title: string; at: number }
+
+export function rememberParty(code: string, title: string): void {
+  try { localStorage.setItem(LAST_PARTY_KEY, JSON.stringify({ code, title, at: Date.now() })); } catch {}
+}
+
+export function forgetParty(): void {
+  try { localStorage.removeItem(LAST_PARTY_KEY); } catch {}
+}
+
+/** The last party joined, if it is recent enough to still plausibly be running.
+ *  Six hours is well past any film, and stale enough entries are dropped rather
+ *  than offered as a rejoin that will fail. */
+export function recentParty(): LastParty | null {
+  try {
+    const raw = localStorage.getItem(LAST_PARTY_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw) as LastParty;
+    if (!p?.code || Date.now() - (p.at || 0) > 6 * 3600_000) { forgetParty(); return null; }
+    return p;
+  } catch { return null; }
+}
+
 export function partyLink(joinCode: string): string {
   return `${location.origin}/index.html?party=${joinCode}`;
 }
@@ -172,6 +201,8 @@ export async function joinParty(joinCode: string): Promise<void> {
   // early arrival watched alone. The player opens on the host's start signal --
   // or immediately, if the worker reports the party already running, which is
   // what a late joiner gets.
+  rememberParty(joinCode, item.title || "a watch party");
+
   const { showGuestLobby } = await import("./party-setup");
   const closeLobby = showGuestLobby(item, joinCode);
   veil();
@@ -229,7 +260,15 @@ async function connect(joinCode: string, isHost: boolean): Promise<void> {
       case "start":     emit({}, "veedeeoh:party-start"); break;
       case "refused":   showToast("The host did not let you in"); break;
       case "removed":   showToast("The host removed you from the party"); disconnect(); break;
-      case "closed":    showToast(msg.reason === "idle" ? "The party timed out" : "The host ended the party"); disconnect(); break;
+      case "closed":
+        showToast(msg.reason === "idle" ? "The party timed out" : "The host ended the party");
+        forgetParty();
+        disconnect();
+        break;
+      case "removed":
+        // Removed by the host: do not offer to walk back in.
+        forgetParty();
+        break;
     }
   });
 

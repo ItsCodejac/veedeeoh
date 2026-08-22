@@ -8,7 +8,7 @@
 import type { VodItem } from "./types";
 import { escapeHtml, showToast } from "./util";
 import {
-  activePartyCode, disconnect, joinParty, partyEnabled, partyLink,
+  activePartyCode, disconnect, joinParty, partyEnabled, partyLink, recentParty, forgetParty,
 } from "./party";
 
 let viewers = 0;
@@ -25,12 +25,12 @@ export function renderParty(el: HTMLElement): void {
 
   el.innerHTML = `
     <div class="partyWrap">
-      <header class="partyHero">
+      <div class="partyHero">
         <h1>veedeeoh<span style="color:#c5f04e;">.</span><span style="color:#c5f04e;">party</span></h1>
         <p>Watch the same thing at the same time. The host controls playback; everyone else follows.</p>
-      </header>
+      </div>
 
-      ${code ? activeCard(code) : ""}
+      ${code ? activeCard(code) : rejoinCard()}
 
       <section class="partyCard">
         <h2>Join a party</h2>
@@ -72,6 +72,15 @@ export function renderParty(el: HTMLElement): void {
     void joinParty(c);
   };
   el.querySelector("#partyJoinBtn")!.addEventListener("click", join);
+
+  el.querySelector("#partyRejoin")?.addEventListener("click", () => {
+    const last = recentParty();
+    if (last) void joinParty(last.code);
+  });
+  el.querySelector("#partyForget")?.addEventListener("click", () => {
+    forgetParty();
+    renderParty(el);
+  });
 
   wirePicker(el);
 
@@ -158,4 +167,24 @@ function pickRow(item: VodItem): HTMLElement {
     if (started && mounted) renderParty(mounted);
   });
   return b;
+}
+
+/** Offered when the viewer has left a party that is probably still running.
+ *
+ *  Closing the tab used to mean going back to the original invite message to
+ *  find the code again -- and the code is not shown anywhere once the player is
+ *  open, so there was often nowhere to find it. */
+function rejoinCard(): string {
+  const last = recentParty();
+  if (!last) return "";
+  return `
+    <section class="partyCard partyActive">
+      <h2>Rejoin your party</h2>
+      <p class="partyHint">You were watching <strong>${escapeHtml(last.title)}</strong> in party
+        <span class="partyCodeInline">${escapeHtml(last.code)}</span>.</p>
+      <div class="partyRow">
+        <button id="partyRejoin" class="partyBtn primary">Rejoin</button>
+        <button id="partyForget" class="partyBtn">Not now</button>
+      </div>
+    </section>`;
 }

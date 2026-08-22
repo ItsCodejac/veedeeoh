@@ -3803,7 +3803,19 @@ body.kids-mode { --brand-accent: #ff9f1c; }
 #mobileSheetPanel button.sheetItem svg { flex: none; opacity: .85; }
 
 /* ---- veedeeoh.party -------------------------------------------------- */
-.partyWrap { max-width: 720px; margin: 0 auto; padding: 32px 20px 64px; }
+/* The hero used to be a <header>, which picked up the app's top-bar rule --
+   display:flex (so the title and blurb sat side by side), its own padding and
+   border, and a backdrop-filter that Safari promotes to a containing block.
+   It is a plain div now; these rules no longer fight anything.
+   margin-inline rather than the shorthand so a stray text-align on an ancestor
+   cannot decide where this sits. */
+.partyWrap {
+  max-width: 720px;
+  width: 100%;
+  margin-inline: auto;
+  padding: 32px 20px 64px;
+  text-align: left;
+}
 .partyHero h1 { font-size: 2rem; font-weight: 800; margin: 0 0 6px; }
 .partyHero p { color: rgba(255,255,255,0.62); margin: 0 0 28px; line-height: 1.5; }
 .partyCard {
@@ -4456,3 +4468,4 @@ body.party-guest { background: #06070a; }
   font-family: var(--display); font-weight: 800; font-size: 13.5px;
   cursor: pointer; box-shadow: 0 8px 26px rgba(0,0,0,.6);
 }
+.partyCodeInline { font-weight: 800; letter-spacing: .16em; color: var(--accent); }
