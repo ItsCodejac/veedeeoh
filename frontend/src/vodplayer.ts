@@ -134,11 +134,60 @@ class VodPlayer {
     }
 
     this.player = created;
+    this.fixQualityLabels();
     this.mountBufferSpinner(created);
     this.applyPrefs(created);
     this.style();
     this.wire();
     this.showBump();
+  }
+
+  /** Relabel quality options that have no resolution to report.
+   *
+   *  Pluto's HLS manifests carry BANDWIDTH but no RESOLUTION, so every level
+   *  reports height 0. Vidstack guards its hint text -- `height ? \`${height}p\`
+   *  : "Auto"` -- but builds the radio labels unguarded as `quality.height +
+   *  "p"`, so the menu lists "0p" five times.
+   *
+   *  Relabelled by RANK, not by an invented resolution. Guessing 1080p from
+   *  3.3 Mbps would be fabricating information the source never provided; the
+   *  ordering is real, and the exact bitrate is already shown beside each row.
+   *
+   *  Done in the DOM because the label is computed inside the library's own
+   *  options(), with no prop to override it. Scoped to this player's root and
+   *  to the exact string "0p", so it cannot touch anything else. */
+  private fixQualityLabels(): void {
+    const root = this.root;
+    if (!root) return;
+
+    const rank = (i: number, n: number): string => {
+      if (n <= 1) return "Standard";
+      const ladder = ["Highest", "High", "Medium", "Low", "Lowest"];
+      return ladder[Math.round((i * (ladder.length - 1)) / (n - 1))]!;
+    };
+
+    const relabel = () => {
+      const items = Array.from(root.querySelectorAll<HTMLElement>("[role=menuitemradio]"))
+        .filter((el) => /^0p$/.test(el.textContent?.trim().split("\n")[0]?.trim() || ""));
+      // Nothing to do on a source that reports real heights.
+      if (!items.length) return;
+
+      const zeroed = Array.from(root.querySelectorAll<HTMLElement>("[role=menuitemradio]"))
+        .filter((el) => (el.textContent || "").trim().startsWith("0p"));
+      zeroed.forEach((el, i) => {
+        for (const node of Array.from(el.querySelectorAll("*")).concat([el])) {
+          if (node.childElementCount === 0 && node.textContent?.trim() === "0p") {
+            node.textContent = rank(i, zeroed.length);
+          }
+        }
+      });
+    };
+
+    // The menu is built lazily when it is first opened, so there is nothing to
+    // rewrite until then.
+    const obs = new MutationObserver(relabel);
+    obs.observe(root, { childList: true, subtree: true });
+    this.ac.signal.addEventListener("abort", () => obs.disconnect());
   }
 
   /** Brand spinner for mid-stream stalls.
