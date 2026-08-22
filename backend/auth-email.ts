@@ -17,6 +17,7 @@
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { sendEmail } from './email';
+import { render, P, CODE } from './email-template';
 
 /** What Supabase posts. Only the fields we actually use are typed. */
 export interface AuthEmailPayload {
@@ -77,36 +78,31 @@ export function verifyHook(
 // Templates
 // ---------------------------------------------------------------------------
 
-const shell = (heading: string, body: string, cta: string, ctaUrl: string): string => `
-  <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background-color:#0b0f19;color:#f3f4f6;border-radius:12px;border:1px solid #1f293d;">
-    <div style="margin-bottom:24px;"><span style="font-size:24px;font-weight:800;color:#ffffff;">veedeeoh</span><span style="color:#c5f04e;font-size:24px;font-weight:800;">.</span></div>
-    <h1 style="font-size:22px;font-weight:700;margin-bottom:16px;color:#ffffff;">${heading}</h1>
-    ${body}
-    <p style="margin:26px 0;">
-      <a href="${ctaUrl}" style="display:inline-block;background:#c5f04e;color:#06070a;font-weight:800;font-size:15px;text-decoration:none;padding:13px 26px;border-radius:10px;">${cta}</a>
-    </p>
-    <p style="font-size:12px;color:#6b7280;line-height:1.6;">If the button does not work, paste this into your browser:<br>
-      <span style="color:#9ca3af;word-break:break-all;">${ctaUrl}</span></p>
-    <hr style="border:none;border-top:1px solid #1f293d;margin:24px 0;" />
-    <p style="font-size:12px;color:#6b7280;text-align:center;">veedeeoh &bull; <a href="https://veedeeoh.com" style="color:#6b7280;text-decoration:underline;">veedeeoh.com</a></p>
-  </div>`;
-
-const P = (t: string) =>
-  `<p style="font-size:15px;line-height:1.6;color:#9ca3af;margin-bottom:16px;">${t}</p>`;
-
-const CODE = (t: string) =>
-  `<p style="font-size:26px;letter-spacing:.22em;font-weight:800;color:#c5f04e;margin:8px 0 20px;">${t}</p>`;
-
-/** The link Supabase would have built itself. Verification happens against
- *  token_hash on their side; we only carry it. */
+/** Where a confirmation link goes: our own page, which completes the exchange
+ *  with supabase-js.
+ *
+ *  The first version built /auth/v1/verify against site_url, which is our
+ *  domain and does not have that endpoint. Pointing it at the Supabase project
+ *  instead does work -- it is what their default template does -- but it puts
+ *  another company's hostname and an apikey query parameter into an email that
+ *  claims to be from us. That is the shape of a phishing link, to a filter and
+ *  to anyone reading carefully, and the fallback line asking people to paste it
+ *  by hand made it worse.
+ *
+ *  The key was never the issue: the anon key ships in the front-end bundle and
+ *  authorises nothing alone. The link looking untrustworthy was the issue.
+ *
+ *  Found by clicking a real confirmation email, which returned
+ *  {"message":"No API key found in request"}. Every automated check had passed,
+ *  because all of them stopped at the point the message left the building. */
 function verifyUrl(d: AuthEmailPayload['email_data'], type?: string): string {
-  const base = (d.site_url || 'https://veedeeoh.com').replace(/\/$/, '');
+  const site = (process.env.PUBLIC_SITE_URL || d.site_url || 'https://veedeeoh.com').replace(/\/$/, '');
   const qs = new URLSearchParams({
     token_hash: d.token_hash,
     type: type || d.email_action_type,
   });
   if (d.redirect_to) qs.set('redirect_to', d.redirect_to);
-  return `${base}/auth/v1/verify?${qs.toString()}`;
+  return `${site}/auth/confirm?${qs.toString()}`;
 }
 
 interface Built { subject: string; html: string }
@@ -123,54 +119,74 @@ export function buildAuthEmail(p: AuthEmailPayload): Built {
   switch (d.email_action_type) {
     case 'signup':
       return {
-        subject: 'Confirm your veedeeoh account',
-        html: shell('Confirm your email',
-          P('Tap below and your account is ready. Your seven-day trial starts as soon as you do, and no card is needed for it.')
-          + P('If you did not sign up for veedeeoh, you can ignore this and nothing happens.'),
-          'Confirm my email', link),
+        subject: 'Confirm your email',
+        html: render({
+          preheader: 'One tap and your seven-day trial starts. No card needed.',
+          heading: 'Confirm your email',
+          body: P('Tap below and your account is ready. Your seven-day trial starts as soon as you do, and no card is needed for it.')
+            + P('If you did not sign up, you can ignore this and nothing happens.'),
+          cta: 'Confirm my email', ctaUrl: link, rawLink: link,
+        }),
       };
 
     case 'recovery':
       return {
-        subject: 'Reset your veedeeoh password',
-        html: shell('Reset your password',
-          P('Tap below to choose a new one. The link works once and expires shortly.')
-          + P('If you did not ask for this, ignore it -- your password has not changed.'),
-          'Choose a new password', link),
+        subject: 'Reset your password',
+        html: render({
+          preheader: 'The link works once and expires shortly.',
+          heading: 'Reset your password',
+          body: P('Tap below to choose a new one. The link works once and expires shortly.')
+            + P('If you did not ask for this, ignore it. Your password has not changed.'),
+          cta: 'Choose a new password', ctaUrl: link, rawLink: link,
+        }),
       };
 
     case 'magiclink':
       return {
-        subject: 'Your veedeeoh sign-in link',
-        html: shell('Sign in to veedeeoh',
-          P('Tap below to sign in. The link works once and expires shortly.')
-          + (d.token ? P('Or enter this code:') + CODE(d.token) : ''),
-          'Sign me in', link),
+        subject: 'Your sign-in link',
+        html: render({
+          preheader: 'Tap to sign in. The link works once.',
+          heading: 'Sign in',
+          body: P('Tap below to sign in. The link works once and expires shortly.')
+            + (d.token ? P('Or enter this code:') + CODE(d.token) : ''),
+          cta: 'Sign me in', ctaUrl: link, rawLink: link,
+        }),
       };
 
     case 'invite':
       return {
-        subject: 'You have been invited to veedeeoh',
-        html: shell('You have been invited',
-          P('Someone has invited you to their veedeeoh household. Tap below to set up your profile.'),
-          'Accept the invite', link),
+        subject: 'You have been invited',
+        html: render({
+          preheader: 'Someone has invited you to their household.',
+          heading: 'You have been invited',
+          body: P('Someone has invited you to their veedeeoh household. Tap below to set up your profile.'),
+          cta: 'Accept the invite', ctaUrl: link, rawLink: link,
+        }),
       };
 
     case 'email_change':
-    case 'email_change_new':
+    case 'email_change_new': {
+      const changeLink = verifyUrl(d, 'email_change');
       return {
-        subject: 'Confirm your new veedeeoh email address',
-        html: shell('Confirm your new address',
-          P(`Confirm the change to ${p.user.new_email || 'your new address'}. Until you do, your account keeps its current one.`),
-          'Confirm the change', verifyUrl(d, 'email_change')),
+        subject: 'Confirm your new email address',
+        html: render({
+          preheader: 'Until you confirm, your account keeps its current address.',
+          heading: 'Confirm your new address',
+          body: P(`Confirm the change to ${p.user.new_email || 'your new address'}. Until you do, your account keeps its current one.`),
+          cta: 'Confirm the change', ctaUrl: changeLink, rawLink: changeLink,
+        }),
       };
+    }
 
     default:
       return {
-        subject: 'A message about your veedeeoh account',
-        html: shell('Confirm this request',
-          P('Tap below to continue. If you were not expecting this, ignore it.'),
-          'Continue', link),
+        subject: 'A message about your account',
+        html: render({
+          preheader: 'Tap to continue. If you were not expecting this, ignore it.',
+          heading: 'Confirm this request',
+          body: P('Tap below to continue. If you were not expecting this, ignore it.'),
+          cta: 'Continue', ctaUrl: link, rawLink: link,
+        }),
       };
   }
 }

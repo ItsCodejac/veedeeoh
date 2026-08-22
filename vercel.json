@@ -27,6 +27,10 @@
       "dest": "/change-password.html"
     },
     {
+      "src": "/auth/confirm",
+      "dest": "/auth-confirm.html"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/api/index.ts"
     },

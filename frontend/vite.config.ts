@@ -15,7 +15,8 @@ export default defineConfig({
         privacy: 'privacy.html',
         terms: 'terms.html',
         notFound: '404.html',
-        selfHosting: 'self-hosting.html'
+        selfHosting: 'self-hosting.html',
+        authConfirm: 'auth-confirm.html'
       }
     }
   },
