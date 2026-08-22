@@ -4608,11 +4608,42 @@ body.can-host .vodQuickBtn.partyAct { display: flex; }
    anyone has to enforce. Nothing is stored. */
 #reactBar {
   position: fixed; left: 50%; bottom: 88px; transform: translateX(-50%);
-  z-index: 9998; display: flex; gap: 6px; padding: 7px 9px;
+  z-index: 9998; display: flex; align-items: center; gap: 6px; padding: 7px 9px;
   background: rgba(6,7,10,.82); border: 1px solid rgba(255,255,255,.14);
   border-radius: 999px; backdrop-filter: blur(10px);
+  transition: opacity .35s ease;
 }
-#reactBar.collapsed { padding: 6px; }
+/* Dragged somewhere by the viewer: left/top are set inline, so the centring
+   transform and the bottom anchor both have to go. */
+#reactBar.placed { bottom: auto; transform: none; }
+#reactBar.dragging { transition: none; cursor: grabbing; }
+/* Out of the way once the viewer settles, on the same principle as the player
+   controls. Never to zero -- a control that vanishes completely is one people
+   assume has broken, and they cannot aim at what they cannot see. */
+#reactBar.idle { opacity: .22; }
+#reactBar:hover, #reactBar:focus-within { opacity: 1; }
+#reactBar.collapsed { padding: 6px 6px 6px 3px; }
+/* Collapsed, it defaults to the corner rather than the middle. Someone who has
+   just said "hide this" should not be left with the leftover button parked in
+   the same spot over the picture. */
+#reactBar.collapsed:not(.placed) { left: auto; right: 18px; transform: none; }
+
+.reactGrip {
+  display: flex; align-items: center; justify-content: center;
+  width: 16px; height: 30px; color: #7d8694; cursor: grab;
+  touch-action: none; flex: none;
+  background: none; border: none; padding: 0;
+}
+.reactGrip:hover { color: #cfd6e0; }
+.reactGrip:focus-visible { outline: 2px solid var(--accent, #7c5cff); outline-offset: 2px; border-radius: 6px; }
+#reactBar.dragging .reactGrip { cursor: grabbing; color: #fff; }
+
+/* Stacked. Which orientation fits depends on whether the film letterboxes or
+   pillarboxes against this window, so both are offered rather than guessed. */
+#reactBar.vert { flex-direction: column; padding: 9px 7px; }
+#reactBar.vert .reactGrip { width: 30px; height: 16px; }
+#reactBar.vert .reactGrip svg { transform: rotate(90deg); }
+#reactBar.vert.collapsed { padding: 6px 6px 3px; }
 .reactBtn {
   width: 36px; height: 36px; border-radius: 50%;
   background: none; border: none; cursor: pointer;
@@ -4651,6 +4682,6 @@ body.can-host .vodQuickBtn.partyAct { display: flex; }
   @keyframes reactFade { 0%,70% { opacity: 1; } 100% { opacity: 0; } }
 }
 @media (max-width: 620px) {
-  #reactBar { bottom: 76px; }
+  #reactBar:not(.placed) { bottom: 76px; }
   #reactStage { width: 96px; right: 12px; }
 }
