@@ -258,9 +258,11 @@ export async function createParty(opts: PartyOptions): Promise<{ joinCode: strin
     seat_limit: opts.seatLimit ?? null,
     is_public: !!opts.isPublic,
     blurb: opts.isPublic ? (opts.blurb || null) : null,
-    // Snapshotted so the listing has a name without exposing the host's
-    // profile row, and so a later rename does not retitle a past party.
-    host_name: opts.isPublic ? (getActiveProfile()?.name || null) : null,
+    // Snapshotted so the listing has a name without exposing the host's profile
+    // row, and so a later rename does not retitle a past party. Recorded for
+    // PRIVATE parties too now: the people in one were invited by this person,
+    // and telling them whose room they are in is the least of it.
+    host_name: getActiveProfile()?.name || null,
   }).select("id").single();
   if (error) throw error;
 
@@ -361,6 +363,11 @@ export async function joinParty(joinCode: string): Promise<void> {
   partyTitle = item.title || "a watch party";
   partyRowId = party.id;
   partyStartedAt = Date.now();
+  hostChannel = {
+    name: (party as any).host_name ?? null,
+    platform: (party as any).social_platform ?? null,
+    handle: (party as any).social_handle ?? null,
+  };
   rememberParty(joinCode, partyTitle, "guest");
 
   const { showGuestLobby } = await import("./party-setup");
@@ -659,6 +666,7 @@ export function disconnect(): void {
   generation += 1;
   cancelRetry();
   sessionOpened = false;
+  hostChannel = { name: null, platform: null, handle: null };
   stopMetering();
   void import("./party-reactions").then((m) => m.unmountReactions()).catch(() => {});
   partyStartedAt = 0;
@@ -1157,6 +1165,17 @@ export async function partySignups(partyId: string): Promise<number> {
   if (error) return 0;
   return Number(data) || 0;
 }
+
+// The host's channel, for the party currently joined.
+//
+// It existed only on the public directory listing: you could see that a host
+// was on Discord while browsing, and then never again once you were actually in
+// the room with them -- which is the moment it is for. Held here so every
+// surface that has the viewer's attention while nothing is playing can offer it.
+export interface HostChannel { name: string | null; platform: string | null; handle: string | null }
+let hostChannel: HostChannel = { name: null, platform: null, handle: null };
+
+export function partyHostChannel(): HostChannel { return hostChannel; }
 
 /** Build a social URL from a platform and a handle. The handle is pattern
  *  checked in the database and the URL is assembled HERE, so no user-supplied

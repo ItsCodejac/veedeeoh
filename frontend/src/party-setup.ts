@@ -366,10 +366,15 @@ export function showGuestLobby(item: any, joinCode: string): () => void {
       <div class="prSub">Party ${escapeHtml(joinCode)}</div>
       <div class="vdTrackBar"><span></span></div>
       <p class="prNote" id="prGuestNote">Waiting for the host to start</p>
+      <div class="phcBox" id="prGuestChannel"></div>
       <button class="partyBtn prLeave" id="prGuestLeave">Leave</button>
     </div>`;
   document.body.appendChild(el);
   requestAnimationFrame(() => el.classList.add("in"));
+
+  // Waiting is the best moment for this: nothing is playing, and "join the chat
+  // while you wait" is the whole point of a host running one.
+  void fillHostChannel(el.querySelector<HTMLElement>("#prGuestChannel"));
 
   // WAITING WAS A ROOM WITH NO DOOR. A guest whose request the host had not
   // answered -- or was never going to -- had no way out of this screen except
@@ -630,6 +635,8 @@ export function showPartyEnded(opts: {
 
       <div class="peRow" id="peActions"></div>
 
+      ${opts.host ? "" : `<div class="phcBox" id="peChannel"></div>`}
+
       <div id="peUpsell"></div>
     </div>`;
   document.body.appendChild(el);
@@ -638,6 +645,10 @@ export function showPartyEnded(opts: {
   const close = () => { el.classList.remove("in"); setTimeout(() => el.remove(), 300); };
   void renderEndedActions(el.querySelector<HTMLElement>("#peActions")!, opts, close);
   void renderEndedUpsell(el.querySelector<HTMLElement>("#peUpsell")!, opts.host);
+  // The end of a party is when someone decides whether they want the next one.
+  // Handing them the host's channel here is the difference between an audience
+  // and a one-off.
+  if (!opts.host) void fillHostChannel(el.querySelector<HTMLElement>("#peChannel"));
   if (opts.host && opts.partyId) void renderEndedEarnings(el, opts.partyId);
 
 }
@@ -821,8 +832,10 @@ export function showWrap(isHost: boolean, title: string): void {
         <div class="pwRow">
           <button class="partyBtn" id="pwLeave">Leave party</button>
         </div>`}
+      ${isHost ? "" : `<div class="phcBox" id="pwChannel"></div>`}
     </div>`;
   document.body.appendChild(wrapEl);
+  if (!isHost) void fillHostChannel(wrapEl.querySelector("#pwChannel"));
 
   wrapEl.querySelector("#pwNext")?.addEventListener("click", () => void showNextPicker());
   wrapEl.querySelector("#pwEnd")?.addEventListener("click", async () => {
@@ -981,4 +994,70 @@ export function reconcileKnocks(stillWaiting: Set<string>): void {
     if (!stillWaiting.has(row.dataset.uid || "")) row.remove();
   }
   if (!stack.childElementCount) stack.remove();
+}
+
+// ---------------------------------------------------------------------------
+// The host's channel
+// ---------------------------------------------------------------------------
+//
+// It reached exactly one surface: the public directory. Someone browsing could
+// see a host was on Discord, join, and then never see it again -- and a private
+// party, which is people the host actually invited, could not show it at all.
+//
+// Offered at the three moments a viewer's attention is not on a film: waiting
+// for the party to start, between titles, and after it ends. Never over
+// playback, which is the one place an outbound link has no business being.
+
+const CHANNEL_LABEL: Record<string, string> = {
+  discord: "Discord", twitch: "Twitch", youtube: "YouTube",
+  x: "X", tiktok: "TikTok", instagram: "Instagram",
+};
+
+const CHANNEL_VERB: Record<string, string> = {
+  discord: "is chatting on", twitch: "streams on", youtube: "is on",
+  x: "is on", tiktok: "is on", instagram: "is on",
+};
+
+/** Markup for the host's channel, or "" when they have not set one.
+ *
+ *  Built from a platform and a handle, never from a stored URL, so a disguised
+ *  link, an open redirect or a shortener cannot appear here. rel is noopener
+ *  noreferrer: this is an outbound link to a stranger's page, rendered under
+ *  veedeeoh's name.
+ */
+export function hostChannelHtml(
+  ch: { name: string | null; platform: string | null; handle: string | null } | null,
+  tone: "full" | "chip" = "full",
+): string {
+  if (!ch?.platform || !ch.handle) return "";
+  const label = CHANNEL_LABEL[ch.platform] || "their channel";
+  const who = ch.name || "The host";
+  const link = `<a class="partySocial" data-host-channel="1"
+     href="#" target="_blank" rel="noopener noreferrer">Open ${escapeHtml(label)}</a>`;
+  if (tone === "chip") return link;
+  return `<p class="phcLine">${escapeHtml(who)} ${CHANNEL_VERB[ch.platform] || "is on"}
+    ${escapeHtml(label)}</p>${link}`;
+}
+
+/** Render the host's channel into a container, if there is one. Async because
+ *  the party module owns the channel and the URL builder both. */
+export async function fillHostChannel(box: HTMLElement | null, tone: "full" | "chip" = "full"): Promise<void> {
+  if (!box) return;
+  const { partyHostChannel } = await import("./party");
+  box.innerHTML = hostChannelHtml(partyHostChannel(), tone);
+  await wireHostChannel(box);
+}
+
+/** Fill in the href from the party module. Kept out of the markup so the URL is
+ *  assembled by the one function that knows how, rather than by every caller. */
+export async function wireHostChannel(root: ParentNode): Promise<void> {
+  const anchors = [...root.querySelectorAll<HTMLAnchorElement>("[data-host-channel]")];
+  if (!anchors.length) return;
+  const { partyHostChannel, socialUrl } = await import("./party");
+  const ch = partyHostChannel();
+  const url = socialUrl(ch.platform, ch.handle);
+  for (const a of anchors) {
+    if (url) a.href = url;
+    else a.remove();
+  }
 }

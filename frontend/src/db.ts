@@ -797,8 +797,15 @@ export async function buyPartyCredits(): Promise<void> {
 export interface HostSocial { platform: string | null; handle: string | null }
 
 export async function getHostSocial(): Promise<HostSocial> {
+  // Filtered explicitly rather than left to RLS. The same omission in
+  // getAccount() was what intermittently paywalled a paying account: a query
+  // issued before the session had hydrated came back with no row AND no error,
+  // which is indistinguishable from "you have not set one".
+  const { data: u } = await getSupabase().auth.getUser();
+  if (!u.user) return { platform: null, handle: null };
   const { data } = await getSupabase()
-    .from("profiles").select("social_platform, social_handle").maybeSingle();
+    .from("profiles").select("social_platform, social_handle")
+    .eq("id", u.user.id).maybeSingle();
   return { platform: data?.social_platform ?? null, handle: data?.social_handle ?? null };
 }
 

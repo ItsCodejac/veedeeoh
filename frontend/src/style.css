@@ -4846,3 +4846,10 @@ body.can-host .vodQuickBtn.partyAct { display: flex; }
 .pknBtns { display: flex; gap: 6px; }
 
 .prLeave { margin-top: 18px; }
+
+/* ---- the host's channel -------------------------------------------------
+   Shown while waiting, between titles, and after the party -- never over
+   playback, which is the one place an outbound link has no business being. */
+.phcBox { margin: 18px 0 0; text-align: center; }
+.phcLine { margin: 0 0 8px; font-size: 13px; color: rgba(255,255,255,.62); }
+.phcBox .partySocial { display: inline-block; }
