@@ -119,6 +119,15 @@ app.get('/stats', async (c: Context) => {
 app.get('/vod', async (c: Context) => {
   const region = (c.req.query('region') || 'US').toUpperCase();
 
+  // Edge-cache the catalogue. It was `max-age=0, must-revalidate`, so every
+  // page load in every browser pulled the whole 5 MB payload from the function
+  // -- billed as origin transfer, and served by a cron that only rebuilds it
+  // once a day. Ten minutes fresh with a day of stale-while-revalidate means
+  // the origin is touched roughly once per region per ten minutes instead of
+  // once per visitor, and nobody ever waits for a rebuild.
+  c.header('Cache-Control', 'public, s-maxage=600, stale-while-revalidate=86400');
+  c.header('Vary', 'Accept-Encoding');
+
   const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 

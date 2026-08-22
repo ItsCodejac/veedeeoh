@@ -40,7 +40,18 @@ const MINI_CSS =
   "z-index:9998;display:block;background:#000;border-radius:14px;overflow:hidden;cursor:pointer;" +
   "box-shadow:0 18px 50px rgba(0,0,0,0.6);border:1px solid rgba(197,240,78,0.5);";
 
-const proxied = (u: string) => `/proxy?url=${encodeURIComponent(u)}`;
+// The manifest relay lives on Cloudflare, not Vercel. Relaying through a Vercel
+// function is billed as Fast Origin Transfer -- roughly 1 GB per film against a
+// 10 GB allowance, which is what put this project at 75% of its free tier.
+// Cloudflare never bills data transfer.
+//
+// Only MANIFESTS go through it. Pluto's segment CDN reflects the requesting
+// origin in Access-Control-Allow-Origin, so the worker rewrites segment URLs to
+// the CDN directly and the player fetches them itself -- no video byte touches
+// our infrastructure at all.
+const PROXY_BASE = (import.meta.env.VITE_PROXY_URL as string) || "";
+const proxied = (u: string) =>
+  `${PROXY_BASE}/proxy?url=${encodeURIComponent(u)}`;
 
 // Pluto's CDN answers with `access-control-allow-origin: http://pluto.tv`, so a
 // browser can never read its manifests cross-origin however fresh the token is.

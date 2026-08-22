@@ -1,0 +1,6 @@
+# Stream proxy. Separate worker from the party sync object so a burst of
+# segment traffic cannot interfere with party WebSockets, and so either can be
+# redeployed without touching the other.
+name = "veedeeoh-proxy"
+main = "proxy.ts"
+compatibility_date = "2026-08-01"
