@@ -4436,8 +4436,16 @@ body.party-guest { background: #06070a; }
 .party-viewer .vds-time-slider,
 .party-viewer .vds-slider.vds-time-slider,
 .party-viewer .vds-chapter-title { display: none !important; }
+
+/* Speed goes too. It desyncs exactly as surely as scrubbing does, and it also
+   fights the sync itself -- drift is corrected by nudging playbackRate, so a
+   viewer setting their own would be overwritten every heartbeat. Everything
+   else in the settings menu stays: quality, captions, audio track. */
+.party-viewer .vds-speed-menu { display: none !important; }
+
 /* Vidstack's gesture layer toggles play on tap; in a party that is the same
-   desync by another route. */
+   desync by another route. Picture-in-picture, fullscreen, volume and the rest
+   of the settings menu are untouched -- they change nothing anyone else sees. */
 .party-viewer media-gesture[action="toggle:paused"] { display: none !important; }
 
 #partyResync {
