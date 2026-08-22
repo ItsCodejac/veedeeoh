@@ -3,14 +3,45 @@ import { getSession, restoreSession, signIn, signUp, signInWithGoogle, signInWit
 async function checkAuth() {
   const session = await restoreSession();
   if (session) {
-    window.location.href = '/index.html';
+    window.location.href = afterAuthUrl();
   }
 }
 
 let isSignUpMode = false;
 
+// A watch party link that lands here needs to say WHY. Someone sent a link,
+// they were bounced to a marketing page, and nothing on it mentioned a party --
+// which reads as a broken link rather than "sign in first".
+function showPartyContext(): void {
+  const code = new URLSearchParams(window.location.search).get('party');
+  if (!code) return;
+
+  const title = document.getElementById('authTitle');
+  const sub = document.getElementById('authSubtitle');
+  if (title) title.textContent = 'Join the watch party';
+  if (sub) sub.textContent = `You have been invited to party ${code.toUpperCase()}. Sign in or create a free account to join \u2014 it takes a moment.`;
+
+  const modal = document.getElementById('authModal');
+  if (modal) modal.style.display = 'flex';
+}
+
+// Where to go after a successful sign-in. A watch party link that reaches the
+// landing page must survive the round trip -- every redirect went to a bare
+// /index.html, so an invited guest signed up and arrived at Home with no party,
+// which reads as a broken link.
+function afterAuthUrl(): string {
+  const q = new URLSearchParams(window.location.search);
+  const carry = new URLSearchParams();
+  for (const k of ['party', 'ref']) {
+    const v = q.get(k);
+    if (v) carry.set(k, v);
+  }
+  return '/index.html' + (carry.toString() ? `?${carry}` : '');
+}
+
 // Handle incoming family invite links on Landing Page
 function checkInviteLink() {
+  showPartyContext();
   const params = new URLSearchParams(window.location.search);
   const inviteCode = params.get('invite');
   const accName = params.get('acc');
@@ -254,7 +285,7 @@ if (passkeyBtn) {
       successTitle.textContent = 'Welcome Back';
       successMessage.textContent = 'Passkey verified successfully. Redirecting...';
       setTimeout(() => {
-        window.location.href = '/index.html';
+        window.location.href = afterAuthUrl();
       }, 1000);
     } catch (e: any) {
       authMessage.textContent = e?.message || 'Passkey sign-in failed. You may need to enroll a passkey first in your account settings.';
@@ -300,7 +331,7 @@ if (authForm) {
         successTitle.textContent = 'Account Created';
         successMessage.textContent = 'Account created successfully. Redirecting to your dashboard...';
         setTimeout(() => {
-          window.location.href = '/index.html';
+          window.location.href = afterAuthUrl();
         }, 1500);
       } else {
         const { mustChangePassword } = await signIn(email, password);
@@ -314,7 +345,7 @@ if (authForm) {
         } else {
           successMessage.textContent = 'Access granted! Redirecting...';
           setTimeout(() => {
-            window.location.href = '/index.html';
+            window.location.href = afterAuthUrl();
           }, 1000);
         }
       }

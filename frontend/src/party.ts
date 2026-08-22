@@ -113,10 +113,17 @@ export async function createParty(opts: PartyOptions): Promise<{ joinCode: strin
 export async function joinParty(joinCode: string): Promise<void> {
   if (!WORKER_URL) { showToast("Watch Party isn't configured yet"); return; }
 
+  // A guest following a link previously landed on Home and waited through the
+  // catalogue load, the party lookup and the stream resolve with nothing on
+  // screen explaining any of it -- so the invite looked like it had failed
+  // right up until the film appeared. Covered, and torn down on every exit
+  // path below.
+  const veil = showJoining(joinCode);
+
   const sb = getSupabase();
   const { data: party, error } = await sb.from("parties")
     .select("*").eq("join_code", joinCode).is("ended_at", null).maybeSingle();
-  if (error || !party) { showToast("That party has ended or the link is wrong"); return; }
+  if (error || !party) { veil(); showToast("That party has ended or the link is wrong"); return; }
 
   // THE KIDS TRAP. A party link handed to a kids profile would otherwise play
   // whatever the host is playing. Refuse outright rather than filtering -- a
@@ -127,13 +134,14 @@ export async function joinParty(joinCode: string): Promise<void> {
     const item = await lookupCatalogItem(party.content_id);
     const rating = (item?.rating || "").toUpperCase();
     if (!rating || !allowed.has(rating)) {
+      veil();
       showToast(`This party is playing something outside ${profile.name}'s rating limits`);
       return;
     }
   }
 
   const { data: u } = await sb.auth.getUser();
-  if (!u.user) { showToast("Sign in to join the party"); return; }
+  if (!u.user) { veil(); showToast("Sign in to join the party"); return; }
 
   // Two separate records, deliberately. party_joins is the presence log for
   // this party; the referral is a permanent, first-touch claim on the guest's
@@ -148,10 +156,20 @@ export async function joinParty(joinCode: string): Promise<void> {
     .then(({ error: e }) => { if (e) console.warn("[party] referral not recorded", e); });
 
   const item = await lookupCatalogItem(party.content_id);
-  if (!item) { showToast("That title isn't in the catalog any more"); return; }
+  if (!item) { veil(); showToast("That title isn't in the catalog any more"); return; }
 
-  await openVodPlayer(asPartyChannel(item), party.stream_idx || 0, 0);
+  // Each viewer resolves their OWN url -- a Pluto JWT is per-session and
+  // expires, so the host's cannot be shared. asPartyChannel used to read
+  // `item.url`, which is only set for legacy catalogue rows, so a Pluto, Tubi
+  // or Archive title handed the player a stream with url undefined and the
+  // joiner landed on "this title isn't available to stream right now".
+  const { resolveItemStream } = await import("./vod");
+  const url = await resolveItemStream(item);
+  if (!url) { veil(); showToast("That title can't be streamed right now"); return; }
+
+  await openVodPlayer(asPartyChannel(item, url), party.stream_idx || 0, 0);
   await connect(joinCode, false);
+  veil();
 }
 
 // ----------------------------------------------------------------- socket ---
@@ -299,13 +317,38 @@ async function lookupCatalogItem(contentId: string): Promise<any | null> {
 }
 
 /** Mirrors asChannel in vod.ts so the player receives the shape it expects. */
-function asPartyChannel(item: any): any {
+function asPartyChannel(item: any, url: string): any {
   return {
     id: `vod:${item.id}`,
     name: item.title,
     country: null, categories: [], nsfw: false, logo: null, logos: [],
-    streams: item.streams || [{ url: item.url, quality: null, source: item.genre || "Party" }],
+    streams: [{ url, quality: null, source: item.genre || "Party" }],
     source: item.genre || "Watch Party",
     vodPoster: item.poster, vodBanner: item.banner, vodItem: item,
+  };
+}
+
+
+/** Full-screen "joining" cover. Returns its own dismiss function so every exit
+ *  path from joinParty -- including the failures -- can drop it, rather than
+ *  relying on one happy-path removal that a `return` above it would skip. */
+function showJoining(code: string): () => void {
+  const el = document.createElement("div");
+  el.id = "partyJoining";
+  el.innerHTML = `
+    <div class="pjInner">
+      <div class="pjMark">veedeeoh<span class="dot">.</span><span class="sfx">party</span></div>
+      <div class="pjSub">Joining ${code.toUpperCase()}</div>
+      <div class="vdTrackBar"><span></span></div>
+    </div>`;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add("in"));
+
+  let gone = false;
+  return () => {
+    if (gone) return;
+    gone = true;
+    el.classList.remove("in");
+    setTimeout(() => el.remove(), 380);
   };
 }

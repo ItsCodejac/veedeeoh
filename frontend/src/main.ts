@@ -436,7 +436,17 @@ async function boot(): Promise<void> {
   if (isCloudMode()) {
     const session = await restoreSession();
     if (!session) {
-      window.location.href = '/landing.html';
+      // Carry the invite through sign-in. This dropped every parameter, so
+      // someone following a watch party link with no account landed on a bare
+      // landing page with no idea why, signed up, and arrived at Home with the
+      // party gone.
+      const q = new URLSearchParams(location.search);
+      const carry = new URLSearchParams();
+      for (const k of ['party', 'ref', 'invite', 'beta']) {
+        const v = q.get(k);
+        if (v) carry.set(k, v);
+      }
+      window.location.href = '/landing.html' + (carry.toString() ? `?${carry}` : '');
       return;
     }
     // A legacy local-only session can't write to the DB (no auth.uid()), which
