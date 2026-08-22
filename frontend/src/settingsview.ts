@@ -171,7 +171,12 @@ function renderAbout(el: HTMLElement): void {
     <div class="setBtnRow">
       <button class="setBtn" id="setReport">Report a problem</button>
       <button class="setBtn" id="setInstall">Install app</button>
-    </div>`);
+    </div>
+    <p class="setHint" style="margin-top:14px">
+      <a href="/terms.html" target="_blank" rel="noopener">Terms of Service</a>
+      &nbsp;&middot;&nbsp;
+      <a href="/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>
+    </p>`);
   // Forward to the real controls rather than duplicating them, so behaviour
   // cannot drift between here and the sidebar.
   el.querySelector("#setReport")?.addEventListener("click", () =>

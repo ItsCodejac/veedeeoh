@@ -826,7 +826,33 @@ const DRIFT_SEEK_S = 6;
  *  only when genuinely far out. A rejected play() surfaces to the UI instead of
  *  being discarded.
  */
+// The host's last known state and when THIS device received it. Position is
+// extrapolated from these rather than used verbatim.
+let lastState: PartyPlaybackState | null = null;
+let lastStateAt = 0;
+let syncTicker: number | null = null;
+
+/** Where the host is RIGHT NOW, not where they were when they last spoke.
+ *
+ *  The host emits every five seconds. Applying positionSecs verbatim aims at a
+ *  moment that has already passed, so a viewer corrected mid-interval lands
+ *  behind and stays there -- worst after a hard seek, where the gap that opens
+ *  while the new position buffers survives until the next heartbeat.
+ *
+ *  Measured against the LOCAL receipt time, not the message's own timestamp:
+ *  the worker's clock and the viewer's may differ by seconds, and only the
+ *  elapsed interval matters, which the local clock gives exactly. */
+function expectedPosition(): number | null {
+  if (!lastState) return null;
+  if (lastState.paused) return lastState.positionSecs;
+  return lastState.positionSecs + (Date.now() - lastStateAt) / 1000;
+}
+
 export function applyPartyState(s: PartyPlaybackState): void {
+  lastState = s;
+  lastStateAt = Date.now();
+  startSyncTicker();
+
   const p = current?.raw();
   if (!p) return;
   applyingRemote = true;
@@ -844,11 +870,11 @@ export function applyPartyState(s: PartyPlaybackState): void {
     // A seek in flight has not landed yet, so its position means nothing.
     // Measuring against it is what produced the loop.
     if (!p.seeking) {
-      const drift = s.positionSecs - (p.currentTime ?? 0);
+      const drift = (expectedPosition() ?? s.positionSecs) - (p.currentTime ?? 0);
       const mag = Math.abs(drift);
 
       if (mag > DRIFT_SEEK_S) {
-        p.currentTime = s.positionSecs;
+        p.currentTime = expectedPosition() ?? s.positionSecs;
         p.playbackRate = 1;
       } else if (mag > DRIFT_NUDGE_S) {
         // +/-5% closes a couple of seconds over the next heartbeat without a
@@ -873,6 +899,33 @@ export function applyPartyState(s: PartyPlaybackState): void {
     }
   } catch { /* player torn down mid-apply */ }
   applyingRemote = false;
+}
+
+/** Correct between heartbeats instead of only when one arrives.
+ *
+ *  A viewer that only reconciles on receipt keeps whatever gap it had for the
+ *  full five seconds, which is exactly the window a seek opens. Once a second
+ *  is frequent enough to close a gap quickly and far too cheap to matter -- it
+ *  is local arithmetic and a playback-rate tweak, no network at all. */
+function startSyncTicker(): void {
+  if (syncTicker !== null) return;
+  syncTicker = window.setInterval(() => {
+    const p = current?.raw();
+    const want = expectedPosition();
+    if (!p || want === null || lastState?.paused || p.paused || p.seeking) return;
+
+    const drift = want - (p.currentTime ?? 0);
+    const mag = Math.abs(drift);
+    if (mag > DRIFT_SEEK_S) { p.currentTime = want; p.playbackRate = 1; }
+    else if (mag > DRIFT_NUDGE_S) p.playbackRate = 1 + Math.max(-0.05, Math.min(0.05, drift / 20));
+    else if (p.playbackRate !== 1) p.playbackRate = 1;
+  }, 1000);
+}
+
+export function stopPartySync(): void {
+  if (syncTicker !== null) { clearInterval(syncTicker); syncTicker = null; }
+  lastState = null;
+  lastStateAt = 0;
 }
 
 /** Resume playback that a backgrounded browser paused.

@@ -4028,6 +4028,8 @@ body.kids-mode { --brand-accent: #ff9f1c; }
 .setCard h2 { font-size: 1.02rem; font-weight: 700; margin: 0 0 4px; }
 .setHint { color: rgba(255,255,255,0.55); font-size: 13px; line-height: 1.55; margin: 0 0 14px; }
 .setCard h2 + .setHint { margin-top: 2px; }
+.setHint a { color: var(--accent, #c5f04e); text-decoration: none; }
+.setHint a:hover { text-decoration: underline; }
 .setDim { color: rgba(255,255,255,0.45); font-weight: 500; }
 
 .setRow {

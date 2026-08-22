@@ -11,7 +11,7 @@ import { getSupabase } from "./auth";
 import { getActiveProfile } from "./profiles";
 import { allowedRatingsFor } from "./db";
 import { showToast } from "./util";
-import { openVodPlayer, setPartyEmitter, applyPartyState, setPartyViewerMode, resyncToHost, type PartyPlaybackState } from "./vodplayer";
+import { openVodPlayer, setPartyEmitter, applyPartyState, setPartyViewerMode, resyncToHost, stopPartySync, type PartyPlaybackState } from "./vodplayer";
 
 const WORKER_URL = (import.meta.env.VITE_PARTY_WORKER_URL as string) || "";
 
@@ -385,6 +385,7 @@ export function endParty(): void {
 
 export function disconnect(): void {
   stopMetering();
+  stopPartySync();
   stopWatchingVisibility();
   showHostAway(false);
   showResync(false);
