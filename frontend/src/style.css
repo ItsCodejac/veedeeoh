@@ -4380,3 +4380,49 @@ body.party-guest { background: #06070a; }
   #partyWipe.in { opacity: 1; }
   .pwMark { transition: none; opacity: 1; transform: none; }
 }
+
+/* ---- Party green room -------------------------------------------------
+   Creating a party used to start the film immediately, so the host watched
+   alone while still copying the link and anyone arriving came in part-way
+   through. The party now has a beginning the host controls. */
+#partyRoom {
+  position: fixed; inset: 0; z-index: 10000;
+  background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px; overflow-y: auto;
+  opacity: 0; transition: opacity .3s ease;
+  font-family: var(--display);
+}
+#partyRoom.in { opacity: 1; }
+.prInner { display: flex; flex-direction: column; align-items: center; gap: 14px; max-width: 460px; width: 100%; text-align: center; }
+.prMark { font-family: var(--brand); font-size: 22px; font-weight: 800; letter-spacing: -0.04em; margin-bottom: 6px; }
+.prMark .dot, .prMark .sfx { color: var(--accent); }
+.prArt { width: 100%; max-width: 340px; aspect-ratio: 16/9; object-fit: cover; border-radius: 12px; background: #10141e; }
+.prTitle { font-family: var(--brand); font-size: clamp(20px, 4vw, 27px); font-weight: 800; margin: 2px 0 0; line-height: 1.2; }
+.prSub { font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #8A8F98; }
+.prNote { font-size: 12.5px; color: rgba(255,255,255,.42); margin: 2px 0 0; }
+
+.prCodeBlock {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: center;
+  background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1);
+  border-radius: 12px; padding: 12px 16px; width: 100%;
+}
+.prCodeLabel { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: rgba(255,255,255,.45); }
+.prCode { font-size: 20px; font-weight: 800; letter-spacing: .2em; color: var(--accent); }
+
+.prRoster { width: 100%; display: flex; flex-direction: column; gap: 10px; }
+.prWaiting { background: rgba(255,94,126,.09); border: 1px solid rgba(255,94,126,.35); border-radius: 11px; padding: 11px; }
+.prWaiting .prSub { color: #ff8f9f; margin-bottom: 6px; }
+.prPerson { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 0; font-size: 13.5px; }
+.prChips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.prChip { background: rgba(255,255,255,.08); border-radius: 999px; padding: 4px 11px; font-size: 12.5px; }
+
+.prBtn {
+  padding: 9px 16px; border-radius: 9px; font: inherit; font-size: 13.5px; font-weight: 700;
+  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16); color: #fff; cursor: pointer;
+}
+.prBtn.primary { background: var(--accent); border-color: var(--accent); color: #06070a; font-weight: 800; }
+.prBtn.big { width: 100%; padding: 14px; font-size: 15px; margin-top: 4px; }
+.prBtn.small { padding: 5px 11px; font-size: 12px; }
+.prBtn.text { background: none; border: none; color: rgba(255,255,255,.45); font-weight: 600; }
+.prBtn.text:hover { color: #ff8f8f; }

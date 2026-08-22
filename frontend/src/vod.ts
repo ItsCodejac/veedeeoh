@@ -435,7 +435,7 @@ async function setupWatchPartyButton(item: VodItem): Promise<void> {
  *  Shared by the detail-view button and the picker in veedeeoh.party, so both
  *  entry points get the same setup sheet and the same stream resolution. */
 export async function startWatchParty(item: VodItem): Promise<boolean> {
-  const { openPartySetup, mountHostLobby, partyTransition } = await import("./party-setup");
+  const { openPartySetup, mountHostLobby, showHostLobby, partyTransition } = await import("./party-setup");
   // Hand off from the catalogue to the party surface deliberately, instead of
   // leaving the detail overlay sitting there while a chunk loads and a sheet
   // fades in on top of it.
@@ -488,12 +488,17 @@ export async function startWatchParty(item: VodItem): Promise<boolean> {
       requireApproval: setup.requireApproval,
     });
 
-    await openVodPlayer(asChannel(item, streams as any), 0);
+    // Connect FIRST so the green room can show people arriving, but do not
+    // open the player: the host gathers everyone, then starts.
     await party.hostExisting(joinCode);
-    mountHostLobby(joinCode, link);
-
     try { await navigator.clipboard.writeText(link); showToast("Party link copied \u2014 share it"); }
-    catch { showToast(`Party code ${joinCode}`); }
+    catch { /* the room shows the code */ }
+
+    await showHostLobby(item, joinCode, link);
+
+    party.startPlayback();
+    await openVodPlayer(asChannel(item, streams as any), 0);
+    mountHostLobby(joinCode, link);
     return true;
   } catch (e: any) {
     showToast(e?.message || "Couldn't start the party");

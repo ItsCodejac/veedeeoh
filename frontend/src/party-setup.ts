@@ -155,6 +155,141 @@ export function openPartySetup(item: VodItem): Promise<PartySetup | null> {
   });
 }
 
+// ------------------------------------------------------------- green room ---
+
+const partyArt = (item: VodItem) => item.banner || item.poster || "";
+
+/** The host's green room. Nothing plays until they say so.
+ *
+ *  Creating a party used to start the film immediately, so the host was
+ *  watching alone while still copying the link, and anyone who arrived came in
+ *  part-way through. The party now has a beginning that the host controls.
+ *
+ *  Resolves when they press play. */
+export function showHostLobby(item: VodItem, joinCode: string, link: string): Promise<void> {
+  return new Promise((resolve) => {
+    const el = document.createElement("div");
+    el.id = "partyRoom";
+    el.innerHTML = `
+      <div class="prInner">
+        <div class="prMark">veedeeoh<span class="dot">.</span><span class="sfx">party</span></div>
+        ${partyArt(item) ? `<img class="prArt" src="${escapeHtml(partyArt(item))}" alt="">` : ""}
+        <h1 class="prTitle">${escapeHtml(item.title)}</h1>
+
+        <div class="prCodeBlock">
+          <span class="prCodeLabel">Party code</span>
+          <span class="prCode">${escapeHtml(joinCode)}</span>
+          <button class="prBtn" id="prCopy">Copy invite link</button>
+        </div>
+
+        <div class="prRoster" id="prRoster"></div>
+
+        <button class="prBtn primary big" id="prStart">Start watching</button>
+        <button class="prBtn text" id="prCancel">Cancel the party</button>
+        <p class="prNote">Nobody sees anything until you press start.</p>
+      </div>`;
+    document.body.appendChild(el);
+    requestAnimationFrame(() => el.classList.add("in"));
+
+    const paintRoster = (e?: Event) => {
+      const d = (e as CustomEvent)?.detail || {};
+      const watching = d.watching ?? [];
+      const waiting = d.waiting ?? [];
+      const box = el.querySelector<HTMLElement>("#prRoster");
+      if (!box) return;
+      box.innerHTML = `
+        ${waiting.length ? `
+          <div class="prWaiting">
+            <div class="prSub">${waiting.length === 1 ? "1 person wants to join" : `${waiting.length} people want to join`}</div>
+            ${waiting.map((w: any) => `
+              <div class="prPerson" data-uid="${escapeHtml(w.userId)}">
+                <span>${escapeHtml(w.name)}</span>
+                <span>
+                  <button class="prBtn small primary" data-act="admit">Let in</button>
+                  <button class="prBtn small" data-act="refuse">No</button>
+                </span>
+              </div>`).join("")}
+          </div>` : ""}
+        <div class="prSub">${watching.length ? `${watching.length} ready` : "Waiting for people to join"}</div>
+        <div class="prChips">
+          ${watching.map((w: any) => `<span class="prChip">${escapeHtml(w.name)}</span>`).join("")}
+        </div>`;
+
+      box.querySelectorAll<HTMLElement>("[data-act]").forEach((b) => {
+        b.addEventListener("click", async () => {
+          const uid = b.closest<HTMLElement>("[data-uid]")?.dataset.uid;
+          if (!uid) return;
+          const { respondToKnock } = await import("./party");
+          respondToKnock(uid, b.dataset.act === "admit");
+          b.closest<HTMLElement>("[data-uid]")?.remove();
+        });
+      });
+    };
+    paintRoster();
+    window.addEventListener("veedeeoh:party-roster", paintRoster);
+
+    const close = () => {
+      window.removeEventListener("veedeeoh:party-roster", paintRoster);
+      el.classList.remove("in");
+      setTimeout(() => el.remove(), 320);
+    };
+
+    el.querySelector("#prCopy")!.addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(link); showToast("Invite link copied"); }
+      catch { showToast(`Party code ${joinCode}`); }
+    });
+    el.querySelector("#prStart")!.addEventListener("click", () => { close(); resolve(); });
+    el.querySelector("#prCancel")!.addEventListener("click", async () => {
+      if (!confirm("Cancel this party? Anyone waiting will be disconnected.")) return;
+      const { endParty } = await import("./party");
+      endParty();
+      close();
+    });
+  });
+}
+
+/** The guest's side of the same moment. No controls -- they are waiting on
+ *  someone else -- so this only has to say what they are waiting for, and make
+ *  it obvious the link worked. */
+export function showGuestLobby(item: any, joinCode: string): () => void {
+  const el = document.createElement("div");
+  el.id = "partyRoom";
+  el.innerHTML = `
+    <div class="prInner">
+      <div class="prMark">veedeeoh<span class="dot">.</span><span class="sfx">party</span></div>
+      ${partyArt(item) ? `<img class="prArt" src="${escapeHtml(partyArt(item))}" alt="">` : ""}
+      <h1 class="prTitle">${escapeHtml(item.title)}</h1>
+      <div class="prSub">Party ${escapeHtml(joinCode)}</div>
+      <div class="vdTrackBar"><span></span></div>
+      <p class="prNote" id="prGuestNote">Waiting for the host to start</p>
+    </div>`;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add("in"));
+
+  // The host may still be approving them; say so rather than leaving the same
+  // line up regardless of what is actually happening.
+  const pending = () => {
+    const n = el.querySelector("#prGuestNote");
+    if (n) n.textContent = "Waiting for the host to let you in";
+  };
+  const admitted = () => {
+    const n = el.querySelector("#prGuestNote");
+    if (n) n.textContent = "You are in. Waiting for the host to start";
+  };
+  window.addEventListener("veedeeoh:party-pending", pending);
+  window.addEventListener("veedeeoh:party-admitted", admitted);
+
+  let gone = false;
+  return () => {
+    if (gone) return;
+    gone = true;
+    window.removeEventListener("veedeeoh:party-pending", pending);
+    window.removeEventListener("veedeeoh:party-admitted", admitted);
+    el.classList.remove("in");
+    setTimeout(() => el.remove(), 320);
+  };
+}
+
 // ------------------------------------------------------------------ lobby ---
 
 let lobby: HTMLElement | null = null;

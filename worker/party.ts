@@ -60,6 +60,10 @@ interface Config {
   hostToken: string;
   requireApproval: boolean;
   createdAt: number;
+  /** Set once the host presses play. Persisted rather than held in memory so a
+   *  guest arriving after the object was evicted still learns the party is
+   *  already running, instead of sitting in a lobby that will never open. */
+  started?: boolean;
 }
 
 const STATE_KEY = "state";
@@ -173,6 +177,8 @@ export class Party extends DurableObject<Env> {
     server.serializeAttachment({ isHost, userId, name, approved } satisfies Attachment);
 
     if (approved) {
+      // A late joiner needs both: "the film has begun" and where it is up to.
+      if (config.started) server.send(JSON.stringify({ type: "start" }));
       const state = await this.ctx.storage.get<PartyState>(STATE_KEY);
       if (state) server.send(JSON.stringify({ type: "state", state }));
     } else {
@@ -203,9 +209,13 @@ export class Party extends DurableObject<Env> {
           continue;
         }
         sock.serializeAttachment({ ...a, approved: true });
+        const cfg = await this.ctx.storage.get<Config>(CONFIG_KEY);
         const state = await this.ctx.storage.get<PartyState>(STATE_KEY);
         try {
           sock.send(JSON.stringify({ type: "admitted" }));
+          // Admitted mid-film: send them straight in rather than into a lobby
+          // that has already been left behind.
+          if (cfg?.started) sock.send(JSON.stringify({ type: "start" }));
           if (state) sock.send(JSON.stringify({ type: "state", state }));
         } catch {}
       }
@@ -225,6 +235,18 @@ export class Party extends DurableObject<Env> {
         try { sock.send(JSON.stringify({ type: "removed" })); sock.close(4004, "removed"); } catch {}
       }
       this.broadcastPresence();
+      return;
+    }
+
+    // Host opens the doors. Until this lands, an approved guest sits in the
+    // lobby holding a socket and receives no playback state at all.
+    if (msg?.type === "start") {
+      if (!att.isHost) return;
+      const config = await this.ctx.storage.get<Config>(CONFIG_KEY);
+      if (config && !config.started) {
+        await this.ctx.storage.put<Config>(CONFIG_KEY, { ...config, started: true });
+      }
+      this.broadcast({ type: "start" }, ws, true);
       return;
     }
 

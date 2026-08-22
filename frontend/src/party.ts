@@ -167,9 +167,21 @@ export async function joinParty(joinCode: string): Promise<void> {
   const url = await resolveItemStream(item);
   if (!url) { veil(); showToast("That title can't be streamed right now"); return; }
 
-  await openVodPlayer(asPartyChannel(item, url), party.stream_idx || 0, 0);
-  await connect(joinCode, false);
+  // Do NOT open the player yet. A guest was dropped straight into the film the
+  // instant they joined, so the host had no moment to gather anyone and an
+  // early arrival watched alone. The player opens on the host's start signal --
+  // or immediately, if the worker reports the party already running, which is
+  // what a late joiner gets.
+  const { showGuestLobby } = await import("./party-setup");
+  const closeLobby = showGuestLobby(item, joinCode);
   veil();
+
+  window.addEventListener("veedeeoh:party-start", () => {
+    closeLobby();
+    void openVodPlayer(asPartyChannel(item, url), party.stream_idx || 0, 0);
+  }, { once: true });
+
+  await connect(joinCode, false);
 }
 
 // ----------------------------------------------------------------- socket ---
@@ -204,6 +216,7 @@ async function connect(joinCode: string, isHost: boolean): Promise<void> {
       case "knock":     showToast(`${msg.name} wants to join`); break;
       case "pending":   emit({}, "veedeeoh:party-pending"); showToast("Waiting for the host to let you in"); break;
       case "admitted":  emit({}, "veedeeoh:party-admitted"); showToast("You're in"); break;
+      case "start":     emit({}, "veedeeoh:party-start"); break;
       case "refused":   showToast("The host did not let you in"); break;
       case "removed":   showToast("The host removed you from the party"); disconnect(); break;
       case "closed":    showToast(msg.reason === "idle" ? "The party timed out" : "The host ended the party"); disconnect(); break;
@@ -226,6 +239,12 @@ async function connect(joinCode: string, isHost: boolean): Promise<void> {
 /** Host admits or refuses someone waiting in the lobby. */
 export function respondToKnock(userId: string, admit: boolean): void {
   socket?.send(JSON.stringify({ type: admit ? "admit" : "refuse", userId }));
+}
+
+/** Host opens the doors. Until this is sent, every approved guest sits in the
+ *  green room with a socket open and no playback state. */
+export function startPlayback(): void {
+  socket?.send(JSON.stringify({ type: "start" }));
 }
 
 /** Host removes someone already admitted. */
