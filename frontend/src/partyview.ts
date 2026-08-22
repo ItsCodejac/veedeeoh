@@ -1,9 +1,11 @@
 // veedeeoh.party — the sidebar surface for Watch Party.
 //
-// Hosting starts from a TITLE (the Watch Party button in the detail overlay),
-// because a party is meaningless without something to play. This panel is the
-// other half: joining by code, and seeing/ending the party you already host.
+// A party is meaningless without something to play, so hosting always starts
+// from a TITLE -- either the Watch Party button in the detail overlay, or the
+// picker below. This panel also covers what the overlay cannot: joining by
+// code, and seeing or ending the party you already host.
 
+import type { VodItem } from "./types";
 import { escapeHtml, showToast } from "./util";
 import {
   activePartyCode, disconnect, joinParty, partyEnabled, partyLink,
@@ -44,9 +46,14 @@ export function renderParty(el: HTMLElement): void {
 
       <section class="partyCard">
         <h2>Start a party</h2>
-        <p class="partyHint">
-          Open any title, then press <strong>Watch Party</strong> on its details page.
-          You will get a code and a link to share.
+        <p class="partyHint">Pick something to watch. You will get a code and a link to share.</p>
+        <div class="partyRow">
+          <input id="partyPickInput" class="partyInput" autocomplete="off" spellcheck="false"
+                 placeholder="Search movies and shows" aria-label="Search for something to host" />
+        </div>
+        <div id="partyPickResults" class="partyPickList"></div>
+        <p class="partyHint" style="margin: 12px 0 0;">
+          You can also press <strong>Watch Party</strong> on any title's details page.
         </p>
       </section>
 
@@ -67,6 +74,8 @@ export function renderParty(el: HTMLElement): void {
     void joinParty(c, el.querySelector<HTMLInputElement>("#partyPassInput")!.value || undefined);
   };
   el.querySelector("#partyJoinBtn")!.addEventListener("click", join);
+
+  wirePicker(el);
 
   el.querySelector("#partyCopyBtn")?.addEventListener("click", async () => {
     const c = activePartyCode();
@@ -93,4 +102,62 @@ function activeCard(code: string): string {
         <button id="partyLeaveBtn" class="partyBtn danger">Leave party</button>
       </div>
     </section>`;
+}
+
+/** Title picker. Reuses the catalog search ranking, so it is gated by the
+ *  active profile's rating limits exactly like every other surface -- and
+ *  hosting from a kids profile is refused before this tab is even reachable. */
+function wirePicker(el: HTMLElement): void {
+  const input = el.querySelector<HTMLInputElement>("#partyPickInput");
+  const list = el.querySelector<HTMLElement>("#partyPickResults");
+  if (!input || !list) return;
+
+  let timer = 0;
+  let token = 0;
+
+  const run = async (q: string) => {
+    const mine = ++token;
+    const { searchCatalog } = await import("./search");
+    const results = (await searchCatalog(q)).slice(0, 8);
+    // A slower earlier query must not overwrite a newer one's results.
+    if (mine !== token) return;
+
+    if (!results.length) {
+      list.innerHTML = `<p class="partyHint" style="margin:12px 0 0;">Nothing found for "${escapeHtml(q)}".</p>`;
+      return;
+    }
+
+    list.replaceChildren();
+    for (const item of results) list.append(pickRow(item));
+  };
+
+  input.addEventListener("input", () => {
+    clearTimeout(timer);
+    const q = input.value.trim();
+    if (!q) { token++; list.replaceChildren(); return; }
+    timer = window.setTimeout(() => void run(q), 150);
+  });
+}
+
+function pickRow(item: VodItem): HTMLElement {
+  const b = document.createElement("button");
+  b.className = "partyPick";
+  const img = item.banner || item.poster || "";
+  const meta = [item.genre, item.rating].filter(Boolean).join(" \u00b7 ");
+  b.innerHTML = `
+    <img src="${escapeHtml(img)}" alt="" loading="lazy">
+    <span>
+      <span class="partyPickTitle">${escapeHtml(item.title)}</span><br>
+      <span class="partyPickMeta">${escapeHtml(meta)}</span>
+    </span>`;
+
+  b.addEventListener("click", async () => {
+    b.disabled = true;
+    const { startWatchParty } = await import("./vod");
+    const started = await startWatchParty(item);
+    b.disabled = false;
+    // Re-render so the active-party card appears with the new code.
+    if (started && mounted) renderParty(mounted);
+  });
+  return b;
 }

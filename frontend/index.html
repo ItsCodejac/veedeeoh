@@ -186,6 +186,19 @@
         <div id="kidsRails"></div>
       </div>
 
+      <!-- Full search results. The header dropdown is a preview of this. -->
+      <div id="searchView" class="viewPanel" hidden>
+        <div class="categoryHeaderBar">
+          <button id="searchViewBackBtn" class="categoryBackBtn" style="display:inline-flex;align-items:center;gap:6px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>Back</button>
+          <div class="categoryHeaderTitleGroup">
+            <h1>Results for <span id="searchViewQuery"></span></h1>
+            <span id="searchViewCount" class="categoryCountBadge">0 titles</span>
+          </div>
+        </div>
+        <div id="searchViewFilters" class="searchFilterBar"></div>
+        <div id="searchViewGrid" class="categoryGridContainer"></div>
+      </div>
+
       <!-- Dedicated Category View Panel (Netflix / Hulu Pattern) -->
       <div id="categoryView" class="viewPanel" hidden>
         <div class="categoryHeaderBar">

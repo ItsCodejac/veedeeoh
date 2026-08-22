@@ -3819,3 +3819,53 @@ body.kids-mode { --brand-accent: #ff9f1c; }
 .partyBtn.danger { border-color: rgba(255,107,107,0.45); color: #ff8f8f; }
 .partyCodeBig { font-size: 2.1rem; font-weight: 800; letter-spacing: 0.22em; margin: 6px 0 2px; }
 .partyWarn { color: #ffb84d; font-size: 0.9rem; }
+
+/* ---- full search results --------------------------------------------- */
+.searchFilterBar {
+  display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end;
+  padding: 0 clamp(16px, 4vw, 48px) 18px;
+}
+.searchFilter { display: flex; flex-direction: column; gap: 5px; }
+.searchFilter > span {
+  font-size: 11px; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; color: rgba(255,255,255,0.5);
+}
+.searchFilter select {
+  background: #10141e; border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 9px; color: #fff; padding: 9px 12px; font: inherit;
+  font-size: 13px; min-width: 130px; cursor: pointer;
+}
+.searchFilter select:focus { outline: none; border-color: #c5f04e; }
+.searchFilterClear {
+  background: none; border: 1px solid rgba(255,255,255,0.18); color: #9aa5b5;
+  border-radius: 9px; padding: 9px 14px; font: inherit; font-size: 13px;
+  cursor: pointer; align-self: flex-end;
+}
+.searchFilterClear:hover { color: #fff; border-color: rgba(255,255,255,0.35); }
+.searchViewEmpty {
+  grid-column: 1 / -1; color: rgba(255,255,255,0.55);
+  padding: 32px 4px; font-size: 14px;
+}
+.searchSeeAll {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; background: rgba(197,240,78,0.1);
+  border: none; border-top: 1px solid rgba(255,255,255,0.1);
+  color: #c5f04e; font: inherit; font-weight: 700; font-size: 13.5px;
+  padding: 14px; cursor: pointer;
+}
+.searchSeeAll:hover { background: rgba(197,240,78,0.18); }
+
+/* ---- party title picker ---------------------------------------------- */
+.partyPick {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  background: none; border: none; border-radius: 9px;
+  padding: 8px; cursor: pointer; text-align: left; color: inherit;
+}
+.partyPick:hover { background: rgba(255,255,255,0.07); }
+.partyPick img {
+  width: 68px; height: 40px; object-fit: cover; border-radius: 5px;
+  background: #10141e; flex: none;
+}
+.partyPickTitle { font-weight: 600; color: #fff; font-size: 13.5px; }
+.partyPickMeta { color: rgba(255,255,255,0.5); font-size: 11.5px; }
+.partyPickList { display: flex; flex-direction: column; gap: 2px; margin-top: 12px; }

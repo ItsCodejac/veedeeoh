@@ -25,49 +25,41 @@ let moviesActiveGenre = "";
 export async function setGlobalSearchQuery(query: string): Promise<void> {
   const overlay = $("searchResultsOverlay");
   const searchBar = $("searchBar");
-  
+
   if (!query) {
     overlay.hidden = true;
     searchBar.classList.remove("active");
     return;
   }
-  
+
   overlay.hidden = false;
   searchBar.classList.add("active");
-  
   overlay.innerHTML = `<div class="searchNoResults">Searching...</div>`;
-  
-  const rails = await getVodRails();
-  const allItems = rails.flatMap(r => r.items);
-  
-  const q = query.toLowerCase();
-  const matched = allItems.filter(item => 
-    item.title.toLowerCase().includes(q) || 
-    (item.summary && item.summary.toLowerCase().includes(q))
-  );
-  
-  const unique = new Map<string, VodItem>();
-  for (const item of matched) {
-    if (!unique.has(item.id)) unique.set(item.id, item);
-  }
-  const results = Array.from(unique.values());
+
+  // Same ranking the results page uses, so the preview is the top of the real
+  // list rather than a differently-ordered sample of it.
+  const { searchCatalog } = await import("./search");
+  const results = await searchCatalog(query);
+
+  // A slow catalog load can land after the box was cleared or retyped.
+  if (($("search") as HTMLInputElement | null)?.value.trim().toLowerCase() !== query.toLowerCase()) return;
 
   if (results.length === 0) {
     overlay.innerHTML = `<div class="searchNoResults">No results found for "${escapeHtml(query)}"</div>`;
     return;
   }
-  
-  const movies = results.filter(i => !i.series_id).slice(0, 5);
-  const shows = results.filter(i => !!i.series_id).slice(0, 5);
-  
-  let html = "";
 
+  const byId = new Map(results.map((r) => [r.id, r]));
+  const movies = results.filter((i) => !i.series_id).slice(0, 5);
+  const shows = results.filter((i) => !!i.series_id).slice(0, 5);
+
+  let html = "";
   const renderGroup = (title: string, items: VodItem[]) => {
     if (items.length === 0) return;
     html += `<div class="searchGroupTitle">${title}</div>`;
-    items.forEach(item => {
+    items.forEach((item) => {
       const img = item.banner || item.poster || "";
-      const rating = item.rating ? ` · ${item.rating}` : "";
+      const rating = item.rating ? ` \u00b7 ${item.rating}` : "";
       html += `
         <button class="searchResultItem vodResult" data-id="${item.id}">
           <img class="searchResultImage" src="${escapeHtml(img)}" alt="">
@@ -75,27 +67,35 @@ export async function setGlobalSearchQuery(query: string): Promise<void> {
             <div class="searchResultTitle">${escapeHtml(item.title)}</div>
             <div class="searchResultDesc">${escapeHtml(item.genre || "")}${rating}</div>
           </div>
-        </button>
-      `;
+        </button>`;
     });
   };
-  
+
   renderGroup("Movies", movies);
   renderGroup("TV Shows", shows);
-  
+
+  // The way out of the dropdown. Without it the preview IS the search, which is
+  // exactly the dead end this replaces.
+  html += `<button class="searchSeeAll" id="searchSeeAll">
+      See all ${results.length} ${results.length === 1 ? "result" : "results"}
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+    </button>`;
+
   overlay.innerHTML = html;
-  
-  // Bind clicks
-  overlay.querySelectorAll(".vodResult").forEach(btn => {
+
+  overlay.querySelectorAll(".vodResult").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const id = (btn as HTMLElement).dataset.id;
-      const item = unique.get(id!);
+      const item = byId.get((btn as HTMLElement).dataset.id!);
       if (item) {
         openVodDetails(item);
         overlay.hidden = true;
         searchBar.classList.remove("active");
       }
     });
+  });
+
+  overlay.querySelector("#searchSeeAll")?.addEventListener("click", () => {
+    void import("./search").then((m) => m.openSearchResults(query));
   });
 }
 
@@ -385,33 +385,51 @@ async function setupWatchPartyButton(item: VodItem): Promise<void> {
 
   btn.onclick = async () => {
     btn.disabled = true;
-    try {
-      const seatsRaw = prompt("How many people can join? Leave blank for no limit.");
-      if (seatsRaw === null) return;
-      const seatLimit = seatsRaw.trim() ? Math.max(1, parseInt(seatsRaw, 10) || 0) : null;
-      const password = prompt("Password to join? Leave blank for none.")?.trim() || null;
-
-      const { joinCode, link } = await party.createParty({
-        contentId: String(item.id),
-        streamIdx: 0,
-        title: item.title,
-        seatLimit,
-        password,
-      });
-
-      // Open the title, then take the host seat on the sync channel.
-      const streams = (item as any).streams || (item.url ? [{ url: item.url, quality: null, source: item.genre || "Party" }] : []);
-      await openVodPlayer(asChannel(item, streams as any), 0);
-      party.hostExisting(joinCode, seatLimit);
-
-      try { await navigator.clipboard.writeText(link); showToast("Party link copied — share it"); }
-      catch { showToast(`Party code ${joinCode}`); }
-    } catch (e: any) {
-      showToast(e?.message || "Couldn't start the party");
-    } finally {
-      btn.disabled = false;
-    }
+    try { await startWatchParty(item); }
+    finally { btn.disabled = false; }
   };
+}
+
+/** Create a party for a title, open it, and take the host seat.
+ *
+ *  Shared by the detail-view button and the picker in veedeeoh.party, so both
+ *  entry points get the same stream resolution and the same prompts. */
+export async function startWatchParty(item: VodItem): Promise<boolean> {
+  const party = await import("./party");
+  try {
+    const seatsRaw = prompt("How many people can join? Leave blank for no limit.");
+    if (seatsRaw === null) return false;
+    const seatLimit = seatsRaw.trim() ? Math.max(1, parseInt(seatsRaw, 10) || 0) : null;
+    const password = prompt("Password to join? Leave blank for none.")?.trim() || null;
+
+    // Pluto titles carry only a path and mint a signed URL on click, so the
+    // host has to resolve one here. Without this the player opened with no
+    // streams at all and the party started on a black screen.
+    let streams = (item as any).streams as any[] | undefined;
+    if (!streams?.length) {
+      const url = item.url || (item.pluto_path ? await fetchPlutoStream(item.pluto_path) : null);
+      if (!url) { showToast("That title can't be hosted right now"); return false; }
+      streams = [{ url, quality: null, source: item.genre || "Party" }];
+    }
+
+    const { joinCode, link } = await party.createParty({
+      contentId: String(item.id),
+      streamIdx: 0,
+      title: item.title,
+      seatLimit,
+      password,
+    });
+
+    await openVodPlayer(asChannel(item, streams as any), 0);
+    party.hostExisting(joinCode, seatLimit);
+
+    try { await navigator.clipboard.writeText(link); showToast("Party link copied \u2014 share it"); }
+    catch { showToast(`Party code ${joinCode}`); }
+    return true;
+  } catch (e: any) {
+    showToast(e?.message || "Couldn't start the party");
+    return false;
+  }
 }
 
 // "My List" toggle in the detail view — injected next to the Play button so it
@@ -820,7 +838,7 @@ async function playVod(item: VodItem): Promise<void> {
 const HEART = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21.2l7.8-7.7 1-1.1a5.5 5.5 0 0 0 0-7.8z"></path></svg>`;
 const PLUS  = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`;
 
-function vodCard(item: VodItem): HTMLElement {
+export function vodCard(item: VodItem): HTMLElement {
   const el = document.createElement("button");
   el.className = "vodCard";
   el.title = item.summary || item.title;

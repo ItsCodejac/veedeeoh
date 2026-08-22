@@ -292,6 +292,11 @@ function wireSidebar(): void {
       if (pMin) pMin.textContent = "Expand";
     }
 
+    // The results page sits on top of the panel stack; leaving it hidden here
+    // would make every sidebar tab look dead while search is open.
+    document.getElementById("searchView")?.setAttribute("hidden", "");
+    document.getElementById("categoryView")?.setAttribute("hidden", "");
+
     clearSectionActive();
     if (activeTabId.startsWith("tabSection:")) {
       const id = activeTabId.slice("tabSection:".length);
@@ -646,16 +651,31 @@ function wireHeader(): void {
   }
 
   if (searchInput) {
+    // Raw value, not lowercased: ranking normalises for itself, and the results
+    // page echoes the query back to the user the way they typed it.
     searchInput.addEventListener("input", (e) => {
       clearTimeout(searchTimer);
       searchTimer = window.setTimeout(() => {
-        const query = (e.target as HTMLInputElement).value.toLowerCase();
-        import("./vod").then((vod) => {
-          vod.setGlobalSearchQuery(query);
-        });
+        const query = (e.target as HTMLInputElement).value.trim();
+        import("./vod").then((vod) => vod.setGlobalSearchQuery(query));
       }, 150);
     });
+
+    // Enter goes to the full results page. Every other search box on the web
+    // behaves this way, and the dropdown alone was a dead end.
+    searchInput.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      const query = searchInput.value.trim();
+      if (!query) return;
+      e.preventDefault();
+      searchInput.blur();
+      void import("./search").then((m) => m.openSearchResults(query));
+    });
   }
+
+  document.getElementById("searchViewBackBtn")?.addEventListener("click", () => {
+    void import("./search").then((m) => m.closeSearchResults());
+  });
 }
 
 import { initPWA } from "./pwa";
