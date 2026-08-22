@@ -303,6 +303,7 @@ async function showPaywall(): Promise<void> {
       <div style="font-family:'Bricolage Grotesque',sans-serif;font-size:40px;font-weight:800;margin-bottom:10px;">veedeeoh<span style="color:#c5f04e;">.</span></div>
       <h1 style="font-size:26px;font-weight:800;margin:0 0 10px;">Your free trial has ended</h1>
       <p style="color:#9aa5b5;font-size:16px;line-height:1.6;margin:0 0 22px;">Subscribe to keep watching. Every free service in one app, across your whole household.</p>
+      <div id="pwLosing"></div>
       <button id="pwSub" style="width:100%;padding:15px;border-radius:12px;background:#c5f04e;color:#06070a;border:none;font-weight:800;font-size:16px;cursor:pointer;">Subscribe — $4/mo · 3 profiles</button>
       <p style="color:#6b7482;font-size:13px;line-height:1.6;margin:20px 0 0;">
         Your account stays open. Watch party links you are sent will still work &mdash;
@@ -311,6 +312,7 @@ async function showPaywall(): Promise<void> {
       <button id="pwOut" style="margin-top:18px;background:none;border:none;color:#9aa5b5;font-size:13px;cursor:pointer;">Sign out</button>
     </div>`;
   document.body.appendChild(o);
+  void showWhatIsWaiting(o);
   const sub = o.querySelector("#pwSub") as HTMLButtonElement;
   sub.onclick = async () => {
     sub.disabled = true; sub.textContent = "Opening checkout…";
@@ -394,6 +396,40 @@ async function mountTrialNotice(): Promise<void> {
   el.querySelector(".trialNoticeCta")?.addEventListener("click", async () => {
     try { await startCheckout(); } catch { showToast("Couldn't start checkout"); }
   });
+}
+
+/** Show the titles the account was part-way through.
+ *
+ *  A price alone asks someone to value an abstraction. Their own half-finished
+ *  films are concrete and already theirs, and the data is sitting in
+ *  watch_progress -- it was simply never used at the one moment it matters.
+ *  Silent on failure: a paywall that cannot render artwork must still take a
+ *  payment. */
+async function showWhatIsWaiting(o: HTMLElement): Promise<void> {
+  const box = o.querySelector<HTMLElement>("#pwLosing");
+  if (!box) return;
+  try {
+    // Queried directly rather than via getWatchHistory(profileId): profiles have
+    // not hydrated at the paywall, and the point is the ACCOUNT's history across
+    // every profile. RLS already scopes the table to this user.
+    const { data } = await getSupabase()
+      .from("watch_progress")
+      .select("title, poster")
+      .not("poster", "is", null)
+      .order("updated_at", { ascending: false })
+      .limit(5);
+    const history = data ?? [];
+    if (history.length < 2) return;
+
+    box.innerHTML = `
+      <p style="color:#6b7482;font-size:13px;margin:0 0 12px;">Waiting for you</p>
+      <div style="display:flex;gap:8px;justify-content:center;margin-bottom:26px;">
+        ${history.map((h: any) => `
+          <img src="${escapeHtml(h.poster)}" alt="" title="${escapeHtml(h.title || "")}"
+               style="width:58px;height:84px;object-fit:cover;border-radius:6px;opacity:.42;filter:grayscale(1);">
+        `).join("")}
+      </div>`;
+  } catch { /* the paywall still has to work */ }
 }
 
 async function boot(): Promise<void> {

@@ -84,3 +84,57 @@ export async function sendWaitlistConfirmationEmail(email: string): Promise<void
     console.warn(`[Waitlist] Could not send confirmation email to ${email}: ${result.error}`);
   }
 }
+
+
+// ---------------------------------------------------------- trial reminders ---
+
+/** Branded shell shared by the trial emails, so a change to the frame does not
+ *  have to be made twice and drift. */
+function shell(heading: string, body: string, cta: string, ctaUrl: string): string {
+  return `
+  <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background-color:#0b0f19;color:#f3f4f6;border-radius:12px;border:1px solid #1f293d;">
+    <div style="margin-bottom:24px;"><span style="font-size:24px;font-weight:800;color:#ffffff;">veedeeoh</span><span style="color:#c5f04e;font-size:24px;font-weight:800;">.</span></div>
+    <h1 style="font-size:22px;font-weight:700;margin-bottom:16px;color:#ffffff;">${heading}</h1>
+    ${body}
+    <p style="margin:26px 0;">
+      <a href="${ctaUrl}" style="display:inline-block;background:#c5f04e;color:#06070a;font-weight:800;font-size:15px;text-decoration:none;padding:13px 26px;border-radius:10px;">${cta}</a>
+    </p>
+    <hr style="border:none;border-top:1px solid #1f293d;margin:24px 0;" />
+    <p style="font-size:12px;color:#6b7280;text-align:center;">veedeeoh &bull; <a href="https://veedeeoh.com" style="color:#6b7280;text-decoration:underline;">veedeeoh.com</a></p>
+  </div>`;
+}
+
+const P = (t: string) =>
+  `<p style="font-size:15px;line-height:1.6;color:#9ca3af;margin-bottom:16px;">${t}</p>`;
+
+/** Sent while the trial is still running. Deliberately not a hard sell -- the
+ *  job is to make the clock visible, because six trials expired with no warning
+ *  at all and none of them converted. */
+export async function sendTrialEndingEmail(email: string, daysLeft: number): Promise<void> {
+  await sendEmail({
+    to: email,
+    subject: daysLeft <= 1 ? "Your veedeeoh trial ends tomorrow" : `${daysLeft} days left on your veedeeoh trial`,
+    html: shell(
+      daysLeft <= 1 ? "Your trial ends tomorrow" : `${daysLeft} days left`,
+      P("Your profiles, lists and watch history stay exactly as they are if you subscribe.")
+      + P("$4 a month for the whole household &mdash; three profiles, parental controls, and watch parties."),
+      "Keep watching", "https://veedeeoh.com/#settings/account"
+    ),
+  });
+}
+
+/** Sent after it lapses. Leads with what they KEEP rather than what they lost:
+ *  a lapsed account can still follow watch party links, which is the whole
+ *  point of the free tier and the most likely path back. */
+export async function sendTrialEndedEmail(email: string): Promise<void> {
+  await sendEmail({
+    to: email,
+    subject: "Your veedeeoh trial has ended",
+    html: shell(
+      "Your trial has ended",
+      P("Your account is still open. Any watch party link you are sent will still work &mdash; you just cannot browse the catalogue on your own until you subscribe.")
+      + P("Everything you had is waiting: profiles, lists, and where you left off."),
+      "Subscribe — $4/mo", "https://veedeeoh.com/#settings/account"
+    ),
+  });
+}

@@ -264,6 +264,59 @@ app.delete('/watched/:id?', async (c: Context) => {
   }
 });
 
+// Trial reminders. Runs daily; picks out the accounts whose trial ends in 2
+// days, tomorrow, or ended yesterday.
+//
+// Idempotent through trial_email_sent, so a double cron run or a retry cannot
+// mail the same person twice. Six real trials expired with no warning at all
+// and none converted -- this is the fix for that, and mailing them twice would
+// be a worse version of the same failure.
+app.get('/cron/trial-emails', async (c: Context) => {
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret && c.req.header('authorization') !== `Bearer ${cronSecret}`) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+
+  const { createClient } = await import('@supabase/supabase-js');
+  const sb = createClient(
+    process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+    { auth: { persistSession: false, autoRefreshToken: false } }
+  );
+  const email = await import('../backend/email');
+
+  const now = Date.now();
+  const day = 86_400_000;
+  const { data: rows, error } = await sb
+    .from('profiles')
+    .select('id, email, tier, tier_expires, trial_email_sent')
+    .like('tier', 'trial%')
+    .not('tier_expires', 'is', null)
+    .gt('tier_expires', new Date(now - 2 * day).toISOString())
+    .lt('tier_expires', new Date(now + 3 * day).toISOString());
+  if (error) return c.json({ error: error.message }, 500);
+
+  const sent: string[] = [];
+  for (const r of rows ?? []) {
+    if (!r.email) continue;
+    const days = Math.ceil((new Date(r.tier_expires).getTime() - now) / day);
+    // One stage per account. The column records WHICH mail went out, so an
+    // account that already got the 2-day notice is not sent it again tomorrow.
+    const stage = days <= 0 ? 'ended' : days <= 1 ? 'day1' : days <= 2 ? 'day2' : null;
+    if (!stage || r.trial_email_sent === stage) continue;
+
+    try {
+      if (stage === 'ended') await email.sendTrialEndedEmail(r.email);
+      else await email.sendTrialEndingEmail(r.email, days);
+      await sb.from('profiles').update({ trial_email_sent: stage }).eq('id', r.id);
+      sent.push(`${r.email}:${stage}`);
+    } catch (e: any) {
+      console.error('[cron] trial email failed', r.email, e?.message);
+    }
+  }
+  return c.json({ ok: true, considered: rows?.length ?? 0, sent });
+});
+
 app.get('/cron/catalog-warm', async (c: Context) => {
   const authHeader = c.req.header('authorization');
   const cronSecret = process.env.CRON_SECRET;
