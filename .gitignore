@@ -46,3 +46,6 @@ Video bump ident design 2/
 Veedeeoh Kids Bump.mp4
 veedeeohbump.mp3
 veedeeohkids.mp3
+
+# Debris from Playwright MCP browser sessions, not part of the app.
+.playwright-mcp/
