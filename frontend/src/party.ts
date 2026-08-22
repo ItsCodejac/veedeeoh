@@ -17,6 +17,78 @@ const WORKER_URL = (import.meta.env.VITE_PARTY_WORKER_URL as string) || "";
 
 let socket: WebSocket | null = null;
 let syncPoll: number | null = null;
+
+// ---- reconnection -----------------------------------------------------------
+//
+// A dropped socket used to be the end of it: the viewer got a toast and sat
+// there while the film carried on without them. Now that the worker remembers
+// who it has admitted, walking back in is seamless -- so it should happen by
+// itself.
+//
+// THE RISK IS SPAM, not the retry. A client that reconnects on every close
+// hammers the Durable Object when the honest answer is "stop asking": the party
+// ended, or this person was removed, or the room is full. Every one of those is
+// a final answer, and retrying is asking the same question again. So each is
+// checked before a retry is even scheduled, and what remains is bounded,
+// backed off, and abandoned after a handful of attempts.
+const RETRY_MAX = 6;
+const RETRY_BASE_MS = 1000;
+const RETRY_CAP_MS = 20000;
+
+let retryTimer: number | null = null;
+let retryCount = 0;
+let onlineHandler: (() => void) | null = null;
+/** Bumped by every connect and every deliberate disconnect. A socket whose
+ *  generation is stale belongs to a connection that has been replaced, and its
+ *  close must not schedule anything. */
+let generation = 0;
+/** Whether any socket for the CURRENT party has ever opened. Distinguishes "the
+ *  room is not there" from "we were in it and lost the connection", which look
+ *  identical from a failed upgrade. */
+let sessionOpened = false;
+
+function cancelRetry(): void {
+  if (retryTimer !== null) { clearTimeout(retryTimer); retryTimer = null; }
+  if (onlineHandler) { window.removeEventListener("online", onlineHandler); onlineHandler = null; }
+  retryCount = 0;
+}
+
+function scheduleReconnect(joinCode: string, isHost: boolean): void {
+  if (retryTimer !== null || onlineHandler) return;      // one attempt in flight
+
+  // Offline is not a failed attempt, it is no attempt. Burning the budget on
+  // retries that cannot possibly succeed means being out of them at the moment
+  // the network comes back -- so wait for the browser to say it has returned.
+  if (navigator.onLine === false) {
+    const back = () => {
+      window.removeEventListener("online", back);
+      onlineHandler = null;
+      void reconnectNow(joinCode, isHost);
+    };
+    onlineHandler = back;
+    window.addEventListener("online", back);
+    return;
+  }
+
+  if (retryCount >= RETRY_MAX) {
+    showToast(isHost ? "Lost the party connection. Reopen it to carry on"
+                     : "Lost the party connection");
+    window.dispatchEvent(new CustomEvent("veedeeoh:party-lost"));
+    return;
+  }
+
+  // Jittered, so a room that all dropped together does not come back in one
+  // synchronised wave.
+  const wait = Math.min(RETRY_CAP_MS, RETRY_BASE_MS * 2 ** retryCount)
+             + Math.floor(Math.random() * 400);
+  retryCount += 1;
+  retryTimer = window.setTimeout(() => { retryTimer = null; void reconnectNow(joinCode, isHost); }, wait);
+}
+
+async function reconnectNow(joinCode: string, isHost: boolean): Promise<void> {
+  if (currentCode !== joinCode) return;    // left the party while waiting
+  try { await connect(joinCode, isHost, true); } catch { /* the close handler takes it from here */ }
+}
 let currentCode: string | null = null;
 
 function code6(): string {
@@ -279,8 +351,20 @@ export async function joinParty(joinCode: string): Promise<void> {
 
 // ----------------------------------------------------------------- socket ---
 
-async function connect(joinCode: string, isHost: boolean): Promise<void> {
-  disconnect();
+/** @param resume reconnecting to a party already in progress. Skips the full
+ *  teardown: on a resume the player, the reactions bar, viewer mode and the
+ *  host's metering must all survive, and tearing them down and rebuilding them
+ *  is exactly the interruption reconnecting exists to avoid. */
+async function connect(joinCode: string, isHost: boolean, resume = false): Promise<void> {
+  if (resume) {
+    if (syncPoll !== null) { clearInterval(syncPoll); syncPoll = null; }
+    try { socket?.close(); } catch { /* already gone */ }
+    socket = null;
+  } else {
+    disconnect();
+    sessionOpened = false;
+  }
+  const gen = ++generation;
   currentCode = joinCode;
 
   const { data: u } = await getSupabase().auth.getUser();
@@ -329,7 +413,16 @@ async function connect(joinCode: string, isHost: boolean): Promise<void> {
       case "away":      if (!isHost) showHostAway(true); break;
       case "back":      if (!isHost) showHostAway(false); break;
       case "refused":   showToast("The host did not let you in"); break;
-      case "removed":   showToast("The host removed you from the party"); disconnect(); break;
+      case "removed":
+        // forgetParty() as well as disconnecting: the saved invite is an offer
+        // to walk back in, and someone the host removed should not be given
+        // one. A second, unreachable `case "removed"` further down held this
+        // call and had been silently dead -- the duplicate label meant it never
+        // ran, so a removed viewer kept the party in their recent list.
+        showToast("The host removed you from the party");
+        forgetParty();
+        disconnect();
+        break;
       case "closed": {
         // Was a toast and nothing else, so the film kept playing and a viewer
         // could not tell "the party ended" from "the host paused".
@@ -345,10 +438,6 @@ async function connect(joinCode: string, isHost: boolean): Promise<void> {
         }));
         break;
       }
-      case "removed":
-        // Removed by the host: do not offer to walk back in.
-        forgetParty();
-        break;
     }
   });
 
@@ -358,13 +447,34 @@ async function connect(joinCode: string, isHost: boolean): Promise<void> {
   // never arrive -- and the Supabase row still said the party was live, so the
   // next person walked into the same dead end.
   let everOpened = false;
-  socket.addEventListener("open", () => { everOpened = true; });
+  socket.addEventListener("open", () => {
+    if (gen !== generation) return;
+    everOpened = true;
+    // Reconnected rather than connected: say so, because the last thing this
+    // viewer saw was a disconnection notice.
+    if (sessionOpened && retryCount > 0) showToast("Reconnected to the party");
+    sessionOpened = true;
+    cancelRetry();
+  });
 
   socket.addEventListener("close", (e) => {
-    if (e.code === 1008 || e.code === 4009) { showToast("That party is full"); return; }
-    if (e.code === 4003 || e.code === 4004) return;   // refused / removed, already reported
+    // A socket from a connection that has already been replaced or deliberately
+    // ended. Anything it has to say is out of date, and acting on it would
+    // reconnect a party the user has left.
+    if (gen !== generation) return;
 
-    if (!everOpened) {
+    // ---- final answers. Retrying any of these is asking again after being
+    // told no, which is precisely the spam worth avoiding.
+    if (e.code === 1008 || e.code === 4009) { cancelRetry(); showToast("That party is full"); return; }
+    if (e.code === 4003 || e.code === 4004) { cancelRetry(); return; }  // refused / removed
+    if (e.code === 1000) { cancelRetry(); return; }                     // closed cleanly, by us
+
+    // The room was never there. Only trustworthy on the FIRST attempt: a failed
+    // upgrade and a failed network look identical from here, so once we have
+    // been inside the room, a failure to get back in is treated as something to
+    // retry rather than as proof the party is over.
+    if (!everOpened && !sessionOpened) {
+      cancelRetry();
       showToast("That party has ended");
       window.dispatchEvent(new CustomEvent("veedeeoh:party-dead"));
       forgetParty();
@@ -378,9 +488,16 @@ async function connect(joinCode: string, isHost: boolean): Promise<void> {
       return;
     }
 
-    // Opened and then dropped mid-party. For a guest that is usually the room
-    // ending or the network going; either way say so rather than freezing.
-    if (!isHost) showToast("Disconnected from the party");
+    // Dropped mid-party, with no final answer attached. Walk back in.
+    //
+    // The worker remembers who it has admitted, so a guest who was approved
+    // does not queue again, and the host's token still identifies them as the
+    // host. If the room really has gone, the next attempt fails to upgrade and
+    // the bounded retry gives up on its own rather than hammering it.
+    if (retryCount === 0) {
+      showToast(isHost ? "Connection lost. Reconnecting" : "Disconnected. Reconnecting");
+    }
+    scheduleReconnect(joinCode, isHost);
   });
 
   // ---- the viewer checks, rather than only listening --------------------
@@ -485,6 +602,11 @@ export function endParty(): void {
 }
 
 export function disconnect(): void {
+  // Before anything else: invalidate the live socket's generation so its close
+  // event cannot schedule a reconnect to a party the user has just left.
+  generation += 1;
+  cancelRetry();
+  sessionOpened = false;
   stopMetering();
   void import("./party-reactions").then((m) => m.unmountReactions()).catch(() => {});
   partyStartedAt = 0;
