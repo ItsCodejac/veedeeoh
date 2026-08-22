@@ -302,9 +302,13 @@ async function showPaywall(): Promise<void> {
     <div style="max-width:440px;">
       <div style="font-family:'Bricolage Grotesque',sans-serif;font-size:40px;font-weight:800;margin-bottom:10px;">veedeeoh<span style="color:#c5f04e;">.</span></div>
       <h1 style="font-size:26px;font-weight:800;margin:0 0 10px;">Your free trial has ended</h1>
-      <p style="color:#9aa5b5;font-size:16px;line-height:1.6;margin:0 0 28px;">Subscribe to keep watching. Every free service in one app, across your whole household.</p>
+      <p style="color:#9aa5b5;font-size:16px;line-height:1.6;margin:0 0 22px;">Subscribe to keep watching. Every free service in one app, across your whole household.</p>
       <button id="pwSub" style="width:100%;padding:15px;border-radius:12px;background:#c5f04e;color:#06070a;border:none;font-weight:800;font-size:16px;cursor:pointer;">Subscribe — $4/mo · 3 profiles</button>
-      <button id="pwOut" style="margin-top:16px;background:none;border:none;color:#9aa5b5;font-size:13px;cursor:pointer;">Sign out</button>
+      <p style="color:#6b7482;font-size:13px;line-height:1.6;margin:20px 0 0;">
+        Your account stays open. Watch party links you are sent will still work &mdash;
+        you just cannot browse the catalogue on your own until you subscribe.
+      </p>
+      <button id="pwOut" style="margin-top:18px;background:none;border:none;color:#9aa5b5;font-size:13px;cursor:pointer;">Sign out</button>
     </div>`;
   document.body.appendChild(o);
   const sub = o.querySelector("#pwSub") as HTMLButtonElement;
@@ -314,6 +318,36 @@ async function showPaywall(): Promise<void> {
     catch (e: any) { alert("Couldn't start checkout: " + (e?.message || e)); sub.disabled = false; sub.textContent = "Subscribe — $4/mo · 3 profiles"; }
   };
   (o.querySelector("#pwOut") as HTMLButtonElement).onclick = () => signOut();
+}
+
+/** A lapsed account following a party link. The app shell never mounts: there is
+ *  no catalogue to browse, no sidebar to browse it with, and nothing to gate --
+ *  only the party they were invited to, plus the one CTA that makes this worth
+ *  doing. Every party a lapsed guest attends is another chance to convert them,
+ *  which a hard wall throws away. */
+async function enterAsPartyGuest(code: string): Promise<void> {
+  hideBootSplash();
+  document.body.classList.add("party-guest");
+
+  const bar = document.createElement("div");
+  bar.id = "guestBar";
+  bar.innerHTML = `
+    <span>You are here as a guest. Subscribe to watch anything, any time.</span>
+    <button id="guestSub">Subscribe &mdash; $4/mo</button>`;
+  document.body.appendChild(bar);
+  bar.querySelector("#guestSub")?.addEventListener("click", async () => {
+    const { startCheckout } = await import("./db");
+    try { await startCheckout(); } catch { showToast("Couldn't start checkout"); }
+  });
+
+  // Profiles still have to hydrate: a guest can hold a kids profile, and the
+  // rating gate inside joinParty reads it. Being lapsed does not make a child
+  // eligible for whatever the host is playing.
+  await import("./profiles").then((p) => p.hydrateProfilesFromCloud()).catch(() => {});
+
+  const { joinParty } = await import("./party");
+  await joinParty(code);
+  history.replaceState({}, "", location.pathname);
 }
 
 async function boot(): Promise<void> {
@@ -331,10 +365,18 @@ async function boot(): Promise<void> {
       if (!error && !data.user) { signOut(); return; }
     } catch { /* transient network error — proceed rather than bounce */ }
 
-    // Access gate: no active trial/subscription → paywall, not the app.
+    // Access gate. Two outcomes, not one: an entitled account gets the app, and
+    // a lapsed one gets the paywall UNLESS it arrived on a party link, which it
+    // is still allowed to follow. The old code returned before the ?party=
+    // handler ever ran, so a lapsed guest could not join a party either.
     try {
       const { hasActiveAccess } = await import("./db");
-      if (!(await hasActiveAccess())) { void showPaywall(); return; }
+      if (!(await hasActiveAccess())) {
+        const code = new URLSearchParams(location.search).get("party");
+        if (code) { await enterAsPartyGuest(code.toUpperCase()); return; }
+        void showPaywall();
+        return;
+      }
     } catch { /* if the check errors, fail open rather than lock out a paying user */ }
   }
 

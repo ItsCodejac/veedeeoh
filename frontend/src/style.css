@@ -4089,3 +4089,29 @@ body.kids-mode { --brand-accent: #ff9f1c; }
 .setMatrix tbody tr { border-bottom: 1px solid rgba(255,255,255,0.06); }
 .setMatrix tbody tr:last-child { border-bottom: none; }
 .setMatrix input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+
+/* ---- Party guest ------------------------------------------------------
+   A lapsed account following a party link. The shell never mounts, so this
+   hides whatever chrome exists and leaves the player plus one CTA. */
+body.party-guest aside,
+body.party-guest header,
+body.party-guest #scrollableArea { display: none !important; }
+body.party-guest { background: #06070a; }
+
+#guestBar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  flex-wrap: wrap; gap: 14px;
+  padding: 12px 18px;
+  background: rgba(6,7,10,0.94);
+  border-top: 1px solid rgba(197,240,78,0.28);
+  backdrop-filter: blur(10px);
+  font-family: var(--display); font-size: 13.5px; color: #cfd6e0;
+}
+#guestBar button {
+  background: var(--accent); color: #06070a; border: none;
+  padding: 9px 16px; border-radius: 9px;
+  font: inherit; font-weight: 800; cursor: pointer;
+}
+#guestBar button:hover { filter: brightness(1.06); }
+@media (max-width: 520px) { #guestBar { font-size: 12.5px; text-align: center; } }

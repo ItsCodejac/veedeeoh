@@ -102,6 +102,26 @@ export async function hasActiveAccess(): Promise<boolean> {
   return true;
 }
 
+/** Entitlement is TWO-DIMENSIONAL, not one boolean.
+ *
+ *  hasActiveAccess  -> may browse and stream the catalogue
+ *  canJoinParty     -> may join a watch party someone else is hosting
+ *
+ *  A lapsed account keeps the second. The marginal cost of a viewer is zero --
+ *  streams come from the providers, not from us -- so walling someone out
+ *  entirely converts a live prospect into a lost one for no saving. A guest can
+ *  only watch what a host chose, when the host chose it, which is a genuinely
+ *  lesser product than a subscription rather than a substitute for one.
+ *
+ *  Deliberately derived rather than a new tier: "signed in but not entitled" is
+ *  already expressible, and a `party_guest` tier would be a second source of
+ *  truth that the Stripe webhook would have to learn not to overwrite.
+ */
+export async function canJoinParty(): Promise<boolean> {
+  const { data } = await getSupabase().auth.getUser();
+  return !!data.user;
+}
+
 /** Days left in the current trial/subscription (null if none or already expired). */
 export async function trialDaysLeft(): Promise<number | null> {
   const acct = await getAccount();
