@@ -3943,7 +3943,7 @@ body.kids-mode { --brand-accent: #ff9f1c; }
   letter-spacing: -0.045em;
   line-height: 1;
 }
-.regionSplashMark .sfx { color: var(--accent); }
+.regionSplashMark .sfx .dot { color: var(--accent); }
 .regionSplashSub {
   font-size: 13px; font-weight: 700; letter-spacing: 0.14em;
   text-transform: uppercase; color: #8A8F98;

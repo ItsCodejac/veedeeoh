@@ -28,10 +28,14 @@ function applyWordmark(isKids: boolean): void {
   // read as a badge on the normal state rather than a signal that something is
   // different.
   const code = getActiveRegion().toUpperCase();
-  const sfx = code === "US" ? "" : (REGION_NAMES[code]?.suffix || code.toLowerCase());
+  const region = REGION_NAMES[code];
+  const sfx = code === "US" ? "" : (region?.suffix || code.toLowerCase());
+  // The dot stays brand lime and only the suffix takes the region colour, so
+  // the wordmark is still veedeeoh's with a region on it, not a repainted logo.
+  const tint = sfx ? ` style="color:${region?.color || "var(--accent)"}"` : "";
 
-  if (brand) brand.innerHTML = `veedeeoh<span>.</span>${escapeHtml(sfx)}`;
-  if (mobileBrand) mobileBrand.innerHTML = `v<span>.</span>${escapeHtml(sfx)}`;
+  if (brand) brand.innerHTML = `veedeeoh<span>.</span><span${tint}>${escapeHtml(sfx)}</span>`;
+  if (mobileBrand) mobileBrand.innerHTML = `v<span>.</span><span${tint}>${escapeHtml(sfx)}</span>`;
 }
 
 // Branded ident, played on profile SELECTION (a user gesture, so audio is
@@ -69,18 +73,30 @@ function playIdent(isKids: boolean, done: () => void): void {
 // reads as a glitch. Reuses the boot-splash language and the veedeeoh.kids /
 // veedeeoh.party wordmark pattern, so the region becomes part of the brand
 // rather than a dropdown that flickers.
-const REGION_NAMES: Record<string, { name: string; suffix: string }> = {
-  US: { name: "United States", suffix: "us" },
-  GB: { name: "United Kingdom", suffix: "uk" },
-  CA: { name: "Canada", suffix: "ca" },
-  DE: { name: "Germany", suffix: "de" },
-  ES: { name: "Spain", suffix: "es" },
-  MX: { name: "Mexico", suffix: "mx" },
-  FR: { name: "France", suffix: "fr" },
+// Each region carries ONE dominant colour, not its flag. Two prototypes proved
+// the point: per-letter flag colours put an invisible black "d" on ".de", and
+// full flag bands rendered into the letterforms as SVG gradients read as noise
+// at the 20px the sidebar actually uses. A two-letter suffix has no room for a
+// tricolour, so anything more than one colour is decoration that costs
+// legibility.
+//
+// Same rule the .kids wordmark follows -- a legible palette that evokes, rather
+// than literal reference colours. US is deliberately absent a suffix: a
+// permanent ".us" would badge the default state instead of marking a changed
+// one.
+const REGION_NAMES: Record<string, { name: string; suffix: string; color: string }> = {
+  US: { name: "United States", suffix: "us", color: "var(--accent)" },
+  GB: { name: "United Kingdom", suffix: "uk", color: "#EF3340" },
+  CA: { name: "Canada",         suffix: "ca", color: "#FF5A5F" },
+  DE: { name: "Germany",        suffix: "de", color: "#FFCE00" },
+  ES: { name: "Spain",          suffix: "es", color: "#FF8C1A" },
+  MX: { name: "Mexico",         suffix: "mx", color: "#12B76A" },
+  FR: { name: "France",         suffix: "fr", color: "#5A8DEF" },
 };
 
 function showRegionSplash(code: string): (subtitle?: string) => Promise<void> {
-  const meta = REGION_NAMES[code.toUpperCase()] || { name: code, suffix: code.toLowerCase() };
+  const meta = REGION_NAMES[code.toUpperCase()]
+    || { name: code, suffix: code.toLowerCase(), color: "var(--accent)" };
   const shownAt = Date.now();
 
   // Markup follows the "App boot" loader from the brand package
@@ -92,7 +108,7 @@ function showRegionSplash(code: string): (subtitle?: string) => Promise<void> {
   o.innerHTML = `
     <div class="regionSplashInner">
       <div class="regionSplashMark">
-        <span class="vdShimmerText">veedeeoh</span><span class="sfx">.${escapeHtml(meta.suffix)}</span>
+        <span class="vdShimmerText">veedeeoh</span><span class="sfx"><span class="dot">.</span><span style="color:${meta.color}">${escapeHtml(meta.suffix)}</span></span>
         <span class="vdDot"></span>
       </div>
       <div class="regionSplashSub" id="regionSplashSub">Loading the ${escapeHtml(meta.name)} catalog</div>
