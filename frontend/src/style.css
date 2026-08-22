@@ -4268,3 +4268,12 @@ body.party-guest { background: #06070a; }
   max-height: 100%;
   object-fit: contain;
 }
+
+/* Wide (16:9) variant of the catalogue card, used by the See All grid.
+   The rails keep 2:3 posters -- this is only for the full-page grid, where a
+   snapshot reads better at size and matches the artwork the rails themselves
+   use for their hero-style cards. */
+.vodCard.wide .vodPoster { aspect-ratio: 16 / 9; }
+.categoryGridContainer:has(.vodCard.wide) {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}

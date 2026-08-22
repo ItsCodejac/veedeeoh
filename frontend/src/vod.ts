@@ -947,12 +947,20 @@ function attachQuickActions(el: HTMLElement, item: VodItem, onPlain: () => void)
   });
 }
 
-export function vodCard(item: VodItem): HTMLElement {
+/** @param wide 16:9 banner artwork instead of the 2:3 poster.
+ *
+ *  Opt-in rather than a global switch: vodCard backs seven surfaces, including
+ *  every Shows/Movies/Kids rail, and those are built around poster proportions.
+ *  Only the See All grid asked for the wider frame. Falls back to the poster
+ *  when a title has no banner, so a mixed grid stays filled rather than showing
+ *  gaps. */
+export function vodCard(item: VodItem, wide = false): HTMLElement {
+  const art = wide ? (item.banner || item.poster) : (item.poster || item.banner);
   const el = document.createElement("button");
-  el.className = "vodCard";
+  el.className = wide ? "vodCard wide" : "vodCard";
   el.title = item.summary || item.title;
   el.innerHTML = `
-    <span class="vodPoster">${item.poster ? `<img loading="lazy" alt="" src="${escapeHtml(item.poster)}">` : FILM_ICON}
+    <span class="vodPoster">${art ? `<img loading="lazy" alt="" src="${escapeHtml(art)}">` : FILM_ICON}
       ${QUICK_ACTIONS}
     </span>
     <span class="vodTitle">${escapeHtml(item.title)}</span>
@@ -1103,7 +1111,7 @@ export function openCategoryView(titleName: string, items: VodItem[]): void {
 
   grid.replaceChildren();
   items.forEach((item) => {
-    grid.append(vodCard(item));
+    grid.append(vodCard(item, true));
   });
 
   categoryView.removeAttribute("hidden");
