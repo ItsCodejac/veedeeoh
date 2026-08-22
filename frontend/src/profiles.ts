@@ -562,9 +562,11 @@ export function openProfileEditor(editingProfile?: HouseholdProfile, onClose?: (
 
 
   modal.innerHTML = `
-    <div style="background: #10141e; border: 1px solid rgba(255,255,255,0.15); border-radius: 24px; max-width: 460px; width: 100%; padding: 32px; box-shadow: 0 24px 60px rgba(0,0,0,0.9);">
-      <h2 style="margin: 0 0 20px; font-size: 24px; font-weight: 800;">${isEdit ? 'Edit Profile' : 'Create New Profile'}</h2>
-      
+    <div class="peShell">
+      <h2 class="peTitle">${isEdit ? 'Edit profile' : 'Create a profile'}</h2>
+      <div class="peCols">
+      <div class="peCol">
+
       <div style="margin-bottom: 20px;">
         <label style="display: block; font-size: 13px; color: #9aa5b5; margin-bottom: 8px; font-weight: 700;">PROFILE NAME</label>
         <input type="text" id="editName" value="${escapeHtml(pName)}" placeholder="e.g. Living Room, Sarah" style="width: 100%; padding: 12px 16px; background: #080a10; border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; color: #fff; font-size: 15px; outline: none;" />
@@ -587,12 +589,18 @@ export function openProfileEditor(editingProfile?: HouseholdProfile, onClose?: (
         <div class="avGrid" id="avatarPickerRow"></div>
       </div>
 
+      </div><div class="peCol">
+
       <div style="margin-bottom: 24px; background:#080a10; border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:16px;">
         <label style="display:block; font-size:13px; color:#9aa5b5; margin-bottom:4px; font-weight:700;">ALLOWED RATINGS</label>
         <div style="font-size:11.5px; color:#7C828C; line-height:1.5; margin-bottom:12px;">
-          Pick exactly what this profile may watch. Leave everything unticked for no restriction.
+          Start from an age band, or open the full list and pick exactly.
         </div>
-        <div id="ratingGroups"></div>
+        <div class="rtPresets" id="ratingPresets"></div>
+        <details class="rtExact">
+          <summary>Choose exactly</summary>
+          <div id="ratingGroups"></div>
+        </details>
         <div id="ratingSummary" style="font-size:12px; color:#c5f04e; margin-top:12px; font-weight:700;"></div>
       </div>
 
@@ -602,11 +610,14 @@ export function openProfileEditor(editingProfile?: HouseholdProfile, onClose?: (
         <div style="font-size:11px; color:#9aa5b5; margin-top:6px;">Anyone switching into this profile must enter the PIN.${editingProfile?.pin ? ' <button type="button" id="clearPinBtn" style="background:none;border:none;color:#ff6b6b;cursor:pointer;padding:0;font-size:11px;text-decoration:underline;">Remove PIN</button>' : ''}</div>
       </div>
 
-      <div style="display: flex; gap: 12px; margin-bottom: ${isEdit && editingProfile?.id !== 'default_main' ? '12px' : '0'};">
-        <button id="cancelEditBtn" style="flex: 1; padding: 12px; border-radius: 10px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); color: #fff; font-weight: 700; cursor: pointer;">Cancel</button>
-        <button id="saveProfileBtn" style="flex: 1; padding: 12px; border-radius: 10px; background: #c5f04e; border: none; color: #06070a; font-weight: 700; cursor: pointer;">Save Profile</button>
       </div>
-      ${isEdit && editingProfile?.id !== 'default_main' ? `<button id="deleteProfileBtn" style="width: 100%; padding: 12px; border-radius: 10px; background: rgba(255,94,126,0.1); border: 1px solid rgba(255,94,126,0.3); color: #ff5e7e; font-weight: 700; cursor: pointer; transition: all 0.2s;">Delete Profile</button>` : ''}
+      </div>
+
+      <div class="peFoot" style="display: flex; gap: 12px; margin-bottom: ${isEdit && editingProfile?.id !== 'default_main' ? '12px' : '0'};">
+        <button id="cancelEditBtn" style="flex: 1; padding: 12px; border-radius: 10px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); color: #fff; font-weight: 700; cursor: pointer;">Cancel</button>
+        <button id="saveProfileBtn" style="flex: 1; padding: 12px; border-radius: 10px; background: #c5f04e; border: none; color: #06070a; font-weight: 700; cursor: pointer;">Save profile</button>
+      </div>
+      ${isEdit && editingProfile?.id !== 'default_main' ? `<button id="deleteProfileBtn" style="width: 100%; padding: 12px; border-radius: 10px; background: rgba(255,94,126,0.1); border: 1px solid rgba(255,94,126,0.3); color: #ff5e7e; font-weight: 700; cursor: pointer; transition: all 0.2s;">Delete profile</button>` : ''}
     </div>
   `;
 
@@ -648,6 +659,30 @@ export function openProfileEditor(editingProfile?: HouseholdProfile, onClose?: (
 
   const KID_ONLY = new Set(['TV-Y', 'TV-Y7', 'TV-Y7-FV', 'TV-G', 'TV-PG']);
 
+  // TV-Y7-FV is TV-Y7 with a fantasy-violence descriptor, and the catalogue
+  // carries both. It has no checkbox of its own -- offering "age 7+" twice
+  // would be a worse control -- so it travels with TV-Y7: ticking that allows
+  // both, and the count ignores it, because a parent who ticks four boxes and
+  // is told they allowed five has been given a reason to distrust the screen.
+  const IMPLIED: Record<string, string[]> = { 'TV-Y7': ['TV-Y7-FV'] };
+  const visibleCount = (set: Set<string>): number => {
+    let n = 0;
+    for (const code of set) if (code !== 'TV-Y7-FV') n += 1;
+    return n;
+  };
+
+  // Age bands, cumulative. Eleven checkboxes is the right control for someone
+  // who wants a specific combination and the wrong one for everybody else --
+  // the common cases are four, and they are these.
+  const PRESETS: { id: string; label: string; note: string; codes: string[] }[] = [
+    { id: 'little', label: 'Little kids', note: 'Up to about 6',  codes: ['TV-Y', 'TV-Y7', 'TV-Y7-FV', 'TV-G', 'G'] },
+    { id: 'older',  label: 'Older kids', note: 'Around 7 to 12',  codes: ['TV-Y', 'TV-Y7', 'TV-Y7-FV', 'TV-G', 'G', 'TV-PG', 'PG'] },
+    { id: 'teen',   label: 'Teens',      note: '13 and up',       codes: ['TV-Y', 'TV-Y7', 'TV-Y7-FV', 'TV-G', 'G', 'TV-PG', 'PG', 'TV-14', 'PG-13'] },
+    { id: 'all',    label: 'Everything', note: 'No restriction',  codes: [] },
+  ];
+  const presetBox = modal.querySelector('#ratingPresets') as HTMLElement | null;
+  let presetBtns: HTMLElement[] = [];
+
   if (ratingGroups && ratingSummary) {
     ratingGroups.innerHTML = RATING_GROUPS.map((g) => `
       <div style="margin-bottom:14px;">
@@ -663,18 +698,53 @@ export function openProfileEditor(editingProfile?: HouseholdProfile, onClose?: (
     const boxes = Array.from(ratingGroups.querySelectorAll<HTMLInputElement>('input[data-rating]'));
     const paint = () => {
       for (const b of boxes) b.checked = selected.has(b.dataset.rating!);
-      const n = selected.size;
+      const n = visibleCount(selected);
+      // Unrestricted is the DEFAULT, not a fault. It was rendered in the same
+      // red used for destructive actions, which made an adult profile look
+      // misconfigured every time the editor opened.
       ratingSummary.textContent = n === 0
-        ? 'No restriction — this profile can watch everything.'
+        ? 'No restriction. This profile can watch everything.'
         : `${n} rating${n === 1 ? '' : 's'} allowed`;
-      ratingSummary.style.color = n === 0 ? '#ff6b6b' : '#c5f04e';
+      ratingSummary.style.color = n === 0 ? 'rgba(255,255,255,.5)' : '#c5f04e';
       if (pinWrap) pinWrap.style.display = n === 0 ? '' : 'none';
+
+      // Highlight whichever band matches exactly, so a preset reads as a state
+      // rather than as a button that did something once.
+      for (const el of presetBtns) {
+        const codes = PRESETS.find((x) => x.id === el.dataset.preset)!.codes;
+        const same = codes.length === selected.size && codes.every((c) => selected.has(c));
+        // (compared on the full set, including implied codes, so a band still
+        // matches exactly rather than approximately)
+        el.classList.toggle('on', same);
+      }
     };
+
+    if (presetBox) {
+      presetBox.innerHTML = PRESETS.map((p) => `
+        <button type="button" class="rtPreset" data-preset="${p.id}">
+          <span class="rtLabel">${escapeHtml(p.label)}</span>
+          <span class="rtNote">${escapeHtml(p.note)}</span>
+        </button>`).join('');
+      presetBtns = Array.from(presetBox.querySelectorAll<HTMLElement>('[data-preset]'));
+      for (const el of presetBtns) {
+        el.addEventListener('click', () => {
+          const codes = PRESETS.find((x) => x.id === el.dataset.preset)!.codes;
+          selected.clear();
+          for (const c of codes) selected.add(c);
+          paint();
+        });
+      }
+    }
 
     for (const b of boxes) {
       b.addEventListener('change', async () => {
         const code = b.dataset.rating!;
-        if (!b.checked) { selected.delete(code); paint(); return; }
+        if (!b.checked) {
+          selected.delete(code);
+          for (const extra of IMPLIED[code] || []) selected.delete(extra);
+          paint();
+          return;
+        }
 
         // Warn once when an MPAA letter is added to an otherwise kid-rated
         // profile. The letters are not interchangeable with the TV ones: PG-13
@@ -689,6 +759,7 @@ export function openProfileEditor(editingProfile?: HouseholdProfile, onClose?: (
           b.checked = true;
         }
         selected.add(code);
+        for (const extra of IMPLIED[code] || []) selected.add(extra);
         paint();
       });
     }

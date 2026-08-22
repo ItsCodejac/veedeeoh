@@ -4942,3 +4942,45 @@ body.can-host .vodQuickBtn.partyAct { display: flex; }
 .setCredits a { color: rgba(255,255,255,.7); }
 .setCredits a:hover { color: #fff; }
 @media (max-width: 620px) { .setCredits { columns: 1; } }
+
+/* ---- profile editor -----------------------------------------------------
+   Was a 460px column with eleven bare checkboxes in it, in a modal that
+   scrolled the whole page. Two columns where there is room, one where there
+   is not, and the sheet scrolls inside itself so the actions stay reachable. */
+.peShell {
+  background: #10141e; border: 1px solid rgba(255,255,255,.15);
+  border-radius: 24px; width: 100%; max-width: 760px;
+  max-height: min(90vh, 900px); overflow-y: auto;
+  padding: 28px 30px 26px; box-shadow: 0 24px 60px rgba(0,0,0,.9);
+  scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.18) transparent;
+}
+.peShell::-webkit-scrollbar { width: 8px; }
+.peShell::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,.16); border-radius: 999px;
+  border: 2px solid transparent; background-clip: content-box;
+}
+.peTitle { margin: 0 0 20px; font-size: 22px; font-weight: 800; }
+.peCols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 26px; align-items: start; }
+.peFoot { margin-top: 4px; }
+@media (max-width: 720px) { .peCols { grid-template-columns: 1fr; } }
+
+/* Age bands. Eleven checkboxes is the right control for someone who wants a
+   specific combination and the wrong one for everyone else. */
+.rtPresets { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-bottom: 12px; }
+.rtPreset {
+  text-align: left; cursor: pointer; padding: 9px 11px; border-radius: 9px;
+  background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.09);
+  color: inherit; font: inherit;
+}
+.rtPreset:hover { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.2); }
+.rtPreset.on { border-color: var(--accent, #c5f04e); background: rgba(197,240,78,.1); }
+.rtLabel { display: block; font-size: 12.5px; font-weight: 700; color: #fff; }
+.rtNote { display: block; font-size: 11px; color: rgba(255,255,255,.45); margin-top: 1px; }
+
+.rtExact > summary {
+  cursor: pointer; list-style: none; padding: 6px 0;
+  font-size: 12px; font-weight: 700; color: var(--accent, #c5f04e);
+}
+.rtExact > summary::-webkit-details-marker { display: none; }
+.rtExact > summary::before { content: "+ "; }
+.rtExact[open] > summary::before { content: "\2212 "; }
