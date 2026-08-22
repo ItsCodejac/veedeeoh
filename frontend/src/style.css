@@ -1190,6 +1190,10 @@ select { max-width: 190px; }
   scrollbar-width: thin;
   scrollbar-color: #2a2c34 transparent;
 }
+/* Safari ignores scrollbar-width entirely and paints its own on every rail.
+   .showcaseScroll already had this; .railScroll never did, so Shows, Movies,
+   Kids and Continue Watching all carried a visible bar there and nowhere else. */
+.railScroll::-webkit-scrollbar { height: 0; width: 0; display: none; }
 .railScroll .card { width: 195px; flex-shrink: 0; }
 .vodCard {
   width: 132px;
@@ -4469,3 +4473,19 @@ body.party-guest { background: #06070a; }
   cursor: pointer; box-shadow: 0 8px 26px rgba(0,0,0,.6);
 }
 .partyCodeInline { font-weight: 800; letter-spacing: .16em; color: var(--accent); }
+
+/* Autoplay refused -- see guardAutoplay. The only thing that lifts the block is
+   a real press, so give them one rather than a black rectangle. */
+.vdTapPlay {
+  position: absolute; inset: 0; z-index: 45;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  background: rgba(6,7,10,.72); backdrop-filter: blur(3px);
+  border: none; cursor: pointer;
+  font-family: var(--display); font-size: 14px; font-weight: 700; color: #fff;
+}
+.vdTapIcon {
+  width: 66px; height: 66px; border-radius: 50%;
+  background: var(--accent); color: #06070a;
+  display: flex; align-items: center; justify-content: center;
+}
+.vdTapIcon svg { width: 26px; height: 26px; margin-left: 3px; }

@@ -134,12 +134,50 @@ class VodPlayer {
     }
 
     this.player = created;
+    this.guardAutoplay(created);
     this.fixQualityLabels();
     this.mountBufferSpinner(created);
     this.applyPrefs(created);
     this.style();
     this.wire();
     this.showBump();
+  }
+
+  /** Recover when the browser refuses to autoplay.
+   *
+   *  `autoplay: true` is a request, not a guarantee. Safari only honours it
+   *  within a short window after a real user gesture, and the player is built
+   *  AFTER an async stream resolve -- so by the time it exists the activation
+   *  has often expired and play() is rejected. Chrome is lenient and plays
+   *  anyway, which is why this looks like a Safari-only "nothing plays".
+   *
+   *  Nothing caught that rejection, so the viewer got a black player with no
+   *  explanation. Now they get something to press, which is the only thing that
+   *  can lift the block. */
+  private guardAutoplay(p: any): void {
+    const attempt = p.play?.();
+    if (!attempt?.catch) return;
+
+    attempt.catch(() => {
+      if (this.destroyed || !p.paused) return;
+
+      const el = document.createElement("button");
+      el.className = "vdTapPlay";
+      el.innerHTML = `
+        <span class="vdTapIcon"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg></span>
+        <span>Tap to play</span>`;
+      el.addEventListener("click", () => {
+        el.remove();
+        void p.play()?.catch?.(() => {
+          this.showPanel("Couldn't start playback.", "Try another title.");
+        });
+      });
+      this.root?.appendChild(el);
+
+      // If something else starts it -- a keyboard shortcut, the player's own
+      // control bar -- the prompt has served its purpose and should go.
+      p.addEventListener("playing", () => el.remove(), { once: true, signal: this.ac.signal });
+    });
   }
 
   /** Relabel quality options that have no resolution to report.
