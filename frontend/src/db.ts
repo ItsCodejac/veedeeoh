@@ -233,6 +233,8 @@ export interface HouseholdProfile {
   name: string;
   avatar_color: string;
   avatar_url?: string | null;
+  /** How avatar_url was generated. Editor-only; see the migration. */
+  avatar_recipe?: { style: string; seed: string; choices: Record<string, string> } | null;
   is_kids: boolean;
   /** Legacy single ceiling. Superseded by allowed_ratings; kept so existing
    *  profiles keep working until a parent edits them. */
@@ -256,6 +258,7 @@ export async function createProfile(fields: {
   name: string;
   avatar_color?: string;
   avatar_url?: string | null;
+  avatar_recipe?: { style: string; seed: string; choices: Record<string, string> } | null;
   is_kids?: boolean;
   max_rating?: string;
   allowed_ratings?: string[] | null;
@@ -275,7 +278,7 @@ export async function createProfile(fields: {
 
 export async function updateProfile(
   profileId: string,
-  fields: Partial<Pick<HouseholdProfile, "name" | "avatar_color" | "avatar_url" | "is_kids" | "max_rating" | "pin">>
+  fields: Partial<Pick<HouseholdProfile, "name" | "avatar_color" | "avatar_url" | "avatar_recipe" | "is_kids" | "max_rating" | "pin">>
 ): Promise<void> {
   const sb = getSupabase();
   const { error } = await sb.from("household_profiles").update(fields).eq("id", profileId);

@@ -3,6 +3,11 @@ import * as db from './db';
 import { getSession, signOut } from './auth';
 import { RATING_GROUPS, allowedRatingsFor } from './db';
 
+/** How an avatar was generated. Kept beside the finished image so the editor
+ *  can reopen on the same style, seed and feature choices instead of resetting
+ *  every control to Random. Never used to render. */
+export interface AvatarRecipe { style: string; seed: string; choices: Record<string, string> }
+
 const ACTIVE_PROFILE_KEY = 'veedeeoh_active_profile';
 
 const DEFAULT_PROFILES: HouseholdProfile[] = [
@@ -112,7 +117,8 @@ export async function hydrateProfilesFromCloud(): Promise<void> {
 
 /** Create a profile in Supabase (when signed in) + local cache. */
 export async function createProfileEverywhere(fields: {
-  name: string; avatar_color: string; is_kids?: boolean; max_rating?: string | null;
+  name: string; avatar_color: string; avatar_url?: string | null;
+  avatar_recipe?: AvatarRecipe | null; is_kids?: boolean; max_rating?: string | null;
   allowed_ratings?: string[] | null; pin?: string | null;
 }): Promise<void> {
   const local = getStoredProfiles().filter((p) => p.id !== 'default_main');
@@ -121,12 +127,19 @@ export async function createProfileEverywhere(fields: {
       const row = await db.createProfile({
         name: fields.name,
         avatar_color: fields.avatar_color,
+        // NEITHER OF THESE WAS BEING SENT. Creating a profile dropped the
+        // avatar entirely -- chosen in the editor, gone the moment it saved --
+        // while editing an existing one kept it, which made it look like the
+        // picker worked intermittently rather than not at all on the one path.
+        avatar_url: fields.avatar_url ?? null,
+        avatar_recipe: fields.avatar_recipe ?? null,
         is_kids: fields.is_kids,
         max_rating: fields.max_rating ?? undefined,
         allowed_ratings: fields.allowed_ratings ?? null,
         pin: fields.pin ?? null,
       });
       local.push({ id: row.id, name: row.name, avatar_color: row.avatar_color,
+        avatar_url: row.avatar_url ?? null, avatar_recipe: row.avatar_recipe ?? null,
         is_kids: row.is_kids, max_rating: row.max_rating,
         allowed_ratings: row.allowed_ratings ?? null, pin: row.pin });
       saveProfiles(local);
@@ -260,7 +273,8 @@ export async function ensureAdultPinExists(excludeId?: string): Promise<void> {
 }
 
 export async function updateProfileEverywhere(id: string, fields: {
-  name: string; avatar_color: string; avatar_url?: string | null; is_kids?: boolean;
+  name: string; avatar_color: string; avatar_url?: string | null;
+  avatar_recipe?: AvatarRecipe | null; is_kids?: boolean;
   max_rating?: string | null; allowed_ratings?: string[] | null; pin?: string | null;
 }): Promise<void> {
   const list = getStoredProfiles().map((p) => (p.id === id ? { ...p, ...fields } : p));
@@ -272,6 +286,9 @@ export async function updateProfileEverywhere(id: string, fields: {
       // avatar_url was reaching localStorage but never the DB, so a chosen avatar
       // vanished on the next hydrate from cloud.
       if (fields.avatar_url !== undefined) patch.avatar_url = fields.avatar_url;
+      // The recipe follows the image. Written together or not at all, so the
+      // two can never describe different avatars.
+      if (fields.avatar_recipe !== undefined) patch.avatar_recipe = fields.avatar_recipe;
       if (fields.allowed_ratings !== undefined) patch.allowed_ratings = fields.allowed_ratings;
       if (fields.pin !== undefined) patch.pin = fields.pin; // only touch pin when set/cleared
       await db.updateProfile(id, patch);
@@ -650,11 +667,13 @@ export function openProfileEditor(editingProfile?: HouseholdProfile, onClose?: (
   // done a handful of times, and ten dropdowns is a screen of its own for
   // something a randomise button covers.
   let selectedAvatarUrl = pAvatarUrl;
+  let selectedRecipe: AvatarRecipe | null = (editingProfile as any)?.avatar_recipe ?? null;
   void wireAvatarPicker(modal, {
     initial: pAvatarUrl,
     initialName: pName,
+    recipe: selectedRecipe,
     color: () => selectedColor,
-    onPick: (dataUri) => { selectedAvatarUrl = dataUri; },
+    onPick: (dataUri, recipe) => { selectedAvatarUrl = dataUri; selectedRecipe = recipe; },
   });
 
   const ratingGroups = modal.querySelector('#ratingGroups') as HTMLElement | null;
@@ -852,8 +871,12 @@ export function openProfileEditor(editingProfile?: HouseholdProfile, onClose?: (
         pin = await hashPin(rawPin);
       }
 
-      const fields: { name: string; avatar_color: string; avatar_url: string | null; is_kids: boolean; max_rating: string | null; allowed_ratings: string[] | null; pin?: string | null } =
-        { name: nameInput, avatar_color: selectedColor, avatar_url: selectedAvatarUrl || null, is_kids: isKids, max_rating: maxRating, allowed_ratings: allowedList.length ? allowedList : null };
+      const fields: { name: string; avatar_color: string; avatar_url: string | null; avatar_recipe: AvatarRecipe | null; is_kids: boolean; max_rating: string | null; allowed_ratings: string[] | null; pin?: string | null } =
+        { name: nameInput, avatar_color: selectedColor, avatar_url: selectedAvatarUrl || null,
+          // Cleared alongside the image when "use initial" is chosen, so a
+          // stale recipe cannot outlive the avatar it describes.
+          avatar_recipe: selectedAvatarUrl ? selectedRecipe : null,
+          is_kids: isKids, max_rating: maxRating, allowed_ratings: allowedList.length ? allowedList : null };
       if (pin !== undefined) fields.pin = pin;
 
       (saveBtn as HTMLButtonElement).disabled = true;
@@ -897,8 +920,9 @@ async function wireAvatarPicker(
   o: {
     initial: string;
     initialName: string;
+    recipe: AvatarRecipe | null;
     color: () => string;
-    onPick: (dataUri: string) => void;
+    onPick: (dataUri: string, recipe: AvatarRecipe | null) => void;
   },
 ): Promise<void> {
   const styleRowEl = root.querySelector<HTMLElement>('#avatarStyleRow');
@@ -912,18 +936,22 @@ async function wireAvatarPicker(
     = await import('./avatars');
 
   const existing = parseAvatar(o.initial);
-  let style = existing?.style || AVATAR_STYLES[0]!.id;
+  // The saved recipe wins. It is the only thing that knows which features were
+  // set, and without it every control reopened at Random and changing one
+  // meant rebuilding the whole avatar from memory.
+  let style = o.recipe?.style || existing?.style || AVATAR_STYLES[0]!.id;
+  let seed = o.recipe?.seed || (o.initialName || 'veedeeoh').trim();
+  let choices: Record<string, string> = { ...(o.recipe?.choices || {}) };
   let round = 0;
-  let seed = (o.initialName || 'veedeeoh').trim();
-  let choices: Record<string, string> = {};
   let chosen = o.initial;
+  let chosenSeed = seed;
 
   // A legacy api.dicebear.com value is regenerated locally here, so opening the
   // editor is what heals a profile that would otherwise keep making the
   // request the display paths now refuse.
   if (isRemoteAvatar(o.initial)) {
     chosen = (await renderAvatar(o.initial, { size: 96, background: o.color() })) || '';
-    if (chosen) o.onPick(chosen);
+    if (chosen) o.onPick(chosen, existing ? { style: existing.style, seed: existing.seed, choices: {} } : null);
   }
 
   const letter = (o.initialName || 'A').charAt(0).toUpperCase();
@@ -971,9 +999,10 @@ async function wireAvatarPicker(
     preview.style.backgroundImage = `url("${chosen}")`;
   }
 
-  function select(uri: string): void {
+  function select(uri: string, seedUsed: string): void {
     chosen = uri;
-    o.onPick(uri);
+    chosenSeed = seedUsed;
+    o.onPick(uri, { style, seed: seedUsed, choices: { ...choices } });
     void paintPreview();
     grid.querySelectorAll('.avOpt').forEach((x) => x.classList.remove('on'));
     grid.querySelectorAll<HTMLElement>('.avOpt').forEach((x) => {
@@ -991,7 +1020,10 @@ async function wireAvatarPicker(
    *    'clear'    select nothing. Needed for "use initial", which the previous
    *               auto-select undid the instant it ran. */
   async function paint(mode: 'init' | 'reselect' | 'clear' = 'reselect'): Promise<void> {
-    const seeds = [seed, ...Array.from({ length: 5 }, (_v, i) => `${seed}-${i}`)];
+    // The saved seed leads, so reopening shows the current avatar as the first
+    // option and selected, rather than six strangers with the real one nowhere.
+    const seeds = [mode === 'init' ? chosenSeed : seed,
+                   ...Array.from({ length: 5 }, (_v, i) => `${seed}-${round}-${i}`)];
     grid.innerHTML = seeds.map(() => `<button type="button" class="avOpt"></button>`).join('');
     const uris = await Promise.all(seeds.map((sd) =>
       renderCustom(style, sd, choices, { size: 96, background: o.color() })));
@@ -1001,22 +1033,23 @@ async function wireAvatarPicker(
       const uri = uris[i] || '';
       if (!uri) { b.remove(); return; }
       b.dataset.uri = uri;
+      b.dataset.seed = seeds[i];
       b.style.backgroundImage = `url("${uri}")`;
       if (uri === chosen) b.classList.add('on');
-      b.addEventListener('click', () => select(uri));
+      b.addEventListener('click', () => select(uri, seeds[i]!));
     });
 
     if (mode === 'clear') {
       chosen = '';
-      o.onPick('');
+      o.onPick('', null);
       grid.querySelectorAll('.avOpt').forEach((x) => x.classList.remove('on'));
       await paintPreview();
       return;
     }
     // Choosing a style or a feature should show its result immediately rather
     // than waiting for a click nobody knows they have to make.
-    const first = uris.find(Boolean);
-    if (first && (mode === 'reselect' || !chosen)) select(first);
+    const firstIdx = uris.findIndex(Boolean);
+    if (firstIdx >= 0 && (mode === 'reselect' || !chosen)) select(uris[firstIdx]!, seeds[firstIdx]!);
     else await paintPreview();
   }
 

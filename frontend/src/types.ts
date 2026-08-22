@@ -69,6 +69,11 @@ export interface HouseholdProfile {
   name: string;
   avatar_color: string;
   avatar_url?: string | null;
+  /** How avatar_url was generated, so the editor can reopen with the same
+   *  style, seed and feature choices instead of starting from Random. Never
+   *  used to render: avatar_url is authoritative, so a recipe naming a style
+   *  that no longer exists costs nothing. */
+  avatar_recipe?: { style: string; seed: string; choices: Record<string, string> } | null;
   role?: 'owner' | 'adult';
   is_kids?: boolean;
   max_rating?: string | null; // e.g. 'TV-G'; null/undefined = no cap (adult)
