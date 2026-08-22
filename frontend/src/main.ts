@@ -350,6 +350,52 @@ async function enterAsPartyGuest(code: string): Promise<void> {
   history.replaceState({}, "", location.pathname);
 }
 
+/** Trial countdown in the sidebar.
+ *
+ *  Six real trials expired with zero conversions, and the reason was not price:
+ *  trialDaysLeft() was computed and rendered NOWHERE, so a trial ran out with no
+ *  warning and the next visit was a full-screen paywall. Nobody was asked to
+ *  convert; they were locked out.
+ *
+ *  Only appears in the last five days. A banner from day one is wallpaper by
+ *  day six, and the point is to be noticed exactly when it matters.
+ */
+async function mountTrialNotice(): Promise<void> {
+  const { trialDaysLeft, getAccount, startCheckout } = await import("./db");
+  let days: number | null = null;
+  let acct: any = null;
+  try {
+    [days, acct] = await Promise.all([trialDaysLeft(), getAccount()]);
+  } catch { return; }
+
+  // Paid and comped accounts have an expiry too; only a trial should be nagged.
+  if (days === null || days > 5 || days < 0) return;
+  if (!acct || !String(acct.tier || "").startsWith("trial")) return;
+
+  const dismissedFor = localStorage.getItem("veedeeoh_trial_notice_day");
+  if (dismissedFor === String(days)) return;   // dismissed today, back tomorrow
+
+  const el = document.createElement("div");
+  el.id = "trialNotice";
+  el.innerHTML = `
+    <div class="trialNoticeTop">
+      <strong>${days === 0 ? "Trial ends today" : days === 1 ? "1 day left" : `${days} days left`}</strong>
+      <button class="trialNoticeX" aria-label="Dismiss">&times;</button>
+    </div>
+    <p>Keep your profiles, lists and watch history. $4/mo for the household.</p>
+    <button class="trialNoticeCta">Subscribe</button>`;
+
+  document.querySelector("aside .sidebar-spacer")?.before(el);
+
+  el.querySelector(".trialNoticeX")?.addEventListener("click", () => {
+    localStorage.setItem("veedeeoh_trial_notice_day", String(days));
+    el.remove();
+  });
+  el.querySelector(".trialNoticeCta")?.addEventListener("click", async () => {
+    try { await startCheckout(); } catch { showToast("Couldn't start checkout"); }
+  });
+}
+
 async function boot(): Promise<void> {
   if (isCloudMode()) {
     const session = await restoreSession();
@@ -431,6 +477,8 @@ async function boot(): Promise<void> {
     prof.openProfileSwitcher((sel) => { void enterAsProfile(sel, dataReady); });
     hideBootSplash();
   }
+
+  void mountTrialNotice();
 
   // A referral link lands here: ?ref=CODE. Stashed rather than redeemed on the
   // spot, because a brand new visitor has no session yet and sign-up leaves the

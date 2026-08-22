@@ -192,6 +192,103 @@ export async function setSeats(userId: string, seats: number): Promise<number> {
   return qty;
 }
 
+// ------------------------------------------------------------ party credits ---
+
+const CREDIT_PRICE_ID = () => process.env.STRIPE_CREDIT_PRICE_ID || "";
+
+/** One-time Checkout for a credit top-up. Separate from the subscription
+ *  Checkout because this is `mode: payment` -- a top-up must not create or
+ *  alter a subscription, and mixing them is how someone ends up double-billed
+ *  monthly for a one-off dollar. */
+export async function createCreditCheckout(
+  userId: string, email: string | undefined, origin: string
+): Promise<string> {
+  if (!CREDIT_PRICE_ID()) throw new Error("STRIPE_CREDIT_PRICE_ID is not configured");
+  const customer = await ensureCustomer(userId, email || "");
+  const session = await getStripe().checkout.sessions.create({
+    mode: "payment",
+    customer,
+    line_items: [{ price: CREDIT_PRICE_ID(), quantity: 1 }],
+    success_url: `${origin}/#settings/account?credits=1`,
+    cancel_url: `${origin}/#settings/account`,
+    // Read back by the webhook. The user id must travel with the payment: a
+    // Checkout session is the only place the two are reliably tied together.
+    metadata: { userId, kind: "party_credits", credits: "24" },
+  });
+  return session.url || "";
+}
+
+/** Add purchased credits. Idempotent on the Stripe session id, because a
+ *  webhook retry that tops someone up twice is free money we did not sell. */
+async function creditPurchase(session: Stripe.Checkout.Session): Promise<void> {
+  const userId = session.metadata?.userId;
+  const credits = parseInt(session.metadata?.credits || "0", 10);
+  if (!userId || !credits) return;
+
+  const sb = adminSupabase();
+  const { data: seen } = await sb.from("party_credit_ledger")
+    .select("id").eq("note", session.id).maybeSingle();
+  if (seen) return;
+
+  const { data: prof } = await sb.from("profiles")
+    .select("party_credits").eq("id", userId).maybeSingle();
+  if (!prof) return;
+
+  // Purchased credits deliberately IGNORE the 180 rollover cap. That ceiling
+  // exists to bound an unearned liability from stacked monthly grants; someone
+  // who paid cash for four hours must receive four hours.
+  await sb.from("profiles")
+    .update({ party_credits: (prof.party_credits ?? 0) + credits })
+    .eq("id", userId);
+  await sb.from("party_credit_ledger")
+    .insert({ user_id: userId, delta: credits, reason: "purchase", note: session.id });
+}
+
+/** Issue any free months the account has earned.
+ *
+ *  Applied as a CUSTOMER BALANCE CREDIT rather than a coupon or a trial
+ *  extension: it is exactly "do not charge for this one", it shows on the
+ *  invoice as applied balance so the customer can see why, and it touches no
+ *  subscription field that applySubscription would then misread as a status
+ *  change.
+ *
+ *  claim -> apply -> mark is three steps on purpose. The unique key in
+ *  free_month_grants makes the claim atomic, and a Stripe failure leaves
+ *  applied_at null so the next run retries rather than minting or losing one.
+ */
+export async function issueFreeMonths(userId: string): Promise<number> {
+  const sb = adminSupabase();
+  const { data: pending, error } = await sb.rpc("claim_free_months", { target: userId });
+  if (error || !Array.isArray(pending) || !pending.length) return 0;
+
+  const { data: prof } = await sb.from("profiles")
+    .select("stripe_customer_id").eq("id", userId).maybeSingle();
+  if (!prof?.stripe_customer_id) return 0;
+
+  let applied = 0;
+  for (const grant of pending as any[]) {
+    try {
+      const txn = await getStripe().customers.createBalanceTransaction(prof.stripe_customer_id, {
+        amount: -MONTHLY_PRICE_CENTS,   // negative == credit toward future invoices
+        currency: "usd",
+        description: `veedeeoh free month (${grant.trigger} milestone ${grant.milestone})`,
+      });
+      await sb.from("free_month_grants")
+        .update({ applied_at: new Date().toISOString(), stripe_ref: txn.id })
+        .eq("id", grant.id);
+      applied++;
+    } catch (e) {
+      console.error("[billing] free month not applied", grant.id, e);
+    }
+  }
+  return applied;
+}
+
+// What a free month is worth. Kept next to the issuance rather than read from
+// the price at runtime: a customer who earned a month at $4 should get $4, even
+// if the price later changes.
+const MONTHLY_PRICE_CENTS = 400;
+
 // ---------------------------------------------------------------- referrals ---
 
 /** Accrue affiliate commission for one paid invoice.
@@ -268,6 +365,26 @@ async function accrueReferral(inv: Stripe.Invoice): Promise<void> {
   }
 }
 
+/** Monthly allowance, then any free month it just earned. Never throws into the
+ *  webhook: entitlement was already applied by this point, and making Stripe
+ *  retry a paid invoice over a credit-grant hiccup would risk the customer's
+ *  access for a recoverable bookkeeping miss. */
+async function grantAndReward(inv: Stripe.Invoice): Promise<void> {
+  try {
+    const customerId = typeof inv.customer === "string" ? inv.customer : inv.customer?.id;
+    if (!customerId) return;
+    const sb = adminSupabase();
+    const { data: prof } = await sb.from("profiles")
+      .select("id").eq("stripe_customer_id", customerId).maybeSingle();
+    if (!prof?.id) return;
+
+    await sb.rpc("grant_monthly_credits", { target: prof.id });
+    await issueFreeMonths(prof.id);
+  } catch (e) {
+    console.error("[billing] credit grant failed", e);
+  }
+}
+
 /** Verify + process a Stripe webhook. Throws on bad signature. */
 export async function handleWebhook(rawBody: string, signature: string): Promise<void> {
   const secret = process.env.STRIPE_WEBHOOK_SECRET || "";
@@ -289,7 +406,13 @@ export async function handleWebhook(rawBody: string, signature: string): Promise
       if (subId) await applySubscription(await getStripe().subscriptions.retrieve(subId as string));
       // Entitlement first, then bookkeeping. accrueReferral swallows its own
       // errors so it can never cost the customer their access.
-      if (event.type === "invoice.paid") await accrueReferral(inv);
+      if (event.type === "invoice.paid") {
+        await accrueReferral(inv);
+        // A paid invoice IS the month boundary, so the allowance is granted here
+        // rather than on a cron: no schedule to drift, and grant_monthly_credits
+        // is idempotent on credits_granted_for so a webhook retry is harmless.
+        await grantAndReward(inv);
+      }
       break;
     }
     case "checkout.session.completed": {
@@ -298,6 +421,9 @@ export async function handleWebhook(rawBody: string, signature: string): Promise
         const sub = await getStripe().subscriptions.retrieve(s.subscription as string);
         await applySubscription(sub);
       }
+      // A credit top-up has no subscription, so it would otherwise fall through
+      // this case having done nothing.
+      if (s.metadata?.kind === "party_credits") await creditPurchase(s);
       break;
     }
     default:

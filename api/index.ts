@@ -350,6 +350,19 @@ app.post('/billing/checkout', async (c: Context) => {
   }
 });
 
+// One-time Checkout for a watch party credit top-up. mode:payment, so it can
+// never touch the subscription.
+app.post('/billing/credits', async (c: Context) => {
+  const user = await userFromRequest(c);
+  if (!user) return c.json({ error: 'unauthorized' }, 401);
+  try {
+    const origin = new URL(c.req.url).origin;
+    return c.json({ url: await billing.createCreditCheckout(user.id, user.email, origin) });
+  } catch (e: any) {
+    return c.json({ error: e?.message || 'checkout failed' }, 500);
+  }
+});
+
 // Self-service manage/cancel via the Stripe Customer Portal.
 app.post('/billing/portal', async (c: Context) => {
   const user = await userFromRequest(c);

@@ -5,7 +5,7 @@
 import { escapeHtml, showToast } from "./util";
 import { getSession, signOut, getSupabase } from "./auth";
 import { getActiveProfile, getStoredProfiles } from "./profiles";
-import { getAccount, openBillingPortal, startCheckout } from "./db";
+import { getAccount, openBillingPortal, startCheckout, partyCreditSummary, buyPartyCredits } from "./db";
 import { card, row, fmtDate } from "./settings-ui";
 
 export async function renderAccount(el: HTMLElement): Promise<void> {
@@ -107,7 +107,10 @@ async function renderBilling(el: HTMLElement): Promise<void> {
         ? `<button class="setBtn" id="setPortal">Manage billing</button>`
         : `<button class="setBtn primary" id="setSubscribe">Subscribe — $4/mo</button>`}
     </div>
-    ${comped ? `<p class="setHint">Comped account. You are not charged, and there is nothing to manage.</p>` : ""}`);
+    ${comped ? `<p class="setHint">Comped account. You are not charged, and there is nothing to manage.</p>` : ""}
+    <div id="setCredits"></div>`);
+
+  void renderCredits(el.querySelector<HTMLElement>("#setCredits")!);
 
   el.querySelector("#setPortal")?.addEventListener("click", async (e) => {
     const b = e.currentTarget as HTMLButtonElement;
@@ -190,4 +193,65 @@ async function confirmDelete(email: string): Promise<void> {
   } catch {
     showToast("Deletion failed. Nothing was removed.");
   }
+}
+
+// ------------------------------------------------------------ party credits ---
+
+/** Watch party hours, inside the billing card because that is where someone
+ *  looks to answer "what am I paying for and what do I get".
+ *
+ *  An EXEMPT account still sees this section and is told plainly that it is not
+ *  charged -- the same treatment a comped founder gets above. Hiding it would
+ *  leave an exempt user unable to tell whether hosting is free for them or
+ *  simply missing. */
+async function renderCredits(el: HTMLElement): Promise<void> {
+  const c = await partyCreditSummary();
+  if (!c) { el.innerHTML = ""; return; }
+
+  const hrs = (credits: number) => {
+    const h = Math.floor(credits / 6), m = (credits % 6) * 10;
+    return h && m ? `${h}h ${m}m` : h ? `${h} hours` : `${m} minutes`;
+  };
+
+  if (c.exempt) {
+    el.innerHTML = `
+      <div class="setRow">
+        <span class="setRowLabel">Watch party hosting</span>
+        <span class="setRowValue"><span class="setBadge gold">Unlimited</span></span>
+      </div>
+      <p class="setHint" style="margin-top:10px">Hosting is not metered on this account. You are not charged for it.</p>`;
+    return;
+  }
+
+  // Show the NEARER of the two milestones rather than two competing bars. The
+  // hosting path needs half the credits, so an active host naturally sees that
+  // one and is not told to go and not-use the product.
+  const viaSpend = c.to_free_spent <= c.to_free_accrued;
+  const remaining = viaSpend ? c.to_free_spent : c.to_free_accrued;
+  const label = viaSpend
+    ? `${hrs(remaining)} more hosting earns a free month`
+    : `${hrs(remaining)} more unused earns a free month`;
+
+  el.innerHTML = `
+    <div class="setRow">
+      <span class="setRowLabel">Watch party hosting</span>
+      <span class="setRowValue">${hrs(c.balance)} <span class="setDim">of ${hrs(c.cap)} max</span></span>
+    </div>
+    <div class="setRow">
+      <span class="setRowLabel">Free months earned this year</span>
+      <span class="setRowValue">${c.free_months_this_year} <span class="setDim">of 3</span></span>
+    </div>
+    <p class="setHint" style="margin-top:10px">
+      10 hours are added every month and roll over. ${escapeHtml(label)}.
+    </p>
+    <div class="setBtnRow">
+      <button class="setBtn" id="setBuyCredits">Add 4 hours &mdash; $1</button>
+    </div>`;
+
+  el.querySelector("#setBuyCredits")?.addEventListener("click", async (e) => {
+    const b = e.currentTarget as HTMLButtonElement;
+    b.disabled = true; b.textContent = "Opening…";
+    try { await buyPartyCredits(); }
+    catch (err: any) { showToast(err?.message || "Couldn't start checkout"); b.disabled = false; b.textContent = "Add 4 hours — $1"; }
+  });
 }

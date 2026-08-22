@@ -699,3 +699,37 @@ export async function referralsBySource(): Promise<Record<string, number>> {
   }
   return out;
 }
+
+// ------------------------------------------------------- watch party credits ---
+
+export interface PartyCreditSummary {
+  balance: number;
+  exempt: boolean;
+  accrued: number;
+  spent: number;
+  cap: number;
+  to_free_accrued: number;
+  to_free_spent: number;
+  free_months_this_year: number;
+}
+
+export async function partyCreditSummary(): Promise<PartyCreditSummary | null> {
+  const { data, error } = await getSupabase().rpc("party_credit_summary");
+  if (error) { console.warn("[credits] summary", error); return null; }
+  return (data as PartyCreditSummary) ?? null;
+}
+
+/** Charge the host for a stretch of hosting. Returns false when the balance is
+ *  short, so the caller can warn rather than fail the party outright. */
+export async function spendPartyCredits(minutes: number, partyId?: string): Promise<boolean> {
+  const { data, error } = await getSupabase()
+    .rpc("spend_party_credits", { minutes, party: partyId ?? null });
+  if (error) { console.warn("[credits] spend", error); return false; }
+  return !!(data as any)?.ok;
+}
+
+/** Redirect to one-time Checkout for a top-up. */
+export async function buyPartyCredits(): Promise<void> {
+  const { url } = await authedPost("/api/billing/credits");
+  if (url) window.location.href = url;
+}
