@@ -172,40 +172,42 @@ function inviteCode() {
 const EDITIONS = {
   founder: {
     label: "Founder",
-    tier: "founder_vip",
-    expiresDays: null,
     subject: "You're a veedeeoh founder",
     heading: "You're in.",
     lede: "You've been invited to the veedeeoh beta. Thousands of free movies and TV shows in one app, with profiles and parental controls for the whole household.",
     grant: "founder access, free for as long as veedeeoh runs",
+    // Preset only. Every field is overridable in the panel before sending --
+    // the presets exist so the common case is one click, not so the controls
+    // are hidden.
+    grants: { tier: "founder_vip", tier_days: null, party_credits_exempt: true },
   },
   beta: {
     label: "Beta tester",
-    tier: "founder_vip",
-    expiresDays: 180,
     subject: "Your veedeeoh beta invite",
     heading: "Want to break something?",
     lede: "You've been invited to test veedeeoh before it opens up. Thousands of free movies and TV shows in one app, with profiles and parental controls for the whole household. Expect rough edges -- that's the point.",
     grant: "full access for the length of the beta",
+    grants: { tier: "founder_vip", tier_days: 180, party_credits: 60 },
   },
   partner: {
     label: "Affiliate partner",
-    tier: "founder_vip",
-    expiresDays: null,
     subject: "Your veedeeoh partner account",
     heading: "Let's work together.",
     lede: "Here's your veedeeoh partner account. Thousands of free movies and TV shows in one app, with profiles and parental controls for the whole household.",
     grant: "full access plus a partner share of every subscription you refer",
     extra: "Your referral link is in Settings once you sign in. Anyone who joins a watch party you host is credited to you as well, with no link needed.",
+    grants: {
+      tier: "founder_vip", tier_days: null, party_credits_exempt: true,
+      referral_kind: "partner", referral_rate_bps: 3000, referral_duration_months: 0,
+    },
   },
   comp: {
     label: "Friends and family",
-    tier: "founder_vip",
-    expiresDays: null,
     subject: "veedeeoh, on me",
     heading: "This one's on me.",
     lede: "I built veedeeoh: thousands of free movies and TV shows in one app, with profiles and parental controls for the whole household. Here's an account, no charge.",
     grant: "full access, on the house, permanently",
+    grants: { tier: "founder_vip", tier_days: null, party_credits_exempt: true },
   },
 };
 
@@ -237,21 +239,28 @@ function inviteEmailHtml(code, edition) {
   </div>`;
 }
 
-async function createInvite({ email, edition = "founder", tier, send = true }) {
+async function createInvite({ email, edition = "founder", grants, note, send = true }) {
   if (!email) return { ok: false, error: "email required" };
   const ed = EDITIONS[edition] || EDITIONS.founder;
+
+  // The caller's grant wins outright when supplied. Merging it over the preset
+  // would make "unset the exemption" impossible -- an absent key would silently
+  // fall back to the preset's true.
+  const g = grants && typeof grants === "object" ? grants : { ...ed.grants };
+
   const code = inviteCode();
-  // The edition owns the tier unless one is passed explicitly, so the copy and
-  // the grant cannot drift apart.
-  const grantTier = tier || ed.tier;
-  const expires = ed.expiresDays
-    ? new Date(Date.now() + ed.expiresDays * 86400000).toISOString()
-    : null;
+  const expires = g.tier_days ? new Date(Date.now() + g.tier_days * 86400000).toISOString() : null;
+
   const r = await sb("beta_invites", {
     method: "POST",
     headers: { Prefer: "return=representation" },
     body: JSON.stringify({
-      code, email: email.trim().toLowerCase(), tier: grantTier, tier_expires: expires,
+      code,
+      email: email.trim().toLowerCase(),
+      tier: g.tier || "founder_vip",
+      tier_expires: expires,
+      grants: g,
+      note: note || null,
     }),
   });
   const rows = await r.json();
@@ -277,142 +286,7 @@ async function createInvite({ email, edition = "founder", tier, send = true }) {
       else await sb(`beta_invites?code=eq.${code}`, { method: "PATCH", body: JSON.stringify({ sent_at: new Date().toISOString() }) });
     }
   }
-  return { ok: true, code, edition, tier: grantTier, link: `${SITE}/landing.html?beta=${code}`, sent, sendError };
-}
-
-// ---------------------------------------------------------------- credits ---
-
-async function creditsFor(email) {
-  const r = await sb(`profiles?select=id,email,tier,party_credits,party_credits_accrued,party_credits_spent,party_credits_exempt&email=eq.${encodeURIComponent((email || "").toLowerCase())}`);
-  if (!r.ok) return { ok: false, error: await r.text() };
-  const rows = await r.json();
-  if (!rows.length) return { ok: false, error: "no such user" };
-  const u = rows[0];
-
-  const g = await sb(`free_month_grants?select=trigger,milestone,year,applied_at&user_id=eq.${u.id}&order=created_at.desc`);
-  u.free_months = g.ok ? await g.json() : [];
-  const l = await sb(`party_credit_ledger?select=delta,reason,created_at&user_id=eq.${u.id}&order=created_at.desc&limit=10`);
-  u.ledger = l.ok ? await l.json() : [];
-  return { ok: true, user: u };
-}
-
-/** Grant or revoke the hosting exemption. Its own axis, not a tier property --
- *  it is granted and revoked per account regardless of what that account pays. */
-async function setCreditExempt({ email, exempt }) {
-  const r = await sb(`profiles?email=eq.${encodeURIComponent((email || "").toLowerCase())}`, {
-    method: "PATCH", headers: { Prefer: "return=representation" },
-    body: JSON.stringify({ party_credits_exempt: !!exempt }),
-  });
-  if (!r.ok) return { ok: false, error: await r.text() };
-  const rows = await r.json();
-  if (!rows.length) return { ok: false, error: "no such user" };
-  return { ok: true, exempt: rows[0].party_credits_exempt };
-}
-
-/** Hand-adjust a balance. Writes the ledger too, so an admin correction is as
- *  auditable as a purchase -- a balance that changed with no ledger row is the
- *  thing you cannot explain to a customer later. */
-async function adjustCredits({ email, delta, note }) {
-  const n = parseInt(delta, 10);
-  if (!Number.isFinite(n) || n === 0) return { ok: false, error: "delta must be a non-zero integer" };
-
-  const cur = await creditsFor(email);
-  if (!cur.ok) return cur;
-  const next = Math.max(0, (cur.user.party_credits || 0) + n);
-
-  const r = await sb(`profiles?id=eq.${cur.user.id}`, {
-    method: "PATCH", headers: { Prefer: "return=representation" },
-    body: JSON.stringify({ party_credits: next }),
-  });
-  if (!r.ok) return { ok: false, error: await r.text() };
-
-  await sb("party_credit_ledger", {
-    method: "POST",
-    body: JSON.stringify({ user_id: cur.user.id, delta: n, reason: "admin", note: note || "manual adjustment" }),
-  });
-  return { ok: true, balance: next };
-}
-
-// -------------------------------------------------------------- referrals ---
-
-/** Who is owed what. Grouped in JS rather than SQL because PostgREST cannot
- *  express a grouped aggregate without a view, and this list is small enough
- *  that a view would be premature. */
-async function referralPayouts() {
-  const r = await sb("referral_earnings?select=*&order=occurred_at.desc&limit=2000");
-  if (!r.ok) return { ok: false, error: await r.text() };
-  const rows = await r.json();
-
-  const byReferrer = new Map();
-  for (const e of rows) {
-    let g = byReferrer.get(e.referrer_user_id);
-    if (!g) {
-      g = { user_id: e.referrer_user_id, email: null, pending_cents: 0, paid_cents: 0, invoices: 0 };
-      byReferrer.set(e.referrer_user_id, g);
-    }
-    g.invoices += 1;
-    if (e.paid_out_at) g.paid_cents += e.commission_cents;
-    else g.pending_cents += e.commission_cents;
-  }
-
-  // Attach emails so a payout can actually be sent to a person.
-  const ids = [...byReferrer.keys()];
-  if (ids.length) {
-    const q = `profiles?select=id,email&id=in.(${ids.join(",")})`;
-    const pr = await sb(q);
-    if (pr.ok) for (const p of await pr.json()) {
-      const g = byReferrer.get(p.id);
-      if (g) g.email = p.email;
-    }
-  }
-
-  const out = [...byReferrer.values()].sort((a, b) => b.pending_cents - a.pending_cents);
-  return {
-    ok: true,
-    total_pending_cents: out.reduce((n, g) => n + g.pending_cents, 0),
-    referrers: out,
-  };
-}
-
-/** Mark everything currently owed to one referrer as settled. Scoped to
- *  paid_out_at is null so a concurrent accrual arriving mid-payout is not
- *  swept up in a payment that did not include it. */
-async function markReferralPaid({ user_id, ref }) {
-  if (!user_id) return { ok: false, error: "user_id required" };
-  const r = await sb(
-    `referral_earnings?referrer_user_id=eq.${encodeURIComponent(user_id)}&paid_out_at=is.null`,
-    {
-      method: "PATCH",
-      headers: { Prefer: "return=representation" },
-      body: JSON.stringify({ paid_out_at: new Date().toISOString(), payout_ref: ref || null }),
-    }
-  );
-  if (!r.ok) return { ok: false, error: await r.text() };
-  const rows = await r.json();
-  return { ok: true, settled: rows.length, cents: rows.reduce((n, e) => n + e.commission_cents, 0) };
-}
-
-/** Set a partner rate. Snapshotted onto future referrals only -- existing
- *  agreements keep the terms they were made under, by design. */
-async function setReferralTerms({ email, rate_bps, duration_months, kind }) {
-  const ur = await sb(`profiles?select=id&email=eq.${encodeURIComponent((email || "").toLowerCase())}`);
-  const users = ur.ok ? await ur.json() : [];
-  if (!users.length) return { ok: false, error: "no such user" };
-
-  const patch = {};
-  if (rate_bps != null) patch.rate_bps = Number(rate_bps);
-  if (duration_months != null) patch.duration_months = Number(duration_months);
-  if (kind) patch.kind = kind;
-
-  const r = await sb(`referral_codes?user_id=eq.${users[0].id}`, {
-    method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify(patch),
-  });
-  if (!r.ok) return { ok: false, error: await r.text() };
-  const rows = await r.json();
-  if (!rows.length) {
-    return { ok: false, error: "that user has no referral code yet -- they must open Settings once" };
-  }
-  return { ok: true, code: rows[0].code, rate_bps: rows[0].rate_bps, duration_months: rows[0].duration_months };
+  return { ok: true, code, edition, grants: g, link: `${SITE}/landing.html?beta=${code}`, sent, sendError };
 }
 
 async function listInvites() {
@@ -587,7 +461,7 @@ const routes = {
   "GET /api/user": (u) => findUser(u.searchParams.get("email") || ""),
   "POST /api/tier": (u, b) => setTier(b.email, b.tier),
   "GET /api/editions": () => Object.entries(EDITIONS).map(([id, e]) =>
-    ({ id, label: e.label, tier: e.tier, expiresDays: e.expiresDays, subject: e.subject })),
+    ({ id, label: e.label, subject: e.subject, grants: e.grants })),
   "GET /api/invites": () => listInvites(),
   "POST /api/invite": (u, b) => createInvite(b),
   "POST /api/invite/revoke": (u, b) => revokeInvite(b.code),

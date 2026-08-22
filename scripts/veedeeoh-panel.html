@@ -17,6 +17,12 @@
   button { background:var(--accent); color:#06070a; border:none; padding:10px 16px; border-radius:9px; font:800 13px 'Space Grotesk',sans-serif; cursor:pointer; }
   button.ghost { background:rgba(255,255,255,.08); color:#fff; }
   button:disabled { opacity:.5; cursor:default; }
+  .gRow { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:6px 0; font-size:13px; }
+  .gRow > span { color:#9aa5b5; }
+  .gRow input[type=text], .gRow input[type=number], .gRow select {
+    background:#10141e; border:1px solid rgba(255,255,255,.15); border-radius:8px;
+    color:#fff; padding:7px 10px; font:500 13px 'Space Grotesk',sans-serif; width:190px; }
+  .gRow input[type=checkbox] { width:17px; height:17px; accent-color:var(--accent); }
   input, select { background:#080a10; border:1px solid var(--line); color:#fff; padding:9px 11px; border-radius:8px; font:14px 'Space Grotesk',sans-serif; }
   input { flex:1; min-width:0; }
   .actions { display:flex; gap:9px; margin-top:14px; flex-wrap:wrap; }
@@ -62,9 +68,38 @@
     <div class="actions" style="margin-top:0">
       <input id="invEmail" type="email" placeholder="tester@example.com" />
       <select id="invEdition" style="background:#10141e;border:1px solid rgba(255,255,255,.15);border-radius:9px;color:#fff;padding:10px 12px;font:600 13px 'Space Grotesk',sans-serif;"></select>
+      <button class="ghost" id="invTune">Fine tune</button>
       <button id="invSend">Invite</button>
     </div>
     <div id="invEditionNote" class="dim" style="font-size:11.5px;margin:-4px 0 8px"></div>
+
+    <div id="invGrants" hidden style="background:#0d0f14;border:1px solid rgba(255,255,255,.1);border-radius:11px;padding:14px;margin-bottom:10px">
+      <div class="lbl" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#61666F;margin-bottom:10px">What this invite grants</div>
+      <div class="gRow"><span>Tier</span>
+        <select id="gTier">
+          <option value="founder_vip">founder_vip</option>
+          <option value="giveaway">giveaway</option>
+          <option value="cloud_paid">cloud_paid</option>
+          <option value="trial_7day">trial_7day</option>
+        </select></div>
+      <div class="gRow"><span>Expires after</span>
+        <input id="gDays" type="number" min="1" placeholder="blank = never" /></div>
+      <div class="gRow"><span>Watch party hours</span>
+        <input id="gCredits" type="number" min="0" placeholder="blank = none" /></div>
+      <div class="gRow"><span>Never metered for hosting</span>
+        <input id="gExempt" type="checkbox" /></div>
+      <div class="gRow"><span>Affiliate partner</span>
+        <input id="gPartner" type="checkbox" /></div>
+      <div class="gRow"><span>Partner rate %</span>
+        <input id="gRate" type="number" min="0" max="100" placeholder="20" /></div>
+      <div class="gRow"><span>Commission months</span>
+        <input id="gMonths" type="number" min="0" placeholder="12 · 0 = life" /></div>
+      <div class="gRow"><span>Note to self</span>
+        <input id="gNote" type="text" placeholder="why this person" /></div>
+      <div class="dim" style="font-size:11px;margin-top:8px">
+        Blank leaves a setting alone at redemption. Hours are ADDED to the balance.
+      </div>
+    </div>
     <div id="invResult" class="muted"></div>
     <div id="invList" class="muted">loading…</div>
   </div>
@@ -257,8 +292,38 @@ async function loadEditions() {
 function noteEdition() {
   const e = EDITIONS.find(x => x.id === $('invEdition').value);
   if (!e) return;
+  const g = e.grants || {};
+  // The preset FILLS the form rather than replacing it, so what gets sent is
+  // always whatever is visible -- there is no hidden state behind the dropdown.
+  $('gTier').value = g.tier || 'founder_vip';
+  $('gDays').value = g.tier_days ?? '';
+  $('gCredits').value = g.party_credits ?? '';
+  $('gExempt').checked = !!g.party_credits_exempt;
+  $('gPartner').checked = g.referral_kind === 'partner';
+  $('gRate').value = g.referral_rate_bps != null ? g.referral_rate_bps / 100 : '';
+  $('gMonths').value = g.referral_duration_months ?? '';
   $('invEditionNote').textContent =
-    `Grants ${e.tier}${e.expiresDays ? ` for ${e.expiresDays} days` : ', no expiry'} \u00b7 subject: "${e.subject}"`;
+    `${g.tier || 'founder_vip'}${g.tier_days ? ` for ${g.tier_days} days` : ', no expiry'}` +
+    `${g.party_credits_exempt ? ' \u00b7 unmetered hosting' : ''}` +
+    `${g.referral_kind === 'partner' ? ` \u00b7 partner ${(g.referral_rate_bps||0)/100}%` : ''}` +
+    ` \u00b7 subject: "${e.subject}"`;
+}
+$('invTune').onclick = () => {
+  const box = $('invGrants');
+  box.hidden = !box.hidden;
+  $('invTune').textContent = box.hidden ? 'Fine tune' : 'Hide';
+};
+function readGrants() {
+  const num = (id) => { const v = $(id).value.trim(); return v === '' ? null : Number(v); };
+  const g = { tier: $('gTier').value, tier_days: num('gDays') };
+  if (num('gCredits') != null) g.party_credits = num('gCredits');
+  if ($('gExempt').checked) g.party_credits_exempt = true;
+  if ($('gPartner').checked) {
+    g.referral_kind = 'partner';
+    if (num('gRate') != null) g.referral_rate_bps = Math.round(num('gRate') * 100);
+    if (num('gMonths') != null) g.referral_duration_months = num('gMonths');
+  }
+  return g;
 }
 $('invEdition').onchange = noteEdition;
 loadEditions();
@@ -266,7 +331,7 @@ loadEditions();
 $('invSend').onclick = async () => {
   const email = $('invEmail').value.trim(); if (!email) return;
   const b = $('invSend'); b.disabled = true; b.textContent = 'Sending…';
-  const r = await j('/api/invite', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, edition: $('invEdition').value }) });
+  const r = await j('/api/invite', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, edition: $('invEdition').value, grants: readGrants(), note: $('gNote').value.trim() || null }) });
   $('invResult').innerHTML = r.ok
     ? (r.sent ? `<span class="ok">Sent to ${email}</span>` : `<span class="warn">Created but not emailed: ${r.sendError}</span><br><span class="dim" style="font-size:11.5px">${r.link}</span>`)
     : `<span class="bad">${r.error}</span>`;
