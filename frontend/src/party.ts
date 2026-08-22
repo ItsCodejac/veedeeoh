@@ -35,12 +35,25 @@ export function partyLink(joinCode: string): string {
 // ---------------------------------------------------------------- hosting ---
 
 /** Hosting is an ACCOUNT-level entitlement: only the account owner starts a
- *  party, and never a kids profile. Checked here and again by RLS, because a
- *  hidden button is not a control. */
+ *  party, never a kids profile, and never a lapsed account.
+ *
+ *  The subscription check is the real anti-abuse control for the free tier. A
+ *  lapsed guest may ATTEND a party, so they can only ever watch what a paying
+ *  customer chose to play; letting them host would hand them the whole catalogue
+ *  back and make the paywall decorative. Credits, when they arrive, are a
+ *  quantity on top of this gate -- not a substitute for it.
+ *
+ *  Enforced again by RLS, because a hidden button is not a control.
+ */
 export async function canHost(): Promise<boolean> {
   if (getActiveProfile()?.is_kids) return false;
   const { data } = await getSupabase().auth.getUser();
-  return !!data.user;
+  if (!data.user) return false;
+  const { hasActiveAccess } = await import("./db");
+  // Fail CLOSED here, unlike the browse gate. A transient error that wrongly
+  // lets someone browse is a small mistake; one that lets a lapsed account host
+  // is the hole this exists to close.
+  try { return await hasActiveAccess(); } catch { return false; }
 }
 
 export async function createParty(opts: {
