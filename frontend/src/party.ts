@@ -236,6 +236,8 @@ export async function joinParty(joinCode: string): Promise<void> {
   const closeLobby = showGuestLobby(item, joinCode);
   veil();
 
+  window.addEventListener("veedeeoh:party-dead", () => closeLobby(), { once: true });
+
   window.addEventListener("veedeeoh:party-start", () => {
     closeLobby();
     // Viewer mode goes on BEFORE the player mounts. Applying it afterwards left
@@ -308,8 +310,35 @@ async function connect(joinCode: string, isHost: boolean): Promise<void> {
     }
   });
 
+  // A room the Durable Object has already closed 404s the upgrade, so the
+  // socket never opens at all. Nothing distinguished that from a normal close,
+  // so a guest sat in the green room waiting for a start signal that could
+  // never arrive -- and the Supabase row still said the party was live, so the
+  // next person walked into the same dead end.
+  let everOpened = false;
+  socket.addEventListener("open", () => { everOpened = true; });
+
   socket.addEventListener("close", (e) => {
-    if (e.code === 1008 || e.code === 4009) showToast("That party is full");
+    if (e.code === 1008 || e.code === 4009) { showToast("That party is full"); return; }
+    if (e.code === 4003 || e.code === 4004) return;   // refused / removed, already reported
+
+    if (!everOpened) {
+      showToast("That party has ended");
+      window.dispatchEvent(new CustomEvent("veedeeoh:party-dead"));
+      forgetParty();
+      // Close the row too, so nobody else follows the same link into a room
+      // that no longer exists. Best effort: only the host may write it, and a
+      // guest failing here is harmless.
+      void getSupabase().from("parties")
+        .update({ ended_at: new Date().toISOString() })
+        .eq("join_code", joinCode)
+        .then(() => {}, () => {});
+      return;
+    }
+
+    // Opened and then dropped mid-party. For a guest that is usually the room
+    // ending or the network going; either way say so rather than freezing.
+    if (!isHost) showToast("Disconnected from the party");
   });
 
   if (isHost) {
