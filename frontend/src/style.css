@@ -4312,7 +4312,7 @@ body.party-guest { background: #06070a; }
    and an arriving join request looked the same as everything else, so one got
    missed during testing. Collapsed to a tab by default; a pending request
    opens it and marks the tab, since that is the only event needing an answer. */
-#partyPanel {
+#partyHostPanel {
   position: fixed; top: 50%; right: 0; transform: translateY(-50%);
   z-index: 9999; display: flex; align-items: stretch;
   font-family: var(--display);
@@ -4344,7 +4344,7 @@ body.party-guest { background: #06070a; }
   border-left: 1px solid rgba(255,255,255,0.12);
   max-height: 82vh; overflow-y: auto;
 }
-#partyPanel.open .ppBody { width: min(320px, 88vw); opacity: 1; padding: 16px; }
+#partyHostPanel.open .ppBody { width: min(320px, 88vw); opacity: 1; padding: 16px; }
 
 .ppSection { border-bottom: 1px solid rgba(255,255,255,0.07); padding-bottom: 12px; margin-bottom: 12px; }
 .ppSection:last-of-type { border-bottom: none; }

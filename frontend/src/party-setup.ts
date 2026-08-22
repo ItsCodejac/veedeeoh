@@ -320,7 +320,11 @@ export function mountHostLobby(joinCode: string, link: string): void {
   startedAt = Date.now();
 
   lobby = document.createElement("div");
-  lobby.id = "partyPanel";
+  // NOT "partyPanel": that id already belongs to the veedeeoh.party PAGE
+  // container in index.html, so this rule set -- position:fixed, pinned right,
+  // vertically centred -- was landing on the page itself and shoving it against
+  // the right edge of the window.
+  lobby.id = "partyHostPanel";
   document.body.appendChild(lobby);
   render();
 
