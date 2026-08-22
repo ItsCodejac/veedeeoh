@@ -216,6 +216,7 @@ export function endParty(): void {
 }
 
 export function disconnect(): void {
+  stopMetering();
   setPartyEmitter(null);
   try { socket?.close(); } catch {}
   socket = null;
@@ -230,6 +231,57 @@ export function partyEnabled(): boolean { return !!WORKER_URL; }
 /** Start hosting for a title already open in the player. */
 export async function hostExisting(joinCode: string): Promise<void> {
   await connect(joinCode, true);
+  startMetering(joinCode);
+}
+
+// ---------------------------------------------------------------- metering ---
+//
+// Hosting is billed in 10-minute credits, wall clock. Metered from the client
+// on an interval, which a modified client could dodge -- accepted deliberately,
+// because hosting already requires an active subscription and credits are a
+// premium quantity rather than a security control. The BALANCE itself is
+// server-side: spend_party_credits is SECURITY DEFINER and no client can write
+// profiles.party_credits directly.
+
+let meterTimer: number | null = null;
+const METER_MINUTES = 10;
+
+/** True if the account may start a party at all. Checked before the first
+ *  credit is spent so a host with an empty balance is told up front rather than
+ *  cut off ten minutes in. */
+export async function hasHostingCredit(): Promise<{ ok: boolean; exempt: boolean; balance: number }> {
+  const { partyCreditSummary } = await import("./db");
+  const c = await partyCreditSummary();
+  if (!c) return { ok: true, exempt: false, balance: 0 };   // no data: do not block
+  return { ok: c.exempt || c.balance > 0, exempt: c.exempt, balance: c.balance };
+}
+
+function startMetering(joinCode: string): void {
+  stopMetering();
+  void charge(joinCode);                                     // the first block is due now
+  meterTimer = window.setInterval(() => void charge(joinCode), METER_MINUTES * 60_000);
+}
+
+function stopMetering(): void {
+  if (meterTimer !== null) { clearInterval(meterTimer); meterTimer = null; }
+}
+
+async function charge(joinCode: string): Promise<void> {
+  const { spendPartyCredits, partyCreditSummary } = await import("./db");
+  const ok = await spendPartyCredits(METER_MINUTES, undefined);
+  if (!ok) {
+    // Out of credit. The party is NOT cut off: ending someone's film twenty
+    // minutes from the finish is the most memorable possible bad experience,
+    // and the marginal cost of letting it run is fractions of a cent.
+    stopMetering();
+    showToast("You're out of watch party hours. This party can finish.");
+    window.dispatchEvent(new CustomEvent("veedeeoh:party-credits-out"));
+    return;
+  }
+  const c = await partyCreditSummary();
+  if (c && !c.exempt && c.balance === 1) {
+    showToast("10 minutes of hosting left");
+  }
 }
 
 // ------------------------------------------------------------------ lookup ---

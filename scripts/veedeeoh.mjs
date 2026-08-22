@@ -280,6 +280,59 @@ async function createInvite({ email, edition = "founder", tier, send = true }) {
   return { ok: true, code, edition, tier: grantTier, link: `${SITE}/landing.html?beta=${code}`, sent, sendError };
 }
 
+// ---------------------------------------------------------------- credits ---
+
+async function creditsFor(email) {
+  const r = await sb(`profiles?select=id,email,tier,party_credits,party_credits_accrued,party_credits_spent,party_credits_exempt&email=eq.${encodeURIComponent((email || "").toLowerCase())}`);
+  if (!r.ok) return { ok: false, error: await r.text() };
+  const rows = await r.json();
+  if (!rows.length) return { ok: false, error: "no such user" };
+  const u = rows[0];
+
+  const g = await sb(`free_month_grants?select=trigger,milestone,year,applied_at&user_id=eq.${u.id}&order=created_at.desc`);
+  u.free_months = g.ok ? await g.json() : [];
+  const l = await sb(`party_credit_ledger?select=delta,reason,created_at&user_id=eq.${u.id}&order=created_at.desc&limit=10`);
+  u.ledger = l.ok ? await l.json() : [];
+  return { ok: true, user: u };
+}
+
+/** Grant or revoke the hosting exemption. Its own axis, not a tier property --
+ *  it is granted and revoked per account regardless of what that account pays. */
+async function setCreditExempt({ email, exempt }) {
+  const r = await sb(`profiles?email=eq.${encodeURIComponent((email || "").toLowerCase())}`, {
+    method: "PATCH", headers: { Prefer: "return=representation" },
+    body: JSON.stringify({ party_credits_exempt: !!exempt }),
+  });
+  if (!r.ok) return { ok: false, error: await r.text() };
+  const rows = await r.json();
+  if (!rows.length) return { ok: false, error: "no such user" };
+  return { ok: true, exempt: rows[0].party_credits_exempt };
+}
+
+/** Hand-adjust a balance. Writes the ledger too, so an admin correction is as
+ *  auditable as a purchase -- a balance that changed with no ledger row is the
+ *  thing you cannot explain to a customer later. */
+async function adjustCredits({ email, delta, note }) {
+  const n = parseInt(delta, 10);
+  if (!Number.isFinite(n) || n === 0) return { ok: false, error: "delta must be a non-zero integer" };
+
+  const cur = await creditsFor(email);
+  if (!cur.ok) return cur;
+  const next = Math.max(0, (cur.user.party_credits || 0) + n);
+
+  const r = await sb(`profiles?id=eq.${cur.user.id}`, {
+    method: "PATCH", headers: { Prefer: "return=representation" },
+    body: JSON.stringify({ party_credits: next }),
+  });
+  if (!r.ok) return { ok: false, error: await r.text() };
+
+  await sb("party_credit_ledger", {
+    method: "POST",
+    body: JSON.stringify({ user_id: cur.user.id, delta: n, reason: "admin", note: note || "manual adjustment" }),
+  });
+  return { ok: true, balance: next };
+}
+
 // -------------------------------------------------------------- referrals ---
 
 /** Who is owed what. Grouped in JS rather than SQL because PostgREST cannot
@@ -543,6 +596,9 @@ const routes = {
   "POST /api/curate/decide": (u, b) => curateDecide(b),
   "POST /api/curate/undo": (u, b) => curateUndo(b),
   "POST /api/feedback/update": (u, b) => updateFeedback(b),
+  "GET /api/credits": (u) => creditsFor(u.searchParams.get("email") || ""),
+  "POST /api/credits/exempt": (u, b) => setCreditExempt(b),
+  "POST /api/credits/adjust": (u, b) => adjustCredits(b),
   "GET /api/referrals": () => referralPayouts(),
   "POST /api/referrals/paid": (u, b) => markReferralPaid(b),
   "POST /api/referrals/terms": (u, b) => setReferralTerms(b),

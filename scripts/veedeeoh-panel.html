@@ -99,6 +99,15 @@
     <div id="curUnsureGrid" style="display:none;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;margin-top:14px"></div>
   </div>
 
+  <div class="card">
+    <h2>Watch party credits</h2>
+    <div class="actions" style="margin-top:0">
+      <input id="crEmail" type="email" placeholder="user@example.com" />
+      <button id="crLoad">Look up</button>
+    </div>
+    <div id="crOut" class="muted">No account loaded.</div>
+  </div>
+
   <div class="card" style="grid-column:1/-1">
     <h2>Referral payouts</h2>
     <div id="refTotal" class="muted">loading&hellip;</div>
@@ -404,4 +413,37 @@ $('refTermsSet').onclick = async () => {
     : `<span class="bad">${r.error}</span>`;
 };
 loadReferrals();
+
+// ---- watch party credits ----
+const hrs = (c) => { const h = Math.floor(c/6), m = (c%6)*10; return h && m ? `${h}h ${m}m` : h ? `${h}h` : `${m}m`; };
+async function loadCredits() {
+  const email = $('crEmail').value.trim(); if (!email) return;
+  const r = await j('/api/credits?email=' + encodeURIComponent(email));
+  if (!r.ok) { $('crOut').innerHTML = `<span class="bad">${r.error}</span>`; return; }
+  const u = r.user;
+  const applied = u.free_months.filter(f => f.applied_at).length;
+  $('crOut').innerHTML = `
+    <div class="row"><span>${u.email}<br><span class="dim" style="font-size:11.5px">${u.tier}</span></span>
+      <span style="text-align:right">${u.party_credits_exempt
+        ? '<b class="ok">EXEMPT</b>' : `<b>${hrs(u.party_credits)}</b><br><span class="dim" style="font-size:11.5px">balance</span>`}</span></div>
+    <div class="row"><span class="dim">Lifetime accrued / spent</span><span>${hrs(u.party_credits_accrued)} / ${hrs(u.party_credits_spent)}</span></div>
+    <div class="row"><span class="dim">Free months</span><span>${applied} applied${u.free_months.length > applied ? `, ${u.free_months.length - applied} pending` : ''}</span></div>
+    <div class="actions">
+      <button class="ghost" onclick="setExempt('${u.email}', ${!u.party_credits_exempt})">${u.party_credits_exempt ? 'Remove exemption' : 'Make exempt'}</button>
+      <input id="crDelta" type="number" placeholder="+/- credits" style="width:130px" />
+      <button class="ghost" onclick="adjustCr('${u.email}')">Adjust</button>
+    </div>
+    ${u.ledger.length ? `<div class="dim" style="font-size:11.5px;margin-top:8px">${
+      u.ledger.map(l => `${l.delta > 0 ? '+' : ''}${l.delta} · ${l.reason} · ${l.created_at.slice(0,10)}`).join('<br>')}</div>` : ''}`;
+}
+$('crLoad').onclick = loadCredits;
+window.setExempt = async (email, exempt) => {
+  await j('/api/credits/exempt', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, exempt }) });
+  loadCredits();
+};
+window.adjustCr = async (email) => {
+  const delta = $('crDelta').value;
+  const r = await j('/api/credits/adjust', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, delta }) });
+  if (!r.ok) alert(r.error); else loadCredits();
+};
 </script></body></html>

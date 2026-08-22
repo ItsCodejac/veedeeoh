@@ -412,6 +412,14 @@ export async function startWatchParty(item: VodItem): Promise<boolean> {
 
   const party = await import("./party");
   try {
+    // Checked before anything is created, so a host with no hours left is told
+    // now rather than ten minutes into a film with friends already watching.
+    const credit = await party.hasHostingCredit();
+    if (!credit.ok) {
+      showToast("You're out of watch party hours. Top up in Settings.");
+      return false;
+    }
+
     // Pluto titles carry only a path and mint a signed URL on click, so the
     // host has to resolve one here. Without this the player opened with no
     // streams at all and the party started on a black screen.
