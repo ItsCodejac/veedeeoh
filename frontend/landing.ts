@@ -16,13 +16,22 @@ function showPartyContext(): void {
   const code = new URLSearchParams(window.location.search).get('party');
   if (!code) return;
 
+  // Use the real opener. Setting display:flex by hand left the panel invisible:
+  // visibility is driven by a `show` class that openAuth adds after a frame, so
+  // an invited guest saw the ordinary marketing page and no sign-in at all.
+  //
+  // Sign-up mode, because someone arriving on a party link usually has no
+  // account. The toggle back to sign in is right there in the panel.
+  openAuthSignup();
+
+  // AFTER opening: openAuth calls renderAuthModalUI, which rewrites both of
+  // these, so setting them first would be overwritten immediately.
   const title = document.getElementById('authTitle');
   const sub = document.getElementById('authSubtitle');
   if (title) title.textContent = 'Join the watch party';
-  if (sub) sub.textContent = `You have been invited to party ${code.toUpperCase()}. Sign in or create a free account to join \u2014 it takes a moment.`;
-
-  const modal = document.getElementById('authModal');
-  if (modal) modal.style.display = 'flex';
+  if (sub) {
+    sub.textContent = `You have been invited to party ${code.toUpperCase()}. Create a free account to join, or sign in below.`;
+  }
 }
 
 // Where to go after a successful sign-in. A watch party link that reaches the
@@ -41,7 +50,6 @@ function afterAuthUrl(): string {
 
 // Handle incoming family invite links on Landing Page
 function checkInviteLink() {
-  showPartyContext();
   const params = new URLSearchParams(window.location.search);
   const inviteCode = params.get('invite');
   const accName = params.get('acc');
@@ -140,6 +148,8 @@ const editEmailBtn = document.getElementById('editEmailBtn') as HTMLButtonElemen
 const backToSignInBtn = document.getElementById('backToSignInBtn') as HTMLButtonElement;
 const authModeToggleBtn = document.getElementById('authModeToggleBtn') as HTMLDivElement;
 const passkeyContainer = document.getElementById('passkeyContainer') as HTMLDivElement;
+const authConsentRow = document.getElementById('authConsentRow') as HTMLDivElement;
+const authConsentCheck = document.getElementById('authConsentCheck') as HTMLInputElement;
 
 const authTitle = document.getElementById('authTitle') as HTMLHeadingElement;
 const authSubtitle = document.getElementById('authSubtitle') as HTMLParagraphElement;
@@ -154,15 +164,38 @@ function renderAuthModalUI() {
     passwordInput.placeholder = 'Create Password (min 6 chars)';
     submitBtn.textContent = 'Create Account';
     authModeToggleBtn.innerHTML = `Already have an account? <span>Sign In</span>`;
-    
+
   } else {
     authTitle.textContent = 'Welcome Back';
     authSubtitle.textContent = 'Enter your email to access your library.';
     passwordInput.placeholder = 'Password';
     submitBtn.textContent = 'Sign In';
     authModeToggleBtn.innerHTML = `New user invited by family? <span>Create Account</span>`;
-    
+
   }
+  // Consent is asked once, at account creation. Toggling into sign-in mode
+  // must clear the tick as well as hide the row, so switching back to sign-up
+  // cannot inherit an agreement the person never saw.
+  if (authConsentRow) authConsentRow.classList.toggle('show', isSignUpMode);
+  if (!isSignUpMode && authConsentCheck) authConsentCheck.checked = false;
+  clearConsentError();
+}
+
+/** Drop the "you must agree" state. Separate so both the checkbox handler and
+ *  every re-render can call it without duplicating the class names. */
+function clearConsentError() {
+  authConsentRow?.classList.remove('invalid');
+}
+
+if (authConsentCheck) {
+  authConsentCheck.addEventListener('change', () => {
+    if (!authConsentCheck.checked) return;
+    clearConsentError();
+    if (authMessage.dataset.reason === 'consent') {
+      authMessage.style.display = 'none';
+      delete authMessage.dataset.reason;
+    }
+  });
 }
 
 function showStep(step: 'email' | 'password' | 'success') {
@@ -205,7 +238,9 @@ function closeAuth() {
   setTimeout(() => {
     authModal.style.display = 'none';
     authMessage.style.display = 'none';
-    authForm.reset();
+    delete authMessage.dataset.reason;
+    clearConsentError();
+    authForm.reset();   // also unticks the consent box
   }, 300); // Wait for transition
 }
 
@@ -308,6 +343,17 @@ if (authForm) {
     if (!email || !password) {
       authMessage.style.display = 'block';
       authMessage.textContent = 'Please provide both email and password.';
+      return;
+    }
+
+    // Sign-up only. The account must not be created before the agreement is
+    // recorded, so this gates the call rather than warning after the fact.
+    if (isSignUpMode && authConsentCheck && !authConsentCheck.checked) {
+      authConsentRow?.classList.add('invalid');
+      authMessage.style.display = 'block';
+      authMessage.dataset.reason = 'consent';
+      authMessage.textContent = 'Please agree to the Terms and Privacy Policy to create an account.';
+      authConsentCheck.focus();
       return;
     }
 
@@ -483,4 +529,9 @@ buildMarquee();
 buildHubGrid();
 buildTop10();
 buildGenreStrip();
+// Last, deliberately: openAuth touches consts declared partway down this file,
+// so calling it from checkInviteLink() near the top threw on the temporal dead
+// zone and the panel never opened.
+showPartyContext();
+
 void checkAuth();
