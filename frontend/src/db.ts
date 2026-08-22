@@ -33,7 +33,22 @@ export interface Account {
 }
 
 /** The logged-in user's account row (tier, expiry, seats). Null if not signed in. */
+// The account row is read on every title open (the Watch Party button asks
+// whether hosting is allowed), on the access gate, and by the billing panel.
+// Each of those was a fresh round trip, which is why the Watch Party button
+// took a visible couple of seconds to appear over the detail view.
+//
+// Short TTL rather than a permanent cache: tier changes when a webhook lands or
+// an admin grants something, and a stale entitlement for a few seconds is
+// harmless where a stale one for the session is not.
+let accountCache: { at: number; value: Account | null } | null = null;
+const ACCOUNT_TTL_MS = 30_000;
+
+/** Drop the cached account. Call after anything that can change entitlement. */
+export function invalidateAccount(): void { accountCache = null; }
+
 export async function getAccount(): Promise<Account | null> {
+  if (accountCache && Date.now() - accountCache.at < ACCOUNT_TTL_MS) return accountCache.value;
   const sb = getSupabase();
   const { data, error } = await sb
     .from("profiles")
@@ -42,9 +57,12 @@ export async function getAccount(): Promise<Account | null> {
   // Distinguish a real failure (network/RLS/transient) from "no row". Callers
   // that gate access must fail OPEN on a thrown error, but may treat null (no
   // account row) as no access.
+  // A thrown error is NOT cached: callers that gate access fail open on a throw,
+  // and caching that would extend a transient network blip into 30 seconds of
+  // wrongly-granted access.
   if (error) throw error;
-  if (!data) return null;
-  return data as Account;
+  accountCache = { at: Date.now(), value: (data as Account) ?? null };
+  return accountCache.value;
 }
 
 // Same maturity ladder the backend tags items with (kept in sync deliberately —

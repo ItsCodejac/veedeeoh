@@ -65,6 +65,33 @@ interface Config {
 const STATE_KEY = "state";
 const CONFIG_KEY = "config";
 
+// WebSocket upgrades are exempt from CORS, so the object needed none until
+// /init arrived -- a fetch() with a JSON content-type is not a simple request,
+// so the browser sends an OPTIONS preflight first and refuses the POST when it
+// comes back bare. Same trap that broke /proxy earlier: the WS path worked, so
+// the missing preflight only surfaced on the one endpoint that is plain HTTP.
+//
+// Restricted rather than "*": /init carries the secret that makes a connection
+// the host's, so no unrelated origin should be able to post one.
+const ALLOWED_ORIGINS = [
+  "https://veedeeoh.com",
+  "https://www.veedeeoh.com",
+  "http://localhost:5173",
+  "http://localhost:5199",
+];
+
+function corsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get("Origin") || "";
+  const ok = ALLOWED_ORIGINS.includes(origin) || /^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(origin);
+  return {
+    "Access-Control-Allow-Origin": ok ? origin : ALLOWED_ORIGINS[0]!,
+    "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Max-Age": "86400",
+    Vary: "Origin",
+  };
+}
+
 // How long an idle party lives before it closes itself. A host who shuts the
 // laptop without ending the party would otherwise leave the object alive
 // indefinitely -- and once hosting is metered, silently spending the host's
@@ -80,18 +107,21 @@ export class Party extends DurableObject<Env> {
 
   async fetch(req: Request): Promise<Response> {
     const url = new URL(req.url);
+    const cors = corsHeaders(req);
+
+    if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
 
     // ---- host binds the party, before the link is shared -------------------
     if (url.pathname.endsWith("/init")) {
-      if (req.method !== "POST") return new Response("POST only", { status: 405 });
+      if (req.method !== "POST") return new Response("POST only", { status: 405, headers: cors });
       const body = await req.json().catch(() => null) as any;
       const token = String(body?.hostToken || "");
-      if (token.length < 20) return new Response("bad token", { status: 400 });
+      if (token.length < 20) return new Response("bad token", { status: 400, headers: cors });
 
       const existing = await this.ctx.storage.get<Config>(CONFIG_KEY);
       // One-shot. A second init cannot re-bind a party to a different host,
       // which is what would let someone steal a room mid-session.
-      if (existing) return new Response("already initialised", { status: 409 });
+      if (existing) return new Response("already initialised", { status: 409, headers: cors });
 
       const seats = Number(body?.seatLimit);
       await this.ctx.storage.put<Config>(CONFIG_KEY, {
@@ -102,12 +132,12 @@ export class Party extends DurableObject<Env> {
         createdAt: Date.now(),
       });
       await this.ctx.storage.setAlarm(Date.now() + ALARM_EVERY_MS);
-      return Response.json({ ok: true });
+      return Response.json({ ok: true }, { headers: cors });
     }
 
     if (url.pathname.endsWith("/state")) {
       const state = await this.ctx.storage.get<PartyState>(STATE_KEY);
-      return Response.json({ state: state ?? null, viewers: this.viewerCount() });
+      return Response.json({ state: state ?? null, viewers: this.viewerCount() }, { headers: cors });
     }
 
     if (req.headers.get("Upgrade") !== "websocket") {

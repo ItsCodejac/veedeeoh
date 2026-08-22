@@ -110,6 +110,9 @@ export function setSession(email: string, access_token?: string): void {
 }
 
 export async function signOut(): Promise<void> {
+  // The account cache is keyed to nothing but time, so a second person signing
+  // in on this device within the TTL would inherit the previous account's tier.
+  void import("./db").then((db) => db.invalidateAccount()).catch(() => {});
   // Await Supabase clearing its own stored session BEFORE navigating. Otherwise
   // the landing page's auth check races the still-present session, bounces back
   // into the app, and boot's access gate fires against a half-torn-down session
