@@ -336,7 +336,10 @@ export async function getWatchHistory(profileId: string): Promise<any[]> {
     .select("*")
     .eq("profile_id", profileId)
     .order("updated_at", { ascending: false })
-    .limit(15);
+    // Fetches more than the rail shows. The merge drops anything already
+    // finished and anything missing from the current catalogue, so pulling
+    // exactly the display count left the rail short whenever a row aged out.
+    .limit(40);
   if (error) {
     console.warn("[db] getWatchHistory error", error);
     return [];

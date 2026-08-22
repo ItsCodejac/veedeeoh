@@ -201,6 +201,12 @@ export async function getVodRails(): Promise<VodRail[]> {
 
 // Continue Watching is stored PER PROFILE so a kids profile never sees an adult
 // profile's resume cards (and vice-versa). Keyed on the active profile id.
+// How many titles Continue Watching shows. Twenty is about where the rail
+// stops being "where was I" and starts being an archive nobody scrolls -- the
+// same place the major services land. Anything older stays in watch_progress;
+// it is simply not on the shelf.
+const RESUME_RAIL_MAX = 20;
+
 function resumeHistoryKey(): string {
   let id = "default";
   try { id = getActiveProfile()?.id || "default"; } catch {}
@@ -425,7 +431,7 @@ export async function startWatchParty(item: VodItem): Promise<boolean> {
     // streams at all and the party started on a black screen.
     let streams = (item as any).streams as any[] | undefined;
     if (!streams?.length) {
-      const url = item.url || (item.pluto_path ? await fetchPlutoStream(item.pluto_path) : null);
+      const url = await resolveItemStream(item);
       if (!url) { showToast("That title can't be hosted right now"); return false; }
       streams = [{ url, quality: null, source: item.genre || "Party" }];
     }
@@ -848,6 +854,30 @@ export async function openVodDetails(item: VodItem): Promise<void> {
     card.addEventListener("click", () => playArchive(card));
     grid.append(card);
   }
+}
+
+/** Resolve a playable URL for a single catalog item, whatever provider it came
+ *  from.
+ *
+ *  Written because the resume-from-another-device handler only knew about
+ *  `url` and `pluto_path`, so every Tubi and Archive card in Continue Watching
+ *  failed with "Couldn't resume that title". The detail view already had three
+ *  separate provider branches; this is the one-item version they all imply.
+ *
+ *  Never returns a cached URL for Pluto -- those are signed and expire in 24h,
+ *  which is why resolution happens on click rather than at render. */
+export async function resolveItemStream(item: VodItem): Promise<string | null> {
+  if (item.url) return item.url;
+  const id = String(item.id || "");
+  try {
+    if (item.pluto_path) return await fetchPlutoStream(item.pluto_path);
+    if (id.startsWith("tubi:")) return await fetchTubiStream(id.replace("tubi:", ""));
+    if (item.identifier) return await fetchArchiveStream(item.identifier);
+    if (id.startsWith("archive:")) return await fetchArchiveStream(id.replace("archive:", ""));
+  } catch (e) {
+    console.warn("[vod] stream resolve failed for", id, e);
+  }
+  return null;
 }
 
 async function playVod(item: VodItem): Promise<void> {
@@ -1495,15 +1525,21 @@ export async function renderHome(): Promise<void> {
             time: cloudRow.position_secs,
             duration: cloudRow.duration_secs,
             percentage: pct,
+            updatedAt: cloudRow.updated_at,
             streamIdx: 0,
             streams: null,
             vodItem: item,
           });
         });
 
-        // Newest first, so a title picked up on another device sorts by when it
-        // was actually watched rather than landing at the end.
-        resumeHistory.sort((a: any, b: any) => (b.time ? 1 : 0) - (a.time ? 1 : 0));
+        // Order by when it was actually watched, across BOTH sources, then cap.
+        // The local list, the cloud query and the rendered rail each had their
+        // own idea of how many entries there were; merging two 15-item lists
+        // produced a rail of up to 30 that nothing trimmed.
+        resumeHistory.sort((a: any, b: any) =>
+          new Date(b.updatedAt || b.watchedAt || 0).getTime() -
+          new Date(a.updatedAt || a.watchedAt || 0).getTime());
+        resumeHistory = resumeHistory.slice(0, RESUME_RAIL_MAX);
       } catch (e) {
         // Loud on purpose: this block failing means Continue Watching quietly
         // degrades to whatever this browser happens to have cached, which is
@@ -1565,7 +1601,7 @@ export async function renderHome(): Promise<void> {
           if (!v) { showToast("Couldn't resume that title"); return; }
           card.classList.add("loading");
           try {
-            const url = v.url || (v.pluto_path ? await fetchPlutoStream(v.pluto_path) : null);
+            const url = await resolveItemStream(v);
             if (!url) { showToast("Couldn't resume that title"); return; }
             await openVodPlayer(
               asChannel(v, [{ url, quality: null, source: v.genre || "movie" }]),

@@ -673,12 +673,19 @@ class VodPlayer {
         time,
         duration,
         percentage: pct,
+        // Needed so the rail can order local and cloud entries against each
+        // other. Without it a locally-watched title sorts as epoch zero and
+        // sinks below everything synced from another device.
+        updatedAt: new Date().toISOString(),
         streamIdx: this.idx,
         streams: ch.streams,
         vodItem: ch.vodItem,
       });
     }
-    if (history.length > 15) history = history.slice(0, 15);
+    // Matches RESUME_RAIL_MAX in vod.ts. The local cache holding fewer than the
+    // rail displays meant a title could drop off this device while still
+    // showing on another.
+    if (history.length > 20) history = history.slice(0, 20);
     try { localStorage.setItem(key, JSON.stringify(history)); } catch {}
 
     const pid = activeProfileUuid();
