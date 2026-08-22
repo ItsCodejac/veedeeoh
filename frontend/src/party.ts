@@ -16,6 +16,7 @@ import { openVodPlayer, setPartyEmitter, applyPartyState, setPartyViewerMode, re
 const WORKER_URL = (import.meta.env.VITE_PARTY_WORKER_URL as string) || "";
 
 let socket: WebSocket | null = null;
+let syncPoll: number | null = null;
 let currentCode: string | null = null;
 
 function code6(): string {
@@ -303,10 +304,16 @@ async function connect(joinCode: string, isHost: boolean): Promise<void> {
     try { msg = JSON.parse(String(e.data)); } catch { return; }
     switch (msg?.type) {
       case "state":
-        if (!isHost) {
+        if (!isHost && msg.state) {
           lastHostState = msg.state as PartyPlaybackState;
-          applyPartyState(lastHostState);
-          showResync(false);
+          // How old the host's report is, measured entirely on the SERVER's
+          // clock so the two devices never have to agree on the time. A state
+          // read out of storage -- on joining, on admission, or in answer to a
+          // poll -- can be minutes old, and treating it as current is what put
+          // a late joiner behind and kept them there.
+          const age = Number(msg.serverNow) - Number(msg.state.updatedAt);
+          applyPartyState(lastHostState, Number.isFinite(age) ? age : 0);
+          clearResync("stale");
         }
         break;
       case "presence":
@@ -376,6 +383,33 @@ async function connect(joinCode: string, isHost: boolean): Promise<void> {
     if (!isHost) showToast("Disconnected from the party");
   });
 
+  // ---- the viewer checks, rather than only listening --------------------
+  //
+  // Everything else about sync is push, which is fine while the host is
+  // talking. The gap is that a viewer receiving nothing cannot tell "the host
+  // has not moved" from "I have stopped hearing the host": between heartbeats
+  // it is playing an extrapolation, and a socket that dies half-open -- routine
+  // on mobile -- produces no close event at all, so it would keep playing that
+  // guess indefinitely and believe it was in sync.
+  //
+  // So it asks. Every ten seconds, over the socket that is already open, the
+  // worker answers from storage without waking the host. The reply carries the
+  // server's clock, so a stale answer is recognisable AS stale rather than
+  // being mistaken for a fresh one -- and the request itself is what proves the
+  // socket is still alive.
+  //
+  // Twice as often as the staleness threshold, so a single lost message is
+  // absorbed by the next poll instead of being reported to the viewer as a
+  // problem. Cheap: one small message on an open socket, no media, and
+  // Cloudflare does not bill data transfer.
+  if (!isHost) {
+    if (syncPoll !== null) clearInterval(syncPoll);
+    syncPoll = window.setInterval(() => {
+      if (socket?.readyState !== WebSocket.OPEN) return;
+      try { socket.send(JSON.stringify({ type: "sync" })); } catch { /* closing */ }
+    }, 10000);
+  }
+
   if (isHost) {
     watchHostVisibility();
     setPartyEmitter((s) => {
@@ -383,7 +417,26 @@ async function connect(joinCode: string, isHost: boolean): Promise<void> {
       // video, which would otherwise be emitted as paused:true and stop the
       // whole room -- turning "the host's phone rang" into "everyone's film
       // stopped". Absence is signalled once, as `away`, and viewers keep going.
-      if (hostAway) return;
+      if (hostAway) {
+        // Going silent for the WHOLE absence starved viewers of every
+        // correction for as long as the host looked at another tab -- which,
+        // when the host and a viewer are two tabs of one browser, is the entire
+        // session. It also left them extrapolating a position nothing had
+        // confirmed since the moment the host looked away.
+        //
+        // A hidden tab does not necessarily stop the video: desktop browsers
+        // keep audio-bearing media running. So stay silent only in the case the
+        // suppression was actually written for -- a position that has stopped
+        // moving -- and otherwise keep the room informed, never reporting a
+        // pause, because a pause caused by backgrounding is not one anybody
+        // chose.
+        const advanced = s.positionSecs > lastAwayPos + 0.25;
+        lastAwayPos = s.positionSecs;
+        if (!advanced) return;
+        s = { ...s, paused: false };
+      } else {
+        lastAwayPos = -1;
+      }
       if (socket?.readyState === WebSocket.OPEN) {
         // streamIdx travels; contentId does not. The episode index is what a
         // viewer needs to follow a binge, and it is meaningless outside this
@@ -439,7 +492,8 @@ export function disconnect(): void {
   stopPartySync();
   stopWatchingVisibility();
   showHostAway(false);
-  showResync(false);
+  if (syncPoll !== null) { clearInterval(syncPoll); syncPoll = null; }
+  clearResync();
   setPartyViewerMode(false);
   lastHostState = null;
   setPartyEmitter(null);
@@ -573,26 +627,65 @@ function showJoining(code: string): () => void {
 let lastHostState: PartyPlaybackState | null = null;
 let resyncEl: HTMLElement | null = null;
 
-// A viewer whose browser refused to autoplay is stuck: the host is playing, the
-// viewer is paused, and every heartbeat that follows is applied to a player
-// that will not start. The only thing that can fix it is a real click, so ask
-// for one.
+// WHY THE PILL HAS A REASON. It said "Tap to join the party" over a film that
+// was already playing, and stayed there. Two causes, both from treating one
+// button as one state:
+//
+//   the autoplay rejection resolves AFTER the message handler that clears the
+//   pill, so every incoming heartbeat cleared it a moment before the same
+//   heartbeat put it back, and
+//
+//   nothing watched for playback actually STARTING, so once the viewer pressed
+//   play themselves -- or the browser relented -- the prompt outlived the
+//   problem it was describing.
+//
+// Now each cause clears only its own prompt.
+type ResyncReason = "blocked" | "stale";
+let resyncReason: ResyncReason | null = null;
+
 if (typeof window !== "undefined") {
-  window.addEventListener("veedeeoh:party-blocked", () => showResync(true, "Tap to join the party"));
+  // Autoplay refused. The host is playing, the viewer is paused, and no
+  // heartbeat can fix it -- only a real click can.
+  window.addEventListener("veedeeoh:party-blocked",
+    () => showResync("blocked", "Tap to join the party"));
+
+  // Playing now, however it got there. Whatever the browser was refusing, it
+  // is not refusing any more.
+  window.addEventListener("veedeeoh:party-playing", () => clearResync("blocked"));
+
+  // The sync has gone quiet: the viewer is running on an extrapolation nothing
+  // has confirmed. Offered rather than forced -- a jump mid-scene should be the
+  // viewer's choice when we are not certain where the host is.
+  window.addEventListener("veedeeoh:party-stale", (e) => {
+    const stale = !!(e as CustomEvent).detail?.stale;
+    if (stale) showResync("stale", "Lost sync with the host. Tap to catch up");
+    else clearResync("stale");
+  });
 }
 
-function showResync(on: boolean, label = "Out of sync — resync"): void {
-  if (!on) { resyncEl?.remove(); resyncEl = null; return; }
-  if (resyncEl) return;
+function showResync(reason: ResyncReason, label: string): void {
+  // A blocked player is the more urgent of the two and may replace a stale
+  // notice; the reverse would talk over the only thing that can be acted on.
+  if (resyncEl && !(reason === "blocked" && resyncReason === "stale")) return;
+  resyncEl?.remove();
 
+  resyncReason = reason;
   resyncEl = document.createElement("button");
   resyncEl.id = "partyResync";
   resyncEl.textContent = label;
   resyncEl.addEventListener("click", () => {
     if (lastHostState) resyncToHost(lastHostState);
-    showResync(false);
+    clearResync();
   });
   document.body.appendChild(resyncEl);
+}
+
+/** @param reason clear only if this is what put the prompt up. */
+function clearResync(reason?: ResyncReason): void {
+  if (reason && resyncReason !== reason) return;
+  resyncEl?.remove();
+  resyncEl = null;
+  resyncReason = null;
 }
 
 
@@ -668,6 +761,10 @@ export async function closeParty(joinCode: string): Promise<void> {
 // ------------------------------------------------- host presence & absence ---
 
 let hostAway = false;
+// The host's position at the last emit attempt while backgrounded, used to
+// tell a throttled tab that has genuinely frozen from one that is still
+// playing perfectly well behind another window.
+let lastAwayPos = -1;
 let visHandler: (() => void) | null = null;
 
 /** Tell viewers when the host's tab goes away, instead of letting a
@@ -683,6 +780,7 @@ function watchHostVisibility(): void {
     const hidden = document.visibilityState === "hidden";
     if (hidden === hostAway) return;
     hostAway = hidden;
+    lastAwayPos = -1;
     try { socket?.send(JSON.stringify({ type: hidden ? "away" : "back" })); } catch {}
     // On return, resume if the browser paused us while backgrounded. Without
     // this the host comes back paused and the next heartbeat stops everyone --
@@ -709,7 +807,7 @@ function showHostAway(on: boolean): void {
   if (awayEl) return;
   awayEl = document.createElement("div");
   awayEl.id = "partyHostAway";
-  awayEl.textContent = "The host stepped away — still playing";
+  awayEl.textContent = "The host stepped away. Still playing";
   document.body.appendChild(awayEl);
 }
 

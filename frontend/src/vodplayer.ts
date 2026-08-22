@@ -715,6 +715,10 @@ class VodPlayer {
     on("play", this.emitParty);
     on("pause", this.emitParty);
     on("seeked", this.emitParty);
+    // Playback is actually running. A viewer prompted to tap because autoplay
+    // was refused has no other signal that the refusal is over -- and without
+    // one the prompt sat over a film that was already playing.
+    on("playing", () => window.dispatchEvent(new CustomEvent("veedeeoh:party-playing")));
     const beat = setInterval(this.emitParty, 5000);
     this.ac.signal.addEventListener("abort", () => clearInterval(beat));
 
@@ -811,6 +815,14 @@ export function setPartyEmitter(fn: ((s: PartyPlaybackState) => void) | null): v
 const DRIFT_NUDGE_S = 0.6;
 const DRIFT_SEEK_S = 6;
 
+// Past this the host has not actually told us anything recently, so the
+// extrapolated position is a guess rather than a fact and stops being used to
+// justify a seek. Set above two viewer poll intervals on purpose: ordinary
+// network jitter should be absorbed by a poll succeeding, not announced to the
+// viewer as lost sync. Does not apply while the host is paused, since a paused
+// host is silent deliberately and their position is not moving.
+const STALE_MS = 22000;
+
 /** Apply the host's playback state to a viewer.
  *
  *  The first version hard-assigned currentTime whenever drift exceeded two
@@ -848,9 +860,14 @@ function expectedPosition(): number | null {
   return lastState.positionSecs + (Date.now() - lastStateAt) / 1000;
 }
 
-export function applyPartyState(s: PartyPlaybackState): void {
+/** @param ageMs how long ago the HOST reported this, per the server's clock.
+ *  Non-zero for a state read out of storage -- on joining, on admission, or in
+ *  answer to a poll. Treating a stored state as current is how a viewer who
+ *  joined while the host was quiet started life behind and stayed there. */
+export function applyPartyState(s: PartyPlaybackState, ageMs = 0): void {
   lastState = s;
-  lastStateAt = Date.now();
+  lastStateAt = Date.now() - Math.max(0, Math.min(ageMs, 6 * 60 * 60 * 1000));
+  setStale(Date.now() - lastStateAt > STALE_MS && !s.paused);
   startSyncTicker();
 
   const p = current?.raw();
@@ -912,7 +929,19 @@ function startSyncTicker(): void {
   syncTicker = window.setInterval(() => {
     const p = current?.raw();
     const want = expectedPosition();
-    if (!p || want === null || lastState?.paused || p.paused || p.seeking) return;
+    if (!p || want === null || lastState?.paused) { setStale(false); return; }
+
+    // Nothing from the host in a while. Keep playing -- stopping the film
+    // because a message is late is worse than being a few seconds out -- but
+    // stop correcting against a position nobody has confirmed. Seeking to a
+    // guess is how a viewer ends up somewhere the host never was.
+    if (Date.now() - lastStateAt > STALE_MS) {
+      setStale(true);
+      if (p.playbackRate !== 1) p.playbackRate = 1;
+      return;
+    }
+    setStale(false);
+    if (p.paused || p.seeking) return;
 
     const drift = want - (p.currentTime ?? 0);
     const mag = Math.abs(drift);
@@ -924,8 +953,25 @@ function startSyncTicker(): void {
 
 export function stopPartySync(): void {
   if (syncTicker !== null) { clearInterval(syncTicker); syncTicker = null; }
+  setStale(false);
   lastState = null;
   lastStateAt = 0;
+}
+
+/** Announced rather than acted on here: the player knows the sync has gone
+ *  quiet, but what to show a viewer about it belongs to the party UI. Edge
+ *  triggered, so it is not shouting once a second. */
+let staleNow = false;
+function setStale(on: boolean): void {
+  if (on === staleNow) return;
+  staleNow = on;
+  window.dispatchEvent(new CustomEvent("veedeeoh:party-stale", { detail: { stale: on } }));
+}
+
+/** How long since the host last actually reported, in seconds. Null when there
+ *  is no party state at all. */
+export function hostStateAgeSecs(): number | null {
+  return lastStateAt ? (Date.now() - lastStateAt) / 1000 : null;
 }
 
 /** Resume playback that a backgrounded browser paused.

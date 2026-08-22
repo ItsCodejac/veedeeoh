@@ -4492,7 +4492,9 @@ body.party-guest { background: #06070a; }
 .party-viewer media-gesture[action="toggle:paused"] { display: none !important; }
 
 #partyResync {
-  position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%);
+  /* Clear of the reactions bar's default spot. They were landing on top of each
+     other, and the prompt is the one that has to be readable. */
+  position: fixed; left: 50%; bottom: 152px; transform: translateX(-50%);
   z-index: 10002;
   padding: 11px 20px; border-radius: 999px;
   background: var(--accent); color: #06070a; border: none;

@@ -68,6 +68,18 @@ interface Config {
 
 const STATE_KEY = "state";
 const CONFIG_KEY = "config";
+// Everyone the host has let in, by user id. Persisted because approval is a
+// decision about a PERSON, not about a socket: a viewer who reloads, loses
+// signal for a moment, or switches from wifi to cellular is the same person
+// the host already approved, and making them queue again -- while the film
+// runs on without them -- turns one decision into an interruption for both
+// of them every time a connection blips.
+const ADMITTED_KEY = "admitted";
+// Removed by the host. Kicking was a revolving door: nothing stopped the
+// person reconnecting a second later, and in an open party there was no
+// approval step to stop them at either. A kick has to mean something or it
+// is not moderation.
+const BANNED_KEY = "banned";
 
 // WebSocket upgrades are exempt from CORS, so the object needed none until
 // /init arrived -- a fetch() with a JSON content-type is not a simple request,
@@ -177,15 +189,23 @@ export class Party extends DurableObject<Env> {
 
     // A guest starts UNAPPROVED when the host asked for approval. They hold an
     // open socket but receive no state, so waiting in the lobby is not a way to
-    // watch for free.
-    const approved = isHost || !config.requireApproval;
+    // watch for free. Someone the host has ALREADY admitted goes straight back
+    // in: they are not a new arrival, they are the same guest reconnecting.
+    const banned = (await this.ctx.storage.get<string[]>(BANNED_KEY)) ?? [];
+    if (!isHost && userId !== "" && banned.includes(userId)) {
+      return new Response("removed from this party", { status: 403 });
+    }
+
+    const admitted = (await this.ctx.storage.get<string[]>(ADMITTED_KEY)) ?? [];
+    const approved = isHost || !config.requireApproval
+      || (userId !== "" && admitted.includes(userId));
     server.serializeAttachment({ isHost, userId, name, approved } satisfies Attachment);
 
     if (approved) {
       // A late joiner needs both: "the film has begun" and where it is up to.
       if (config.started) server.send(JSON.stringify({ type: "start" }));
       const state = await this.ctx.storage.get<PartyState>(STATE_KEY);
-      if (state) server.send(JSON.stringify({ type: "state", state }));
+      if (state) server.send(JSON.stringify({ type: "state", state, serverNow: Date.now() }));
     } else {
       server.send(JSON.stringify({ type: "pending" }));
       this.sendToHost({ type: "knock", userId, name });
@@ -214,6 +234,15 @@ export class Party extends DurableObject<Env> {
           continue;
         }
         sock.serializeAttachment({ ...a, approved: true });
+        // Remembered, so a reload does not put them back in the queue. Capped:
+        // this is a party, not a mailing list, and an unbounded array in
+        // storage is a slow leak.
+        if (a.userId) {
+          const list = (await this.ctx.storage.get<string[]>(ADMITTED_KEY)) ?? [];
+          if (!list.includes(a.userId)) {
+            await this.ctx.storage.put(ADMITTED_KEY, [...list, a.userId].slice(-200));
+          }
+        }
         const cfg = await this.ctx.storage.get<Config>(CONFIG_KEY);
         const state = await this.ctx.storage.get<PartyState>(STATE_KEY);
         try {
@@ -221,7 +250,7 @@ export class Party extends DurableObject<Env> {
           // Admitted mid-film: send them straight in rather than into a lobby
           // that has already been left behind.
           if (cfg?.started) sock.send(JSON.stringify({ type: "start" }));
-          if (state) sock.send(JSON.stringify({ type: "state", state }));
+          if (state) sock.send(JSON.stringify({ type: "state", state, serverNow: Date.now() }));
         } catch {}
       }
       this.broadcastPresence();
@@ -234,6 +263,14 @@ export class Party extends DurableObject<Env> {
     if (msg?.type === "kick") {
       if (!att.isHost) return;
       const target = String(msg.userId || "");
+      if (target) {
+        const bans = (await this.ctx.storage.get<string[]>(BANNED_KEY)) ?? [];
+        if (!bans.includes(target)) {
+          await this.ctx.storage.put(BANNED_KEY, [...bans, target].slice(-200));
+        }
+        const list = (await this.ctx.storage.get<string[]>(ADMITTED_KEY)) ?? [];
+        await this.ctx.storage.put(ADMITTED_KEY, list.filter((u) => u !== target));
+      }
       for (const sock of this.ctx.getWebSockets()) {
         const a = sock.deserializeAttachment() as Attachment | null;
         if (!a || a.isHost || a.userId !== target) continue;
@@ -271,6 +308,28 @@ export class Party extends DurableObject<Env> {
       return;
     }
 
+    // ---- a viewer checking it is still with the host ----------------------
+    //
+    // Everything else here is push. That is fine while the host is talking, but
+    // a viewer that only ever receives cannot tell "the host has not moved" from
+    // "I have stopped hearing the host" -- and between heartbeats it is running
+    // on an extrapolation nothing has confirmed. A half-open socket, which is
+    // ordinary on mobile, produces no close event at all: the viewer keeps
+    // playing a guess indefinitely and believes it is in sync.
+    //
+    // So the viewer asks. The reply is the stored state plus the server's clock,
+    // which is what lets the viewer work out how OLD that state is rather than
+    // treating it as current. Answered from storage without waking the host, and
+    // sent only to the socket that asked.
+    if (msg?.type === "sync") {
+      if (!att.approved) return;          // the lobby is not a room
+      const state = await this.ctx.storage.get<PartyState>(STATE_KEY);
+      try {
+        ws.send(JSON.stringify({ type: "state", state: state ?? null, serverNow: Date.now() }));
+      } catch { /* socket went away mid-reply */ }
+      return;
+    }
+
     // Host opens the doors. Until this lands, an approved guest sits in the
     // lobby holding a socket and receives no playback state at all.
     if (msg?.type === "start") {
@@ -303,7 +362,7 @@ export class Party extends DurableObject<Env> {
     await this.ctx.storage.put(STATE_KEY, state);
     // Unapproved sockets are skipped: a guest in the lobby must not receive
     // playback position, or the lobby becomes a free seat.
-    this.broadcast({ type: "state", state }, ws, true);
+    this.broadcast({ type: "state", state, serverNow: Date.now() }, ws, true);
   }
 
   async webSocketClose(ws: WebSocket): Promise<void> {
