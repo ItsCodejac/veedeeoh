@@ -85,6 +85,62 @@ function scheduleReconnect(joinCode: string, isHost: boolean): void {
   retryTimer = window.setTimeout(() => { retryTimer = null; void reconnectNow(joinCode, isHost); }, wait);
 }
 
+/** Find out why a join failed, instead of telling everyone the party ended.
+ *
+ *  It used to say exactly that to all of them: to someone the host had removed,
+ *  to someone who arrived at a full room, and to anyone whose network blinked
+ *  on the way in -- and then wrote ended_at on the party row on the strength of
+ *  that guess. The row write was harmless only because RLS refuses it from
+ *  anyone but the host; the message was not harmless at all, because a viewer
+ *  told the party is over stops trying. */
+async function explainFailedJoin(joinCode: string, isHost: boolean): Promise<void> {
+  let status = "";
+  try {
+    const { data: u } = await getSupabase().auth.getUser();
+    const qs = new URLSearchParams({ party: joinCode, uid: u.user?.id || "" });
+    const res = await fetch(`${WORKER_URL}/access?${qs.toString()}`);
+    status = String(((await res.json()) as any)?.status || "");
+  } catch {
+    // The probe could not get out either, so this is our connection, not their
+    // party. Retry rather than declare anything about a room we cannot see.
+    showToast("Cannot reach the party right now. Retrying");
+    scheduleReconnect(joinCode, isHost);
+    return;
+  }
+
+  if (status === "removed") {
+    cancelRetry();
+    showToast("The host removed you from this party");
+    forgetParty();
+    return;
+  }
+  if (status === "full") {
+    cancelRetry();
+    showToast("That party is full");
+    return;
+  }
+  if (status === "ok") {
+    // The room is there and would take us. Whatever refused the upgrade was
+    // momentary, which is the one case worth trying again.
+    scheduleReconnect(joinCode, isHost);
+    return;
+  }
+
+  // "gone", or an answer we do not recognise.
+  cancelRetry();
+  showToast("That party has ended");
+  window.dispatchEvent(new CustomEvent("veedeeoh:party-dead"));
+  forgetParty();
+  // Close the row too, so nobody else follows the same link into a room that no
+  // longer exists. Best effort: only the host may write it, and a guest failing
+  // here is harmless. Now only done when the worker has actually confirmed the
+  // room is gone, rather than on a guess.
+  void getSupabase().from("parties")
+    .update({ ended_at: new Date().toISOString() })
+    .eq("join_code", joinCode)
+    .then(() => {}, () => {});
+}
+
 async function reconnectNow(joinCode: string, isHost: boolean): Promise<void> {
   if (currentCode !== joinCode) return;    // left the party while waiting
   try { await connect(joinCode, isHost, true); } catch { /* the close handler takes it from here */ }
@@ -469,22 +525,11 @@ async function connect(joinCode: string, isHost: boolean, resume = false): Promi
     if (e.code === 4003 || e.code === 4004) { cancelRetry(); return; }  // refused / removed
     if (e.code === 1000) { cancelRetry(); return; }                     // closed cleanly, by us
 
-    // The room was never there. Only trustworthy on the FIRST attempt: a failed
-    // upgrade and a failed network look identical from here, so once we have
-    // been inside the room, a failure to get back in is treated as something to
-    // retry rather than as proof the party is over.
+    // The upgrade failed before a socket existed, so there is no close code and
+    // no reason attached -- a dead room, a removal, a full room and a dropped
+    // wifi all arrive here identically. Rather than guess, ask.
     if (!everOpened && !sessionOpened) {
-      cancelRetry();
-      showToast("That party has ended");
-      window.dispatchEvent(new CustomEvent("veedeeoh:party-dead"));
-      forgetParty();
-      // Close the row too, so nobody else follows the same link into a room
-      // that no longer exists. Best effort: only the host may write it, and a
-      // guest failing here is harmless.
-      void getSupabase().from("parties")
-        .update({ ended_at: new Date().toISOString() })
-        .eq("join_code", joinCode)
-        .then(() => {}, () => {});
+      void explainFailedJoin(joinCode, isHost);
       return;
     }
 

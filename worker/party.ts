@@ -156,6 +156,33 @@ export class Party extends DurableObject<Env> {
       return Response.json({ ok: true }, { headers: cors });
     }
 
+    // ---- why a join failed -------------------------------------------------
+    //
+    // A rejected WebSocket upgrade has no socket, so it has no close code
+    // either: every reason -- the room is gone, you were removed, it is full,
+    // your wifi dropped -- arrives at the browser as the same silent failure.
+    // The client used to guess, and guessed "that party has ended" at everyone,
+    // which is a lie to someone the host removed and to anyone whose network
+    // blinked.
+    //
+    // Deliberately says nothing about the party itself: no title, no position,
+    // no headcount. Only whether this one person can get in, which is the
+    // question being asked.
+    if (url.pathname.endsWith("/access")) {
+      const config = await this.ctx.storage.get<Config>(CONFIG_KEY);
+      if (!config) return Response.json({ status: "gone" }, { headers: cors });
+
+      const who = url.searchParams.get("uid") || "";
+      const bans = (await this.ctx.storage.get<string[]>(BANNED_KEY)) ?? [];
+      if (who !== "" && bans.includes(who)) {
+        return Response.json({ status: "removed" }, { headers: cors });
+      }
+      if (config.seatLimit != null && this.viewerCount() >= config.seatLimit) {
+        return Response.json({ status: "full" }, { headers: cors });
+      }
+      return Response.json({ status: "ok" }, { headers: cors });
+    }
+
     if (url.pathname.endsWith("/state")) {
       const state = await this.ctx.storage.get<PartyState>(STATE_KEY);
       return Response.json({ state: state ?? null, viewers: this.viewerCount() }, { headers: cors });
