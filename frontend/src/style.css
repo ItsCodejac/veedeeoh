@@ -3703,7 +3703,9 @@ body.kids-mode { --brand-accent: #ff9f1c; }
 
 /* Quick actions on a card. Hidden until hover so the artwork stays clean, and
    always visible on touch, where there is no hover to reveal them. */
-.vodPoster { position: relative; }
+/* Home builds its own cards (showcaseCard/posterCard) so the overlay has to
+   anchor to their image wrappers too, not just the grid card's. */
+.vodPoster, .showcasePoster, .posterImage { position: relative; }
 .vodQuick {
   position: absolute;
   top: 6px; right: 6px;
@@ -3712,7 +3714,11 @@ body.kids-mode { --brand-accent: #ff9f1c; }
   transition: opacity .12s ease;
 }
 .vodCard:hover .vodQuick,
-.vodCard:focus-within .vodQuick { opacity: 1; }
+.vodCard:focus-within .vodQuick,
+.showcaseCard:hover .vodQuick,
+.showcaseCard:focus-within .vodQuick,
+.posterCard:hover .vodQuick,
+.posterCard:focus-within .vodQuick { opacity: 1; }
 .vodQuickBtn {
   display: flex; align-items: center; justify-content: center;
   width: 27px; height: 27px;

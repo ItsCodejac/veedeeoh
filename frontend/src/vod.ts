@@ -849,26 +849,33 @@ async function playVod(item: VodItem): Promise<void> {
 const HEART = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21.2l7.8-7.7 1-1.1a5.5 5.5 0 0 0 0-7.8z"></path></svg>`;
 const PLUS  = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`;
 
-export function vodCard(item: VodItem): HTMLElement {
-  const el = document.createElement("button");
-  el.className = "vodCard";
-  el.title = item.summary || item.title;
-  el.innerHTML = `
-    <span class="vodPoster">${item.poster ? `<img loading="lazy" alt="" src="${escapeHtml(item.poster)}">` : FILM_ICON}
-      <span class="vodQuick">
-        <span class="vodQuickBtn" data-act="fav" title="Add to My List">${HEART}</span>
-        <span class="vodQuickBtn" data-act="add" title="Add to a section">${PLUS}</span>
-      </span>
-    </span>
-    <span class="vodTitle">${escapeHtml(item.title)}</span>
-    <span class="vodMeta">${escapeHtml([item.genre, item.rating].filter(Boolean).join(" · "))}</span>`;
+/** Hover overlay markup for the heart and "add to section" buttons. Returned
+ *  as a string so it can be interpolated into whatever image wrapper a given
+ *  card type uses. */
+const QUICK_ACTIONS = `
+  <span class="vodQuick">
+    <span class="vodQuickBtn" data-act="fav" title="Add to My List">${HEART}</span>
+    <span class="vodQuickBtn" data-act="add" title="Add to a section">${PLUS}</span>
+  </span>`;
 
-  const fav = el.querySelector<HTMLElement>('[data-act="fav"]')!;
-  const paintFav = () => fav.classList.toggle("on", state.favorites.has(item.id));
+/** Wire the quick actions on any card that embeds QUICK_ACTIONS.
+ *
+ *  Shared because Home builds its own cards -- deliberately, since a Home card
+ *  opens the details overlay while a grid card plays immediately -- and the
+ *  first version of this feature only ever reached the grid. Two card builders
+ *  is defensible; two copies of the action handling is how one of them silently
+ *  misses the next button we add.
+ *
+ *  `onPlain` runs for a click anywhere that is NOT a quick action, which is what
+ *  lets the two card types keep their different primary behaviour.
+ */
+function attachQuickActions(el: HTMLElement, item: VodItem, onPlain: () => void): void {
+  const fav = el.querySelector<HTMLElement>('[data-act="fav"]');
+  const paintFav = () => fav?.classList.toggle("on", state.favorites.has(item.id));
   paintFav();
 
-  // Quick actions live inside the card button, so their clicks must not fall
-  // through and open the details overlay.
+  // The actions sit inside the card button, so their clicks must not fall
+  // through to the card's own handler.
   el.addEventListener("click", (e) => {
     const act = (e.target as HTMLElement)?.closest?.("[data-act]")?.getAttribute("data-act");
     if (act) {
@@ -878,6 +885,22 @@ export function vodCard(item: VodItem): HTMLElement {
       else { openAddToMenu(item, e as MouseEvent); }
       return;
     }
+    onPlain();
+  });
+}
+
+export function vodCard(item: VodItem): HTMLElement {
+  const el = document.createElement("button");
+  el.className = "vodCard";
+  el.title = item.summary || item.title;
+  el.innerHTML = `
+    <span class="vodPoster">${item.poster ? `<img loading="lazy" alt="" src="${escapeHtml(item.poster)}">` : FILM_ICON}
+      ${QUICK_ACTIONS}
+    </span>
+    <span class="vodTitle">${escapeHtml(item.title)}</span>
+    <span class="vodMeta">${escapeHtml([item.genre, item.rating].filter(Boolean).join(" · "))}</span>`;
+
+  attachQuickActions(el, item, () => {
     el.classList.add("loading");
     void playVod(item).finally(() => el.classList.remove("loading"));
   });
@@ -1617,13 +1640,13 @@ export async function renderHome(): Promise<void> {
         const imageClass = useBanner ? "showcasePoster" : "posterImage";
         
         card.innerHTML = `
-          <span class="${imageClass}">${imgUrl ? `<img loading="lazy" alt="" src="${escapeHtml(imgUrl)}">` : FILM_ICON}</span>
+          <span class="${imageClass}">${imgUrl ? `<img loading="lazy" alt="" src="${escapeHtml(imgUrl)}">` : FILM_ICON}
+            ${QUICK_ACTIONS}
+          </span>
           <span class="showcaseTitle">${escapeHtml(item.title)}</span>
           <span class="showcaseMeta">${escapeHtml([item.genre, item.rating].filter(Boolean).join(" · "))}</span>
         `;
-        card.onclick = () => {
-          void openVodDetails(item);
-        };
+        attachQuickActions(card, item, () => { void openVodDetails(item); });
         scroller.append(card);
       });
 
