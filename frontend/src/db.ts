@@ -50,9 +50,20 @@ export function invalidateAccount(): void { accountCache = null; }
 export async function getAccount(): Promise<Account | null> {
   if (accountCache && Date.now() - accountCache.at < ACCOUNT_TTL_MS) return accountCache.value;
   const sb = getSupabase();
+
+  // Wait for auth before asking. This used to lean on RLS to pick the row, so
+  // a query issued before the client had hydrated its session matched NOTHING
+  // and came back with no data and no error -- indistinguishable from "this
+  // account does not exist". That is the paywall appearing for a founder
+  // account, and the 30 second cache is what made a momentary race last long
+  // enough to see and to need a sign-out to clear.
+  const { data: u } = await sb.auth.getUser();
+  if (!u.user) return null;               // not cached: this is a timing state
+
   const { data, error } = await sb
     .from("profiles")
     .select("id, email, tier, tier_expires, seats, must_change_password")
+    .eq("id", u.user.id)
     .maybeSingle();
   // Distinguish a real failure (network/RLS/transient) from "no row". Callers
   // that gate access must fail OPEN on a thrown error, but may treat null (no
@@ -61,8 +72,12 @@ export async function getAccount(): Promise<Account | null> {
   // and caching that would extend a transient network blip into 30 seconds of
   // wrongly-granted access.
   if (error) throw error;
-  accountCache = { at: Date.now(), value: (data as Account) ?? null };
-  return accountCache.value;
+
+  // Only a POSITIVE result is cached. A null means either the row genuinely
+  // does not exist or something transient went wrong, and holding that for
+  // thirty seconds turns a blip into a locked-out user.
+  if (data) accountCache = { at: Date.now(), value: data as Account };
+  return (data as Account) ?? null;
 }
 
 // Same maturity ladder the backend tags items with (kept in sync deliberately —
@@ -115,7 +130,17 @@ const PAID_TIERS = new Set(["founder_vip", "giveaway", "cloud_paid", "trial_7day
  *  (has_active_access) is the real enforcement; this drives the UI. */
 export async function hasActiveAccess(): Promise<boolean> {
   const acct = await getAccount();
-  if (!acct || !PAID_TIERS.has(acct.tier)) return false;
+
+  // No row for a signed-in user is an ANOMALY, not a lapsed subscription. A
+  // lapsed account still has a row, with tier 'canceled'. Treating a missing
+  // one as no access is what put a paywall in front of a founder account
+  // whenever the row could not be read.
+  if (!acct) {
+    const { data: u } = await getSupabase().auth.getUser();
+    return !!u.user;   // signed in but unreadable: fail open, do not lock out
+  }
+
+  if (!PAID_TIERS.has(acct.tier)) return false;
   if (acct.tier_expires && new Date(acct.tier_expires).getTime() < Date.now()) return false;
   return true;
 }
