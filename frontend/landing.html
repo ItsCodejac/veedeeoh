@@ -1339,6 +1339,41 @@
         text-decoration: underline;
       }
 
+      /* Sign-up only. Hidden by default so the sign-in path never shows it --
+         an existing user has already agreed and re-asking reads as a bug. */
+      .auth-consent {
+        display: none;
+        gap: 10px;
+        align-items: flex-start;
+        margin: 4px 0 18px;
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--dim);
+        text-align: left;
+      }
+      .auth-consent.show { display: flex; }
+      .auth-consent input[type="checkbox"] {
+        flex: 0 0 auto;
+        width: 17px;
+        height: 17px;
+        margin: 2px 0 0;
+        accent-color: var(--accent);
+        cursor: pointer;
+      }
+      .auth-consent label { cursor: pointer; }
+      .auth-consent a { color: var(--accent); text-decoration: underline; }
+      .auth-back-btn {
+        display: flex; align-items: center; gap: 7px; margin: 14px auto 0;
+        background: none; border: none; cursor: pointer;
+        color: #8A8F98; font-family: inherit; font-size: 13px; font-weight: 600;
+      }
+      .auth-back-btn:hover { color: #fff; }
+
+      /* Matches the red of #authMessage so a blocked submit reads as one error
+         style, not two. */
+      .auth-consent.invalid { color: #ff8a8a; }
+      .auth-consent.invalid input[type="checkbox"] { outline: 1px solid #ff8a8a; outline-offset: 2px; }
+
       @media (max-width: 768px) {
         nav {
           padding: 12px 16px;
@@ -1877,7 +1912,17 @@ Health Check: /api/health</div>
               </div>
               
               <input type="password" class="auth-input" id="passwordInput" placeholder="Password" />
-              
+
+              <div class="auth-consent" id="authConsentRow">
+                <input type="checkbox" id="authConsentCheck" />
+                <label for="authConsentCheck">
+                  I agree to the
+                  <a href="/terms.html" target="_blank" rel="noopener">Terms</a>
+                  and
+                  <a href="/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.
+                </label>
+              </div>
+
               <button type="submit" class="btn btn-accent auth-submit-btn" id="submitBtn">Sign In</button>
               <div id="passkeyContainer">
                 <div class="auth-divider"><span>or passwordless</span></div>
@@ -1886,8 +1931,15 @@ Health Check: /api/health</div>
                   Sign In with Passkey
                 </button>
               </div>
-              
-              
+
+              <!-- A way out that is not "give up". Edit only changes the
+                   address and the X abandons the whole thing, so someone who
+                   decides mid-form that they would rather use Google had
+                   nowhere to go. -->
+              <button type="button" class="auth-back-btn" id="authBackBtn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                Other ways to sign in
+              </button>
             </div>
 
             <!-- Step 3: Success / Check Email -->

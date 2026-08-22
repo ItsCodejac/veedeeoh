@@ -198,6 +198,32 @@ if (authConsentCheck) {
   });
 }
 
+/** A message a person can act on, never an object.
+ *
+ *  Supabase returns its failures as `msg`, not `message`, so `e?.message` was
+ *  handing an object to textContent and rendering a literal "{}" under the
+ *  form. The known server-side failures also deserve a real explanation and a
+ *  way forward rather than the raw text.
+ */
+function authErrorText(e: any, fallback: string): string {
+  const raw = typeof e?.message === 'string' ? e.message
+            : typeof e?.msg === 'string' ? e.msg
+            : typeof e?.error_description === 'string' ? e.error_description
+            : '';
+  const status = e?.status ?? e?.code;
+
+  if (status === 500 || /confirmation email|sending.*email/i.test(raw)) {
+    return 'We could not send your confirmation email. Continue with Google instead, or try again in a few minutes.';
+  }
+  if (/already registered|already exists/i.test(raw)) {
+    return 'That email already has an account. Sign in instead.';
+  }
+  if (/invalid login|invalid credentials/i.test(raw)) {
+    return 'That email and password do not match.';
+  }
+  return raw && raw !== '{}' ? raw : fallback;
+}
+
 function showStep(step: 'email' | 'password' | 'success') {
   authStepEmail.classList.remove('active');
   authStepPassword.classList.remove('active');
@@ -263,6 +289,18 @@ if (authModeToggleBtn) {
   });
 }
 
+// Back to the first step, where Google and passkey live. Clears the error too:
+// a failure from the password attempt has nothing to say about the choice the
+// person is about to make instead.
+const authBackBtn = document.getElementById('authBackBtn') as HTMLButtonElement | null;
+if (authBackBtn) {
+  authBackBtn.addEventListener('click', () => {
+    authMessage.style.display = 'none';
+    delete authMessage.dataset.reason;
+    showStep('email');
+  });
+}
+
 if (editEmailBtn) {
   editEmailBtn.addEventListener('click', () => {
     authMessage.style.display = 'none';
@@ -301,7 +339,7 @@ if (googleAuthBtn) {
     try { 
       await signInWithGoogle(); 
     } catch (e: any) {
-      authMessage.textContent = e?.message || 'Google sign-in failed'; 
+      authMessage.textContent = authErrorText(e, 'Google sign-in failed.');
       authMessage.style.display = 'block';
       googleAuthBtn.disabled = false; 
       googleAuthBtn.innerHTML = originalText;
@@ -323,7 +361,7 @@ if (passkeyBtn) {
         window.location.href = afterAuthUrl();
       }, 1000);
     } catch (e: any) {
-      authMessage.textContent = e?.message || 'Passkey sign-in failed. You may need to enroll a passkey first in your account settings.';
+      authMessage.textContent = authErrorText(e, 'Passkey sign-in failed. Add one in Settings first, on a device you are already signed in on.');
       authMessage.style.display = 'block';
     } finally {
       passkeyBtn.disabled = false;
@@ -397,7 +435,7 @@ if (authForm) {
       }
     } catch (e: any) {
       authMessage.style.display = 'block';
-      authMessage.textContent = e?.message || 'Authentication failed.';
+      authMessage.textContent = authErrorText(e, 'Authentication failed.');
       submitBtn.disabled = false;
       submitBtn.textContent = originalText;
     }

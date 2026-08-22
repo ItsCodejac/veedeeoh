@@ -305,6 +305,7 @@ app.get('/cron/trial-emails', async (c: Context) => {
   if (error) return c.json({ error: error.message }, 500);
 
   const sent: string[] = [];
+  const failed: string[] = [];
   for (const r of rows ?? []) {
     if (!r.email) continue;
     const days = Math.ceil((new Date(r.tier_expires).getTime() - now) / day);
@@ -319,10 +320,17 @@ app.get('/cron/trial-emails', async (c: Context) => {
       await sb.from('profiles').update({ trial_email_sent: stage }).eq('id', r.id);
       sent.push(`${r.email}:${stage}`);
     } catch (e: any) {
+      // NOT marked. The send helpers throw now, so a failure leaves
+      // trial_email_sent alone and tomorrow's run retries -- previously a dead
+      // API key would have burned through every trial marking them reminded
+      // with nothing delivered and no second chance.
       console.error('[cron] trial email failed', r.email, e?.message);
+      failed.push(`${r.email}:${e?.message || 'unknown'}`);
     }
   }
-  return c.json({ ok: true, considered: rows?.length ?? 0, sent });
+  // Failures are reported, not hidden: a cron that always returns ok is a cron
+  // nobody notices has stopped working.
+  return c.json({ ok: failed.length === 0, considered: rows?.length ?? 0, sent, failed });
 });
 
 app.get('/cron/catalog-warm', async (c: Context) => {

@@ -111,7 +111,7 @@ const P = (t: string) =>
  *  job is to make the clock visible, because six trials expired with no warning
  *  at all and none of them converted. */
 export async function sendTrialEndingEmail(email: string, daysLeft: number): Promise<void> {
-  await sendEmail({
+  const r = await sendEmail({
     to: email,
     subject: daysLeft <= 1 ? "Your veedeeoh trial ends tomorrow" : `${daysLeft} days left on your veedeeoh trial`,
     html: shell(
@@ -121,20 +121,25 @@ export async function sendTrialEndingEmail(email: string, daysLeft: number): Pro
       "Keep watching", "https://veedeeoh.com/#settings/account"
     ),
   });
+  // THROW on failure. sendEmail swallows errors and returns success:false, so
+  // a caller that ignores the result treats a dead API key as a delivered
+  // message. The trial cron marked people as reminded on exactly that basis.
+  if (!r.success) throw new Error(r.error || "email send failed");
 }
 
 /** Sent after it lapses. Leads with what they KEEP rather than what they lost:
  *  a lapsed account can still follow watch party links, which is the whole
  *  point of the free tier and the most likely path back. */
 export async function sendTrialEndedEmail(email: string): Promise<void> {
-  await sendEmail({
+  const r = await sendEmail({
     to: email,
     subject: "Your veedeeoh trial has ended",
     html: shell(
       "Your trial has ended",
       P("Your account is still open. Any watch party link you are sent will still work &mdash; you just cannot browse the catalogue on your own until you subscribe.")
       + P("Everything you had is waiting: profiles, lists, and where you left off."),
-      "Subscribe — $4/mo", "https://veedeeoh.com/#settings/account"
+      "Subscribe \u2014 $4/mo", "https://veedeeoh.com/#settings/account"
     ),
   });
+  if (!r.success) throw new Error(r.error || "email send failed");
 }
