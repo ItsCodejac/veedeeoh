@@ -86,6 +86,9 @@ class VodPlayer {
   private readonly ac = new AbortController();
   private mode: "full" | "mini" = "full";
   private lastSave = 0;
+  /** Set once the resume seek has been applied, so a later can-play (after a
+   *  scrub or a quality switch) cannot yank the viewer back. */
+  private resumed = false;
   private destroyed = false;
 
   constructor(
@@ -519,6 +522,29 @@ class VodPlayer {
     // Hide the loader only once media can genuinely play. provider-change fires
     // before a byte is fetched, which made every failure look like a black screen.
     on("can-play", this.hideLoader);
+
+    // Resume position, applied HERE and not at create().
+    //
+    // `currentTime` was passed to VidstackPlayer.create(), but an HLS source
+    // loads asynchronously: at construction there is no seekable range yet, so
+    // the value was discarded and every resume started the title from zero.
+    // Continue Watching stored the right timecode all along and simply never
+    // reached the media element.
+    if (this.startTime > 1) {
+      const seek = () => {
+        const p = this.player;
+        if (!p) return;
+        // Guard against re-seeking a viewer who has already scrubbed: can-play
+        // fires again after a seek and on some quality switches.
+        if (this.resumed) return;
+        this.resumed = true;
+        if (Math.abs((p.currentTime ?? 0) - this.startTime) > 2) {
+          p.currentTime = this.startTime;
+        }
+      };
+      on("can-play", seek);
+      on("loaded-metadata", seek);
+    }
     on("playing", this.hideLoader);
 
     on("error", (e: any) => {

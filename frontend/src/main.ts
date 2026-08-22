@@ -500,6 +500,21 @@ async function boot(): Promise<void> {
     // and marks the Home tab active, which is the state enterAsProfile leaves
     // behind. Unhiding by hand leaves the sidebar with no active tab.
     goHome();
+
+    // The ident on a genuine app start.
+    //
+    // playIdent only ran from enterAsProfile, i.e. a real profile selection --
+    // and since boot started restoring the persisted profile, that almost never
+    // happens, so the splash stopped appearing at launch and only survived as
+    // the in-player bump on first play. Keyed on sessionStorage: a fresh tab
+    // gets it, a reload within the same session does not, which is what stops
+    // it replaying on every refresh.
+    try {
+      if (!sessionStorage.getItem("veedeeoh_ident_at")) {
+        playIdent(!!resumed.is_kids, () => {});
+      }
+    } catch { /* private mode: skip the ident rather than fail boot */ }
+
     await dataReady;
     // Skip building Home when a saved route is about to replace it -- every
     // switchView branch renders its own surface, including the Home fallback.
