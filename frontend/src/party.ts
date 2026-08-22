@@ -203,9 +203,27 @@ export async function joinParty(joinCode: string): Promise<void> {
   // `item.url`, which is only set for legacy catalogue rows, so a Pluto, Tubi
   // or Archive title handed the player a stream with url undefined and the
   // joiner landed on "this title isn't available to stream right now".
-  const { resolveItemStream } = await import("./vod");
-  const url = await resolveItemStream(item);
-  if (!url) { veil(); showToast("That title can't be streamed right now"); return; }
+  const vod = await import("./vod");
+
+  // A series guest needs the WHOLE episode list, not just one URL. streamIdx is
+  // an index into this array, so without it a host moving to episode 4 would
+  // send an index the viewer cannot resolve.
+  let streams: any[] | null = null;
+  if (item.series_id) {
+    const { fetchVodSeries } = await import("./api");
+    const eps = await fetchVodSeries(item.series_id).catch(() => [] as any[]);
+    if (eps.length) {
+      streams = [...eps]
+        .sort((a, b) => (a.season ?? 1) - (b.season ?? 1) || (a.number ?? 0) - (b.number ?? 0))
+        .map((ep) => ({
+          url: ep.url, quality: null,
+          source: `S${ep.season ?? "?"}E${ep.number ?? "?"} ${ep.title}`.slice(0, 48),
+        }));
+    }
+  }
+
+  const url = streams?.length ? null : await vod.resolveItemStream(item);
+  if (!streams?.length && !url) { veil(); showToast("That title can't be streamed right now"); return; }
 
   // Do NOT open the player yet. A guest was dropped straight into the film the
   // instant they joined, so the host had no moment to gather anyone and an
@@ -290,7 +308,12 @@ async function connect(joinCode: string, isHost: boolean): Promise<void> {
   if (isHost) {
     setPartyEmitter((s) => {
       if (socket?.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ type: "state", state: { ...s, contentId: "", streamIdx: 0 } }));
+        // streamIdx travels; contentId does not. The episode index is what a
+        // viewer needs to follow a binge, and it is meaningless outside this
+        // party. contentId stays blank because every viewer already knows the
+        // title and resolves their own URL for it -- sending the host's would
+        // be a signed, per-session link that expires on them.
+        socket.send(JSON.stringify({ type: "state", state: { ...s, contentId: "" } }));
       }
     });
   }
@@ -405,12 +428,12 @@ async function lookupCatalogItem(contentId: string): Promise<any | null> {
 }
 
 /** Mirrors asChannel in vod.ts so the player receives the shape it expects. */
-function asPartyChannel(item: any, url: string): any {
+function asPartyChannel(item: any, url: string | null, streams?: any[] | null): any {
   return {
     id: `vod:${item.id}`,
     name: item.title,
     country: null, categories: [], nsfw: false, logo: null, logos: [],
-    streams: [{ url, quality: null, source: item.genre || "Party" }],
+    streams: streams?.length ? streams : [{ url, quality: null, source: item.genre || "Party" }],
     source: item.genre || "Watch Party",
     vodPoster: item.poster, vodBanner: item.banner, vodItem: item,
   };
@@ -497,7 +520,7 @@ export async function resumeHosting(joinCode: string): Promise<boolean> {
   const url = await resolveItemStream(item);
   if (!url) { showToast("That title can't be streamed right now"); return false; }
 
-  await openVodPlayer(asPartyChannel(item, url), party.stream_idx || 0, 0);
+  await openVodPlayer(asPartyChannel(item, url, null), party.stream_idx || 0, 0);
   await hostExisting(joinCode);
 
   const { mountHostLobby } = await import("./party-setup");

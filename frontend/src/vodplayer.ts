@@ -362,9 +362,32 @@ class VodPlayer {
    *  whole document when two players briefly overlap. */
   rootEl(): HTMLElement | null { return this.root; }
 
+  /** Which stream (episode) is playing, for the party sync payload. */
+  streamIndex(): number { return this.idx; }
+
+  /** Follow the host to another episode, landing at their position.
+   *
+   *  startTime is readonly and only consulted at construction, so the seek is
+   *  applied on can-play here instead -- the same reason resume needed it: an
+   *  HLS source has no seekable range until it has loaded. */
+  switchTo(i: number, atSecs: number): void {
+    if (i === this.idx || !this.ch.streams?.[i]) return;
+    this.load(i);
+    const p = this.player;
+    if (!p) return;
+    const seek = () => {
+      if (atSecs > 1 && Math.abs((p.currentTime ?? 0) - atSecs) > 2) p.currentTime = atSecs;
+    };
+    p.addEventListener("can-play", seek, { once: true, signal: this.ac.signal });
+  }
+
   private emitParty = (): void => {
     if (!partyEmit || applyingRemote || !this.player) return;
-    partyEmit({ positionSecs: this.player.currentTime ?? 0, paused: !!this.player.paused });
+    partyEmit({
+      positionSecs: this.player.currentTime ?? 0,
+      paused: !!this.player.paused,
+      streamIdx: this.idx,
+    });
   };
 
   setMode(mode: "full" | "mini"): void {
@@ -756,7 +779,15 @@ class VodPlayer {
 // ---- Watch Party hooks ----------------------------------------------------
 // Kept as a narrow surface so party.ts never reaches into the player: the host
 // emits its position, a viewer applies one. Nothing else crosses the boundary.
-export interface PartyPlaybackState { positionSecs: number; paused: boolean }
+export interface PartyPlaybackState {
+  positionSecs: number;
+  paused: boolean;
+  /** Which entry in the channel's stream list -- the EPISODE, for a series.
+   *  Absent from the payload originally, so a host binge-watching moved through
+   *  a season on their own while every viewer stayed on the episode the party
+   *  opened with, still receiving that episode's positions. */
+  streamIdx?: number;
+}
 let partyEmit: ((s: PartyPlaybackState) => void) | null = null;
 let applyingRemote = false;
 
@@ -794,6 +825,16 @@ export function applyPartyState(s: PartyPlaybackState): void {
   if (!p) return;
   applyingRemote = true;
   try {
+    // Episode first. Switching source resets currentTime, so reconciling
+    // position against the OLD episode and then changing source would throw
+    // that correction away -- and a position from a different episode is
+    // meaningless anyway.
+    if (typeof s.streamIdx === "number" && s.streamIdx !== current!.streamIndex()) {
+      current!.switchTo(s.streamIdx, s.positionSecs);
+      applyingRemote = false;
+      return;
+    }
+
     // A seek in flight has not landed yet, so its position means nothing.
     // Measuring against it is what produced the loop.
     if (!p.seeking) {
