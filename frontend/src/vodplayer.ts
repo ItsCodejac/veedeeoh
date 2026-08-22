@@ -162,10 +162,19 @@ class VodPlayer {
       if (want) {
         p.qualities?.addEventListener?.("change", () => {
           if (!p.qualities || p.qualities.length === 0) return;
-          p.qualities.autoSelect?.();
+
+          // Pluto's manifests carry BANDWIDTH but no RESOLUTION, so every level
+          // reports height 0 -- which is also why the player's own menu shows
+          // "0p". Comparing heights there matched the FIRST entry, the lowest
+          // bitrate, so asking for 1080p pinned the viewer to 0.64 Mbps. With
+          // no resolution data there is nothing honest to choose on, so leave
+          // adaptive selection alone.
+          const levels = Array.from(p.qualities) as any[];
+          if (!levels.some((q) => (q.height ?? 0) > 0)) return;
+
           let best: any = null;
-          for (const q of p.qualities) {
-            if (q.height <= want && (!best || q.height > best.height)) best = q;
+          for (const q of levels) {
+            if (q.height > 0 && q.height <= want && (!best || q.height > best.height)) best = q;
           }
           // No level at or below the cap: leave auto alone rather than pinning
           // the viewer to a quality they did not ask for.
