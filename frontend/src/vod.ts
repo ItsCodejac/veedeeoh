@@ -939,11 +939,29 @@ const PLUS  = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" strok
 /** Hover overlay markup for the heart and "add to section" buttons. Returned
  *  as a string so it can be interpolated into whatever image wrapper a given
  *  card type uses. */
+const PARTY_ICON = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>`;
+
+/** Hover actions. The party button is present in the markup for every card but
+ *  hidden unless `body.can-host` is set, because hosting needs an active
+ *  subscription and canHost() is an async round trip -- checking it per card
+ *  would mean hundreds of them, and a third button that silently fails for a
+ *  lapsed account is worse than no button. */
 const QUICK_ACTIONS = `
   <span class="vodQuick">
     <span class="vodQuickBtn" data-act="fav" title="Add to My List">${HEART}</span>
     <span class="vodQuickBtn" data-act="add" title="Add to a section">${PLUS}</span>
+    <span class="vodQuickBtn partyAct" data-act="party" title="Start a watch party">${PARTY_ICON}</span>
   </span>`;
+
+/** Set once, from the same check the Watch Party button uses. */
+export async function refreshHostingAffordance(): Promise<void> {
+  try {
+    const { canHost } = await import("./party");
+    document.body.classList.toggle("can-host", await canHost());
+  } catch {
+    document.body.classList.remove("can-host");
+  }
+}
 
 /** Wire the quick actions on any card that embeds QUICK_ACTIONS.
  *
@@ -969,6 +987,7 @@ function attachQuickActions(el: HTMLElement, item: VodItem, onPlain: () => void)
       e.preventDefault();
       e.stopPropagation();
       if (act === "fav") { void toggleFavorite(item).then(paintFav); }
+      else if (act === "party") { void startWatchParty(item); }
       else { openAddToMenu(item, e as MouseEvent); }
       return;
     }
@@ -1658,7 +1677,13 @@ export async function renderHome(): Promise<void> {
           <span class="showcaseTitle">${escapeHtml(item.title)}</span>
           <span class="showcaseMeta">${escapeHtml(item.episodeTitle || "Movie")}</span>
         `;
-        card.onclick = async () => {
+        // The resume rail was the only card surface without these. A resume
+        // entry is not a VodItem, but it carries the real one under vodItem,
+        // which is what favourites and sections key off.
+        const asItem = (item.vodItem || item) as VodItem;
+        card.querySelector(".continueImage")?.insertAdjacentHTML("beforeend", QUICK_ACTIONS);
+        attachQuickActions(card, asItem, () => card.dispatchEvent(new CustomEvent("vd:resume")));
+        card.addEventListener("vd:resume", async () => {
           // Rows synced from another device carry no streams; resolve them the
           // same way a normal play does, then open at the saved position.
           if (item.streams?.length) { resumeVodPlayback(item); return; }
@@ -1677,7 +1702,7 @@ export async function renderHome(): Promise<void> {
           } finally {
             card.classList.remove("loading");
           }
-        };
+        });
         return card;
       };
 

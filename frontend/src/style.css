@@ -4531,3 +4531,13 @@ body.party-guest { background: #06070a; }
   background: rgba(255, 184, 77, .08); border: 1px solid rgba(255, 184, 77, .28);
   border-radius: 9px; padding: 10px 12px;
 }
+
+/* The party action is in every card's markup but only shown to an account that
+   can actually host. Hiding by class rather than checking per card keeps it to
+   one entitlement lookup instead of one per thumbnail. */
+.vodQuickBtn.partyAct { display: none; }
+body.can-host .vodQuickBtn.partyAct { display: flex; }
+/* Continue Watching cards carry the same overlay now. */
+.continueImage { position: relative; }
+.continueCard:hover .vodQuick,
+.continueCard:focus-within .vodQuick { opacity: 1; }

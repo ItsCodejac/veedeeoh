@@ -541,6 +541,14 @@ async function boot(): Promise<void> {
 
   void mountTrialNotice();
 
+  // Decides whether cards show the watch party action. Re-run on profile change
+  // because a kids profile may not host, and the answer is per profile as much
+  // as per account.
+  void import("./vod").then((v) => v.refreshHostingAffordance());
+  window.addEventListener("veedeeoh:profile-changed", () => {
+    void import("./vod").then((v) => v.refreshHostingAffordance());
+  });
+
   // A referral link lands here: ?ref=CODE. Stashed rather than redeemed on the
   // spot, because a brand new visitor has no session yet and sign-up leaves the
   // page. redeemPendingReferral runs on every boot and no-ops once attributed.
