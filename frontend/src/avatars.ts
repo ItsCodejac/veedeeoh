@@ -219,3 +219,80 @@ export async function avatarCredits(): Promise<AvatarCredit[]> {
   }
   return out.sort((a, b) => a.title.localeCompare(b.title));
 }
+
+// ---------------------------------------------------------------------------
+// Customisation
+// ---------------------------------------------------------------------------
+
+export interface AvatarOption {
+  key: string;
+  label: string;
+  values: string[];
+}
+
+/** The features a style lets you choose, read from its own JSON schema.
+ *
+ *  SCHEMA-DRIVEN, not a hardcoded list per style. Avataaars alone has 21
+ *  options and every style has a different set; writing them out would mean
+ *  maintaining 31 lists that silently rot whenever the library changes. Reading
+ *  the schema means a style added next year is customisable the day it appears.
+ *
+ *  Only enumerated features are offered. The rest are colour arrays with no
+ *  fixed values, and probability integers that would need a slider to express
+ *  something nobody is asking for. */
+export async function avatarOptions(styleId: string): Promise<AvatarOption[]> {
+  const { col } = await collection();
+  const props = (col as any)[styleId]?.schema?.properties;
+  if (!props) return [];
+
+  const out: AvatarOption[] = [];
+  for (const [key, raw] of Object.entries(props as Record<string, any>)) {
+    // backgroundColor is ours: it follows the profile colour picker, and
+    // offering it twice would let the two disagree.
+    if (key === "backgroundColor" || key === "base") continue;
+    if (/Probability$/.test(key)) continue;
+    const values: string[] | undefined = raw?.items?.enum || raw?.enum;
+    if (!Array.isArray(values) || values.length < 2) continue;
+    out.push({ key, label: humanise(key), values });
+  }
+  // Longest lists first: the features with the most variety are the ones worth
+  // putting in front of someone.
+  return out.sort((a, b) => b.values.length - a.values.length).slice(0, 8);
+}
+
+function humanise(key: string): string {
+  const s = key.replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase();
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** Generate with explicit feature choices layered over the seed.
+ *
+ *  An empty value means "leave it to the seed", so a half-customised avatar is
+ *  still mostly random rather than snapping to whatever happens to be first in
+ *  every list. */
+export async function renderCustom(
+  styleId: string,
+  seed: string,
+  choices: Record<string, string>,
+  opts: { size?: number; background?: string } = {},
+): Promise<string | null> {
+  try {
+    const { createAvatar, col } = await collection();
+    const style = (col as any)[styleId];
+    if (!style) return null;
+
+    const overrides: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(choices)) if (v) overrides[k] = [v];
+
+    const bg = (opts.background || "").replace("#", "");
+    const built = createAvatar(style, {
+      seed,
+      size: opts.size ?? 128,
+      ...(bg ? { backgroundColor: [bg] } : {}),
+      ...overrides,
+    });
+    return smallestUri(built.toString(), built.toDataUri());
+  } catch {
+    return null;
+  }
+}

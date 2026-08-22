@@ -581,12 +581,22 @@ export function openProfileEditor(editingProfile?: HouseholdProfile, onClose?: (
             "></button>
           `).join('')}
         </div>
-        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:8px;">
-          <label style="display:block; font-size:13px; color:#9aa5b5; font-weight:700;">AVATAR</label>
-          <button type="button" id="avatarShuffle" class="avShuffle">Shuffle</button>
+        <label style="display:block; font-size:13px; color:#9aa5b5; font-weight:700; margin-bottom:8px;">AVATAR</label>
+        <div class="avTop">
+          <div class="avPreview" id="avatarPreview"><span id="avatarPreviewLetter"></span></div>
+          <div class="avTopRight">
+            <div class="avStyles" id="avatarStyleRow"></div>
+            <div class="avActions">
+              <button type="button" id="avatarShuffle" class="avBtn">Shuffle</button>
+              <button type="button" id="avatarNone" class="avBtn subtle">Use initial</button>
+            </div>
+          </div>
         </div>
-        <div class="avStyles" id="avatarStyleRow"></div>
         <div class="avGrid" id="avatarPickerRow"></div>
+        <details class="avCustom">
+          <summary>Customise</summary>
+          <div class="avOptions" id="avatarOptions"></div>
+        </details>
       </div>
 
       </div><div class="peCol">
@@ -888,34 +898,38 @@ async function wireAvatarPicker(
     initial: string;
     initialName: string;
     color: () => string;
-    onPick: (spec: string) => void;
+    onPick: (dataUri: string) => void;
   },
 ): Promise<void> {
   const styleRowEl = root.querySelector<HTMLElement>('#avatarStyleRow');
   const gridEl = root.querySelector<HTMLElement>('#avatarPickerRow');
-  const shuffleBtn = root.querySelector<HTMLElement>('#avatarShuffle');
-  if (!styleRowEl || !gridEl) return;
-  const styleRow = styleRowEl, grid = gridEl;
+  const previewEl = root.querySelector<HTMLElement>('#avatarPreview');
+  const optionsEl = root.querySelector<HTMLElement>('#avatarOptions');
+  if (!styleRowEl || !gridEl || !previewEl || !optionsEl) return;
+  const styleRow = styleRowEl, grid = gridEl, preview = previewEl, optionsBox = optionsEl;
 
-  const { AVATAR_STYLES, avatarSpec, parseAvatar, renderAvatar, isRemoteAvatar } = await import('./avatars');
+  const { AVATAR_STYLES, avatarSpec, parseAvatar, renderAvatar, renderCustom, avatarOptions, isRemoteAvatar }
+    = await import('./avatars');
 
   const existing = parseAvatar(o.initial);
   let style = existing?.style || AVATAR_STYLES[0]!.id;
   let round = 0;
-
-  // A stored data URI is already an image and is kept as-is. A legacy
-  // api.dicebear.com URL is regenerated locally right here, so opening the
-  // editor is what heals a profile that would otherwise have gone on making
-  // the request.
+  let seed = (o.initialName || 'veedeeoh').trim();
+  let choices: Record<string, string> = {};
   let chosen = o.initial;
+
+  // A legacy api.dicebear.com value is regenerated locally here, so opening the
+  // editor is what heals a profile that would otherwise keep making the
+  // request the display paths now refuse.
   if (isRemoteAvatar(o.initial)) {
     chosen = (await renderAvatar(o.initial, { size: 96, background: o.color() })) || '';
     if (chosen) o.onPick(chosen);
   }
 
-  // A select rather than thirty-one chips: the list is long, grouped, and will
-  // get longer as the library publishes more, which a wrapping row of buttons
-  // handles badly and a grouped select handles for free.
+  const letter = (o.initialName || 'A').charAt(0).toUpperCase();
+
+  // A select rather than thirty-one chips: the list is long, grouped, and gets
+  // longer as the library publishes more.
   const groups: string[] = [];
   for (const s of AVATAR_STYLES) if (!groups.includes(s.group)) groups.push(s.group);
   styleRow.innerHTML = `
@@ -929,49 +943,112 @@ async function wireAvatarPicker(
   styleRow.querySelector<HTMLSelectElement>('#avatarStyleSel')!
     .addEventListener('change', (e) => {
       style = (e.target as HTMLSelectElement).value;
-      void paint();
+      // Feature choices belong to the style that defined them: "eyes: wink"
+      // means nothing to Shapes, and carrying it over would silently do
+      // nothing while appearing to be set.
+      choices = {};
+      void paintOptions();
+      void paint('reselect');
     });
-  shuffleBtn?.addEventListener('click', () => { round += 1; void paint(); });
 
-  /** Seeds for one round. The profile's own name leads the first round so the
-   *  suggestion on screen is already about this person. */
-  function seeds(): string[] {
-    const base = (o.initialName || '').trim();
-    const out: string[] = [];
-    if (round === 0 && base) out.push(base);
-    for (let i = out.length; i < 6; i++) out.push(`${base || 'veedeeoh'}-${round}-${i}`);
-    return out;
+  root.querySelector('#avatarShuffle')?.addEventListener('click', () => {
+    round += 1;
+    seed = `${o.initialName || 'veedeeoh'}-${round}-${Math.floor(Math.random() * 1e6)}`;
+    void paint('reselect');
+  });
+
+  root.querySelector('#avatarNone')?.addEventListener('click', () => void paint('clear'));
+
+  /** The big one. Picking from 48px tiles and hoping was the complaint. */
+  async function paintPreview(): Promise<void> {
+    if (!chosen) {
+      preview.style.backgroundImage = '';
+      preview.style.background = o.color();
+      preview.innerHTML = `<span class="avPreviewLetter">${escapeHtml(letter)}</span>`;
+      return;
+    }
+    preview.innerHTML = '';
+    preview.style.backgroundImage = `url("${chosen}")`;
   }
 
-  async function paint(): Promise<void> {
-    const list = seeds();
-    // "None" keeps the initial-letter avatar available -- the only option that
-    // stores nothing at all, and the smallest possible profile row.
-    grid.innerHTML =
-      `<button type="button" class="avOpt${chosen ? '' : ' on'}" data-idx="none">
-         <span class="avNone">${escapeHtml((o.initialName || 'A').charAt(0).toUpperCase())}</span>
-       </button>` +
-      list.map((_seed, i) => `<button type="button" class="avOpt" data-idx="${i}"></button>`).join('');
+  function select(uri: string): void {
+    chosen = uri;
+    o.onPick(uri);
+    void paintPreview();
+    grid.querySelectorAll('.avOpt').forEach((x) => x.classList.remove('on'));
+    grid.querySelectorAll<HTMLElement>('.avOpt').forEach((x) => {
+      if (x.dataset.uri === uri) x.classList.add('on');
+    });
+  }
 
-    // Generated once, here, and the resulting image is what gets stored. The
-    // library is never loaded on a display path, so a cold start does not pay
-    // 678 KB to draw three small pictures.
-    const uris = await Promise.all(list.map((seed) =>
-      renderAvatar(avatarSpec(style, seed), { size: 96, background: o.color() })));
+  /** Six variations on the current seed, honouring any customisation.
+   *
+   *  @param mode what happens to the selection afterwards.
+   *    'init'     keep an existing avatar, otherwise take the first.
+   *    'reselect' take the first -- a style, feature or shuffle change has to
+   *               be visible in the preview, and it was not: the old image
+   *               stayed selected so nothing appeared to happen.
+   *    'clear'    select nothing. Needed for "use initial", which the previous
+   *               auto-select undid the instant it ran. */
+  async function paint(mode: 'init' | 'reselect' | 'clear' = 'reselect'): Promise<void> {
+    const seeds = [seed, ...Array.from({ length: 5 }, (_v, i) => `${seed}-${i}`)];
+    grid.innerHTML = seeds.map(() => `<button type="button" class="avOpt"></button>`).join('');
+    const uris = await Promise.all(seeds.map((sd) =>
+      renderCustom(style, sd, choices, { size: 96, background: o.color() })));
 
-    grid.querySelectorAll<HTMLElement>('[data-idx]').forEach((b) => {
-      const idx = b.dataset.idx!;
-      const uri = idx === 'none' ? '' : (uris[Number(idx)] || '');
-      if (uri) b.style.backgroundImage = `url("${uri}")`;
-      if (uri && uri === chosen) b.classList.add('on');
-      b.addEventListener('click', () => {
-        chosen = uri;
-        grid.querySelectorAll('.avOpt').forEach((x) => x.classList.remove('on'));
-        b.classList.add('on');
-        o.onPick(chosen);
+    const btns = Array.from(grid.querySelectorAll<HTMLElement>('.avOpt'));
+    btns.forEach((b, i) => {
+      const uri = uris[i] || '';
+      if (!uri) { b.remove(); return; }
+      b.dataset.uri = uri;
+      b.style.backgroundImage = `url("${uri}")`;
+      if (uri === chosen) b.classList.add('on');
+      b.addEventListener('click', () => select(uri));
+    });
+
+    if (mode === 'clear') {
+      chosen = '';
+      o.onPick('');
+      grid.querySelectorAll('.avOpt').forEach((x) => x.classList.remove('on'));
+      await paintPreview();
+      return;
+    }
+    // Choosing a style or a feature should show its result immediately rather
+    // than waiting for a click nobody knows they have to make.
+    const first = uris.find(Boolean);
+    if (first && (mode === 'reselect' || !chosen)) select(first);
+    else await paintPreview();
+  }
+
+  /** Feature controls, built from the style's own schema. */
+  async function paintOptions(): Promise<void> {
+    const opts = await avatarOptions(style);
+    if (!opts.length) {
+      optionsBox.innerHTML = `<p class="avNoOpts">This style has no separate features to set. Shuffle for a different one.</p>`;
+      return;
+    }
+    optionsBox.innerHTML = opts.map((op) => `
+      <label class="avOptField">
+        <span>${escapeHtml(op.label)}</span>
+        <select data-opt="${escapeHtml(op.key)}">
+          <option value="">Random</option>
+          ${op.values.map((v) => `<option value="${escapeHtml(v)}">${escapeHtml(humaniseValue(v))}</option>`).join('')}
+        </select>
+      </label>`).join('');
+    optionsBox.querySelectorAll<HTMLSelectElement>('[data-opt]').forEach((sel) => {
+      sel.value = choices[sel.dataset.opt!] || '';
+      sel.addEventListener('change', () => {
+        const key = sel.dataset.opt!;
+        if (sel.value) choices[key] = sel.value; else delete choices[key];
+        void paint('reselect');
       });
     });
   }
 
-  await paint();
+  await Promise.all([paintOptions(), paint('init')]);
+}
+
+function humaniseValue(v: string): string {
+  const s = v.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[-_]/g, ' ').toLowerCase();
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }

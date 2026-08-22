@@ -169,10 +169,35 @@ function applyProfileChrome(profile: { name?: string; avatar_color?: string; is_
   const partyTab = document.getElementById("tabParty");
   if (partyTab) { if (isKids) partyTab.setAttribute("hidden", ""); else partyTab.removeAttribute("hidden"); }
 
-  const av = document.getElementById("sidebarAvatar");
-  if (av && profile.name) { av.textContent = profile.name.charAt(0).toUpperCase(); if (profile.avatar_color) (av as HTMLElement).style.background = profile.avatar_color; }
+  if (profile.name) paintProfileAvatar(document.getElementById("sidebarAvatar"), profile as any);
   const em = document.getElementById("sidebarEmail");
   if (em && profile.name) em.textContent = profile.name;
+}
+
+/** Paint a profile's avatar onto an element.
+ *
+ *  THE SIDEBAR NEVER SHOWED ONE. Both places that set it wrote the initial and
+ *  the colour and ignored avatar_url entirely, so a chosen avatar appeared in
+ *  the switcher and the editor and nowhere else -- which reads as the save
+ *  having failed.
+ *
+ *  A remote value is treated as no avatar: an api.dicebear.com URL saved by the
+ *  old picker would otherwise make the third-party request that generating
+ *  locally exists to remove. Opening the profile editor regenerates it. */
+function paintProfileAvatar(el: HTMLElement | null, p: { name: string; avatar_color?: string; avatar_url?: string | null }): void {
+  if (!el) return;
+  const url = (p.avatar_url || '').trim();
+  const local = url && !/^https?:\/\//i.test(url) ? url : '';
+  if (local) {
+    el.textContent = '';
+    el.style.backgroundImage = `url("${local}")`;
+    el.style.backgroundSize = 'cover';
+    el.style.backgroundPosition = 'center';
+  } else {
+    el.style.backgroundImage = '';
+    el.textContent = (p.name || '?').charAt(0).toUpperCase();
+    if (p.avatar_color) el.style.background = p.avatar_color;
+  }
 }
 
 // ---------------------------------------------------------------- routing ---
@@ -865,10 +890,7 @@ function wireSidebar(): void {
     import("./profiles").then(p => {
       const activeP = p.getActiveProfile();
       if (sidebarEmail) sidebarEmail.textContent = activeP.name;
-      if (sidebarAvatar) {
-        sidebarAvatar.textContent = activeP.name.charAt(0).toUpperCase();
-        sidebarAvatar.style.background = activeP.avatar_color;
-      }
+      paintProfileAvatar(sidebarAvatar, activeP);
     });
   };
 
