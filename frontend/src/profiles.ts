@@ -323,6 +323,18 @@ export function applyKidsMode(profile: HouseholdProfile): void {
   document.body.classList.toggle('kids-mode', !!profile?.is_kids);
 }
 
+/** True when a stored avatar can be drawn without reaching anyone.
+ *
+ *  Deliberately duplicated from avatars.ts rather than imported: importing that
+ *  module from a render path is what would drag the 678 KB collection into a
+ *  cold start, which is the entire thing this design avoids. A legacy
+ *  api.dicebear.com URL falls back to the initial until the editor regenerates
+ *  it locally. */
+function localAvatar(url?: string | null): string {
+  const v = (url || '').trim();
+  return v && !/^https?:\/\//i.test(v) ? v : '';
+}
+
 export function openProfileSwitcher(onSelectProfile?: (p: HouseholdProfile) => void): void {
   const existing = document.getElementById('profileSwitcherModal');
   if (existing) existing.remove();
@@ -358,9 +370,9 @@ export function openProfileSwitcher(onSelectProfile?: (p: HouseholdProfile) => v
             background: none; border: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 14px; transition: transform 0.2s ease, opacity 0.2s; outline: none; position: relative;
           ">
             <div style="
-              width: 100px; height: 100px; border-radius: 20px; background: ${p.avatar_url ? `url('${p.avatar_url}') center/cover` : p.avatar_color}; display: flex; align-items: center; justify-content: center; font-size: 40px; font-weight: 800; color: #06070a; box-shadow: ${p.id === active.id ? '0 0 0 4px #c5f04e, 0 12px 30px rgba(197,240,78,0.4)' : '0 8px 24px rgba(0,0,0,0.5)'}; position: relative;
+              width: 100px; height: 100px; border-radius: 20px; background: ${localAvatar(p.avatar_url) ? `url('${localAvatar(p.avatar_url)}') center/cover` : p.avatar_color}; display: flex; align-items: center; justify-content: center; font-size: 40px; font-weight: 800; color: #06070a; box-shadow: ${p.id === active.id ? '0 0 0 4px #c5f04e, 0 12px 30px rgba(197,240,78,0.4)' : '0 8px 24px rgba(0,0,0,0.5)'}; position: relative;
             ">
-              ${p.avatar_url ? '' : p.name.charAt(0).toUpperCase()}
+              ${localAvatar(p.avatar_url) ? '' : p.name.charAt(0).toUpperCase()}
               <div class="editOverlay" style="display: none; position: absolute; inset: 0; background: rgba(0,0,0,0.6); border-radius: 20px; align-items: center; justify-content: center;">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
               </div>
@@ -548,14 +560,6 @@ export function openProfileEditor(editingProfile?: HouseholdProfile, onClose?: (
   const pKids = !!editingProfile?.is_kids;
   const pRating = editingProfile?.max_rating || '';
 
-  const PRESET_AVATARS = [
-    '', // None (use initial)
-    'https://api.dicebear.com/9.x/bottts/svg?seed=Felix',
-    'https://api.dicebear.com/9.x/bottts/svg?seed=Aneka',
-    'https://api.dicebear.com/9.x/bottts/svg?seed=Liam',
-    'https://api.dicebear.com/9.x/bottts/svg?seed=Jude',
-    'https://api.dicebear.com/9.x/bottts/svg?seed=Sarah'
-  ];
 
   modal.innerHTML = `
     <div style="background: #10141e; border: 1px solid rgba(255,255,255,0.15); border-radius: 24px; max-width: 460px; width: 100%; padding: 32px; box-shadow: 0 24px 60px rgba(0,0,0,0.9);">
@@ -575,14 +579,12 @@ export function openProfileEditor(editingProfile?: HouseholdProfile, onClose?: (
             "></button>
           `).join('')}
         </div>
-        <label style="display: block; font-size: 13px; color: #9aa5b5; margin-bottom: 8px; font-weight: 700;">AVATAR IMAGE</label>
-        <div style="display: flex; gap: 12px; flex-wrap: wrap;" id="avatarPickerRow">
-          ${PRESET_AVATARS.map(url => `
-            <button class="avatarChoiceBtn" data-url="${url}" style="
-              width: 48px; height: 48px; border-radius: 12px; background: ${url ? `url('${url}') center/cover` : '#080a10'}; border: ${url === pAvatarUrl ? '3px solid #fff' : '1px solid rgba(255,255,255,0.1)'}; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #9aa5b5; transition: border 0.2s;
-            ">${url ? '' : 'A'}</button>
-          `).join('')}
+        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:8px;">
+          <label style="display:block; font-size:13px; color:#9aa5b5; font-weight:700;">AVATAR</label>
+          <button type="button" id="avatarShuffle" class="avShuffle">Shuffle</button>
         </div>
+        <div class="avStyles" id="avatarStyleRow"></div>
+        <div class="avGrid" id="avatarPickerRow"></div>
       </div>
 
       <div style="margin-bottom: 24px; background:#080a10; border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:16px;">
@@ -620,14 +622,18 @@ export function openProfileEditor(editingProfile?: HouseholdProfile, onClose?: (
     });
   });
 
+  // ---- avatar -------------------------------------------------------------
+  //
+  // Generated in the browser rather than fetched. Six options plus Shuffle
+  // instead of a character builder: creating a profile is a ten-second job
+  // done a handful of times, and ten dropdowns is a screen of its own for
+  // something a randomise button covers.
   let selectedAvatarUrl = pAvatarUrl;
-  const avatarBtns = modal.querySelectorAll('.avatarChoiceBtn');
-  avatarBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      avatarBtns.forEach(b => (b as HTMLElement).style.border = '1px solid rgba(255,255,255,0.1)');
-      (btn as HTMLElement).style.border = '3px solid #fff';
-      selectedAvatarUrl = (btn as HTMLElement).dataset.url || '';
-    });
+  void wireAvatarPicker(modal, {
+    initial: pAvatarUrl,
+    initialName: pName,
+    color: () => selectedColor,
+    onPick: (dataUri) => { selectedAvatarUrl = dataUri; },
   });
 
   const ratingGroups = modal.querySelector('#ratingGroups') as HTMLElement | null;
@@ -793,4 +799,108 @@ export function openProfileEditor(editingProfile?: HouseholdProfile, onClose?: (
 
 function escapeHtml(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ---------------------------------------------------------------------------
+// Avatar picker
+// ---------------------------------------------------------------------------
+
+/** A style row, six generated options, and Shuffle.
+ *
+ *  The options are seeded from the profile's name where there is one, so the
+ *  first thing shown is already personal rather than arbitrary, and Shuffle
+ *  moves to a fresh set. Nothing is fetched: every image here is generated in
+ *  the browser and cached. */
+async function wireAvatarPicker(
+  root: HTMLElement,
+  o: {
+    initial: string;
+    initialName: string;
+    color: () => string;
+    onPick: (spec: string) => void;
+  },
+): Promise<void> {
+  const styleRowEl = root.querySelector<HTMLElement>('#avatarStyleRow');
+  const gridEl = root.querySelector<HTMLElement>('#avatarPickerRow');
+  const shuffleBtn = root.querySelector<HTMLElement>('#avatarShuffle');
+  if (!styleRowEl || !gridEl) return;
+  const styleRow = styleRowEl, grid = gridEl;
+
+  const { AVATAR_STYLES, avatarSpec, parseAvatar, renderAvatar, isRemoteAvatar } = await import('./avatars');
+
+  const existing = parseAvatar(o.initial);
+  let style = existing?.style || AVATAR_STYLES[0]!.id;
+  let round = 0;
+
+  // A stored data URI is already an image and is kept as-is. A legacy
+  // api.dicebear.com URL is regenerated locally right here, so opening the
+  // editor is what heals a profile that would otherwise have gone on making
+  // the request.
+  let chosen = o.initial;
+  if (isRemoteAvatar(o.initial)) {
+    chosen = (await renderAvatar(o.initial, { size: 96, background: o.color() })) || '';
+    if (chosen) o.onPick(chosen);
+  }
+
+  // A select rather than thirty-one chips: the list is long, grouped, and will
+  // get longer as the library publishes more, which a wrapping row of buttons
+  // handles badly and a grouped select handles for free.
+  const groups: string[] = [];
+  for (const s of AVATAR_STYLES) if (!groups.includes(s.group)) groups.push(s.group);
+  styleRow.innerHTML = `
+    <select class="avSelect" id="avatarStyleSel" aria-label="Avatar style">
+      ${groups.map((g) => `
+        <optgroup label="${escapeHtml(g)}">
+          ${AVATAR_STYLES.filter((s) => s.group === g).map((s) =>
+            `<option value="${s.id}"${s.id === style ? ' selected' : ''}>${escapeHtml(s.label)}</option>`).join('')}
+        </optgroup>`).join('')}
+    </select>`;
+  styleRow.querySelector<HTMLSelectElement>('#avatarStyleSel')!
+    .addEventListener('change', (e) => {
+      style = (e.target as HTMLSelectElement).value;
+      void paint();
+    });
+  shuffleBtn?.addEventListener('click', () => { round += 1; void paint(); });
+
+  /** Seeds for one round. The profile's own name leads the first round so the
+   *  suggestion on screen is already about this person. */
+  function seeds(): string[] {
+    const base = (o.initialName || '').trim();
+    const out: string[] = [];
+    if (round === 0 && base) out.push(base);
+    for (let i = out.length; i < 6; i++) out.push(`${base || 'veedeeoh'}-${round}-${i}`);
+    return out;
+  }
+
+  async function paint(): Promise<void> {
+    const list = seeds();
+    // "None" keeps the initial-letter avatar available -- the only option that
+    // stores nothing at all, and the smallest possible profile row.
+    grid.innerHTML =
+      `<button type="button" class="avOpt${chosen ? '' : ' on'}" data-idx="none">
+         <span class="avNone">${escapeHtml((o.initialName || 'A').charAt(0).toUpperCase())}</span>
+       </button>` +
+      list.map((_seed, i) => `<button type="button" class="avOpt" data-idx="${i}"></button>`).join('');
+
+    // Generated once, here, and the resulting image is what gets stored. The
+    // library is never loaded on a display path, so a cold start does not pay
+    // 678 KB to draw three small pictures.
+    const uris = await Promise.all(list.map((seed) =>
+      renderAvatar(avatarSpec(style, seed), { size: 96, background: o.color() })));
+
+    grid.querySelectorAll<HTMLElement>('[data-idx]').forEach((b) => {
+      const idx = b.dataset.idx!;
+      const uri = idx === 'none' ? '' : (uris[Number(idx)] || '');
+      if (uri) b.style.backgroundImage = `url("${uri}")`;
+      if (uri && uri === chosen) b.classList.add('on');
+      b.addEventListener('click', () => {
+        chosen = uri;
+        grid.querySelectorAll('.avOpt').forEach((x) => x.classList.remove('on'));
+        b.classList.add('on');
+        o.onPick(chosen);
+      });
+    });
+  }
+
+  await paint();
 }

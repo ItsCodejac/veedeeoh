@@ -973,8 +973,8 @@ function wireHeader(): void {
         // set. Preferences live in one place now.
         modal.innerHTML = `
           <div style="background:#10141e;border:1px solid rgba(255,255,255,0.15);border-radius:20px;max-width:340px;width:100%;padding:24px;box-shadow:0 20px 50px rgba(0,0,0,0.9);text-align:center;">
-            <div style="width:60px;height:60px;border-radius:14px;background:${activeP.avatar_url ? `url('${activeP.avatar_url}') center/cover` : activeP.avatar_color};display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;color:#06070a;margin:0 auto 12px;">
-              ${activeP.avatar_url ? '' : escapeHtml(activeP.name.charAt(0).toUpperCase())}
+            <div style="width:60px;height:60px;border-radius:14px;background:${/^https?:/i.test(activeP.avatar_url || '') || !activeP.avatar_url ? activeP.avatar_color : `url('${activeP.avatar_url}') center/cover`};display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;color:#06070a;margin:0 auto 12px;">
+              ${activeP.avatar_url && !/^https?:/i.test(activeP.avatar_url) ? '' : escapeHtml(activeP.name.charAt(0).toUpperCase())}
             </div>
             <h3 style="margin:0 0 4px;font-size:18px;font-weight:800;">${escapeHtml(activeP.name)}</h3>
             <p style="margin:0 0 20px;font-size:12px;color:#9aa5b5;">${

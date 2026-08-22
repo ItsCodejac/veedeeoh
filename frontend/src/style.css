@@ -4900,3 +4900,45 @@ body.can-host .vodQuickBtn.partyAct { display: flex; }
 .setChipN { background: var(--accent); color: #06070a; border-radius: 999px; padding: 0 6px; font-size: 11px; }
 .setField { margin-bottom: 12px; }
 .setLabel { display: block; margin-bottom: 5px; font-size: 12px; font-weight: 700; color: rgba(255,255,255,.6); }
+
+/* ---- profile avatar picker ---------------------------------------------
+   Generated in the browser, six at a time, with Shuffle instead of a
+   character builder: creating a profile is a ten-second job done a handful of
+   times, and a builder is a screen of its own for what a button covers. */
+.avStyles { margin-bottom: 10px; }
+.avSelect {
+  width: 100%; padding: 9px 12px; border-radius: 9px;
+  background: #080a10; border: 1px solid rgba(255,255,255,.15);
+  color: #fff; font: inherit; font-size: 13.5px; outline: none;
+}
+.avShuffle {
+  background: none; border: none; cursor: pointer; padding: 0;
+  color: var(--accent, #c5f04e); font: inherit; font-size: 12.5px; font-weight: 800;
+}
+.avShuffle:hover { text-decoration: underline; }
+.avGrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+.avOpt {
+  aspect-ratio: 1; border-radius: 12px; cursor: pointer;
+  background: #080a10 center/cover no-repeat;
+  border: 1px solid rgba(255,255,255,.12);
+  display: flex; align-items: center; justify-content: center;
+  padding: 0; transition: border-color .15s, transform .1s;
+}
+.avOpt:hover { transform: translateY(-1px); border-color: rgba(255,255,255,.35); }
+.avOpt.on { border: 2px solid var(--accent, #c5f04e); }
+.avNone { font-weight: 800; font-size: 16px; color: #7d8694; }
+@media (max-width: 560px) { .avGrid { grid-template-columns: repeat(4, 1fr); } }
+
+/* Avatar attribution. Generated from the style list, so it cannot fall out of
+   licence by being forgotten. */
+.setCredits { list-style: none; margin: 0; padding: 0; columns: 2; column-gap: 26px; }
+.setCredits li {
+  break-inside: avoid; margin: 0 0 7px; font-size: 12px; line-height: 1.45;
+  color: rgba(255,255,255,.5);
+}
+.scName { color: #fff; font-weight: 700; }
+.scBy { display: block; }
+.scLic { display: block; font-size: 11px; color: rgba(255,255,255,.38); }
+.setCredits a { color: rgba(255,255,255,.7); }
+.setCredits a:hover { color: #fff; }
+@media (max-width: 620px) { .setCredits { columns: 1; } }

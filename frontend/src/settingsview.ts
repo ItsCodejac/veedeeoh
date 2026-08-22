@@ -176,13 +176,48 @@ function renderAbout(el: HTMLElement): void {
       <a href="/terms.html" target="_blank" rel="noopener">Terms of Service</a>
       &nbsp;&middot;&nbsp;
       <a href="/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>
-    </p>`);
+    </p>`)
+    + card("Credits", `<div id="setCredits"><p class="setHint">Loading…</p></div>`,
+        "Avatar artwork used in household profiles. Everything here is generated on your device; none of it is fetched from anyone.");
   // Forward to the real controls rather than duplicating them, so behaviour
   // cannot drift between here and the sidebar.
   el.querySelector("#setReport")?.addEventListener("click", () =>
     document.getElementById("fbEntry")?.click());
   el.querySelector("#setInstall")?.addEventListener("click", () =>
     document.querySelector<HTMLElement>("#pwaInstallEntry .sidebar-install-main")?.click());
+
+  void renderCredits(el.querySelector<HTMLElement>("#setCredits"));
+}
+
+/** Attribution for the avatar styles.
+ *
+ *  GENERATED FROM THE STYLE LIST, not written out. About half the styles on
+ *  offer are CC BY 4.0, which costs nothing but does require crediting the
+ *  creator for as long as the style is available -- and a hand-kept list is
+ *  precisely what goes stale the first time somebody adds a style and forgets.
+ *  Being stale here means being out of licence, so it is derived from the same
+ *  array the picker uses and the two cannot disagree. */
+async function renderCredits(box: HTMLElement | null): Promise<void> {
+  if (!box) return;
+  try {
+    const { avatarCredits } = await import("./avatars");
+    const credits = await avatarCredits();
+    box.innerHTML = `
+      <ul class="setCredits">
+        ${credits.map((c) => `
+          <li>
+            <span class="scName">${escapeHtml(c.title)}</span>
+            <span class="scBy">by ${c.source
+              ? `<a href="${escapeHtml(c.source)}" target="_blank" rel="noopener noreferrer">${escapeHtml(c.creator)}</a>`
+              : escapeHtml(c.creator)}</span>
+            <span class="scLic">${c.licenseUrl
+              ? `<a href="${escapeHtml(c.licenseUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(c.license)}</a>`
+              : escapeHtml(c.license)}</span>
+          </li>`).join("")}
+      </ul>`;
+  } catch {
+    box.innerHTML = `<p class="setHint">Avatar styles by DiceBear and its contributors.</p>`;
+  }
 }
 
 const SECTIONS: Section[] = [
