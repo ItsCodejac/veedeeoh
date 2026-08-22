@@ -166,7 +166,9 @@ const partyArt = (item: VodItem) => item.banner || item.poster || "";
  *  part-way through. The party now has a beginning that the host controls.
  *
  *  Resolves when they press play. */
-export function showHostLobby(item: VodItem, joinCode: string, link: string): Promise<void> {
+export function showHostLobby(
+  item: VodItem, joinCode: string, link: string, seatLimit: number | null = null,
+): Promise<void> {
   return new Promise((resolve) => {
     const el = document.createElement("div");
     el.id = "partyRoom";
@@ -191,17 +193,38 @@ export function showHostLobby(item: VodItem, joinCode: string, link: string): Pr
     document.body.appendChild(el);
     requestAnimationFrame(() => el.classList.add("in"));
 
+    // How many waiting people to list individually before collapsing. Thirty
+    // knocks at once -- a link posted in a group chat -- rendered thirty rows
+    // in a 460px column, pushing Start watching a screen and a half below the
+    // fold and asking the host to tap sixty buttons while everyone waited.
+    const KNOCK_LIST_MAX = 6;
+
     const paintRoster = (e?: Event) => {
       const d = (e as CustomEvent)?.detail || {};
-      const watching = d.watching ?? [];
-      const waiting = d.waiting ?? [];
+      const watching: any[] = d.watching ?? [];
+      const waiting: any[] = d.waiting ?? [];
       const box = el.querySelector<HTMLElement>("#prRoster");
       if (!box) return;
+
+      const shown = waiting.slice(0, KNOCK_LIST_MAX);
+      const hidden = waiting.length - shown.length;
+      // Seats are what actually constrains this, so say so rather than letting
+      // the host admit twenty people into an eight-seat party and find out from
+      // the worker's refusals.
+      const seatNote = seatLimit
+        ? `<div class="prSeats">${watching.length} of ${seatLimit} seats used</div>`
+        : "";
+
       box.innerHTML = `
         ${waiting.length ? `
           <div class="prWaiting">
             <div class="prSub">${waiting.length === 1 ? "1 person wants to join" : `${waiting.length} people want to join`}</div>
-            ${waiting.map((w: any) => `
+            ${waiting.length > 1 ? `
+              <div class="prBulk">
+                <button class="prBtn small primary" data-bulk="admit">Let everyone in</button>
+                <button class="prBtn small" data-bulk="refuse">Refuse all</button>
+              </div>` : ""}
+            ${shown.map((w) => `
               <div class="prPerson" data-uid="${escapeHtml(w.userId)}">
                 <span>${escapeHtml(w.name)}</span>
                 <span>
@@ -209,11 +232,25 @@ export function showHostLobby(item: VodItem, joinCode: string, link: string): Pr
                   <button class="prBtn small" data-act="refuse">No</button>
                 </span>
               </div>`).join("")}
+            ${hidden > 0 ? `<div class="prMore">and ${hidden} more waiting</div>` : ""}
           </div>` : ""}
+        ${seatNote}
         <div class="prSub">${watching.length ? `${watching.length} ready` : "Waiting for people to join"}</div>
         <div class="prChips">
-          ${watching.map((w: any) => `<span class="prChip">${escapeHtml(w.name)}</span>`).join("")}
+          ${watching.slice(0, 24).map((w) => `<span class="prChip">${escapeHtml(w.name)}</span>`).join("")}
+          ${watching.length > 24 ? `<span class="prChip">+${watching.length - 24}</span>` : ""}
         </div>`;
+
+      box.querySelectorAll<HTMLElement>("[data-bulk]").forEach((b) => {
+        b.addEventListener("click", async () => {
+          const admit = b.dataset.bulk === "admit";
+          if (!admit && !confirm(`Refuse all ${waiting.length}?`)) return;
+          const { respondToKnock } = await import("./party");
+          // Every currently waiting id, not just the visible ones -- the point
+          // of the button is to clear the queue, including the collapsed tail.
+          for (const w of waiting) respondToKnock(w.userId, admit);
+        });
+      });
 
       box.querySelectorAll<HTMLElement>("[data-act]").forEach((b) => {
         b.addEventListener("click", async () => {

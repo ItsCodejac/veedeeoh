@@ -494,7 +494,7 @@ export async function startWatchParty(item: VodItem): Promise<boolean> {
     try { await navigator.clipboard.writeText(link); showToast("Party link copied \u2014 share it"); }
     catch { /* the room shows the code */ }
 
-    await showHostLobby(item, joinCode, link);
+    await showHostLobby(item, joinCode, link, setup.seatLimit);
 
     party.startPlayback();
     await openVodPlayer(asChannel(item, streams as any), 0);
