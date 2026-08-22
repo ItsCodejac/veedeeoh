@@ -1695,20 +1695,57 @@ export async function renderHome(): Promise<void> {
           return m !== null && m <= 2;                       // TV-Y, TV-Y7, TV-G
         };
 
+        // Rating alone is not enough to decide what belongs on a KIDS shelf.
+        // TV-G covers infant white-noise tracks, local news and golf, all of
+        // which are technically fine for a child and none of which anyone would
+        // put in front of one. Genre narrows it to things a child would browse;
+        // the title test catches the sleep-sound catalogue, which is filed
+        // under Kids & Family and would otherwise flood the rail.
+        const KID_GENRES = /^(kids & family|animation|anime|comedy|education|sci-fi & fantasy|action & adventure)$/i;
+        const AMBIENT = /white noise|sleep sound|rain sounds|ocean sounds|nature sounds|binaural|asmr|lullaby|dark screen|for sleeping/i;
+        const COMPILATION = /songs|rhymes|nursery|lullab|compilation|non-stop|& more|top \d+/i;
+        const kidRailWorthy = (i: VodItem) =>
+          KID_GENRES.test((i.genre || "").trim()) && !AMBIENT.test(i.title || "");
+
         // On a kids profile the whole catalog is already gated, so splitting
         // would just produce one rail and one empty one.
         if (document.body.classList.contains("kids-mode")) {
           if (items.length >= 4) renderGenreRail("Popular on veedeeoh", items, true);
         } else {
-          const kids = items.filter(kidSafe);
+          const kids = items.filter(kidSafe).filter(kidRailWorthy);
           const rest = items.filter((i) => !kidSafe(i));
           if (rest.length >= 4) renderGenreRail("Popular on veedeeoh", rest, true);
-          if (kids.length >= 4) renderGenreRail("Popular with kids", kids, true);
-          // Too few of either to stand alone: one mixed rail beats hiding
-          // popularity entirely.
-          if (rest.length < 4 && kids.length < 4 && items.length >= 4) {
-            renderGenreRail("Popular on veedeeoh", items, true);
+
+          // Real plays lead; the rest is topped up from the catalog. A brand new
+          // household has almost no play data, and an empty shelf reads as a
+          // broken app rather than an honest one.
+          //
+          // Ranking and brand dedupe both matter here. Sorted only by artwork,
+          // the shelf came back as fourteen near-identical nursery-rhyme
+          // compilations, three of them from the same channel -- filler that
+          // looks like filler is worse than an empty rail. Demoting
+          // compilations and allowing one title per brand surfaces Sesame
+          // Street, Clifford and My Little Pony instead.
+          const brandOf = (t: string) =>
+            (t.split(/[:|\u2013-]/)[0] || t).trim().toLowerCase().split(/\s+/).slice(0, 2).join(" ");
+          const fillRank = (i: VodItem) =>
+            (COMPILATION.test(i.title) ? 2 : 0) + (i.banner ? 0 : 1);
+
+          const seen = new Set(kids.map((i) => strip(i.id)));
+          const brands = new Set(kids.map((i) => brandOf(i.title)));
+          const filler: VodItem[] = [];
+          for (const i of [...uniqueMovies, ...uniqueTv]
+            .filter((i) => !seen.has(strip(i.id)) && kidSafe(i) && kidRailWorthy(i))
+            .sort((a, b) => fillRank(a) - fillRank(b))) {
+            const b = brandOf(i.title);
+            if (brands.has(b)) continue;
+            brands.add(b);
+            filler.push(i);
+            if (kids.length + filler.length >= 20) break;
           }
+
+          const kidRail = [...kids, ...filler].slice(0, 20);
+          if (kidRail.length >= 4) renderGenreRail("Popular with kids", kidRail, true);
         }
       }
     } catch {}
