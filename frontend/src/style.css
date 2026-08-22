@@ -3824,7 +3824,21 @@ body.kids-mode { --brand-accent: #ff9f1c; }
   border-radius: 9px;
   color: #fff; padding: 11px 13px; font: inherit;
 }
-#partyCodeInput { flex: 0 0 8ch; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 700; }
+/* Sized for six characters INCLUDING the tracking and the padding. It was
+   `flex: 0 0 8ch` with border-box sizing, so 26px of horizontal padding came
+   out of that 8ch and the 0.18em tracking widened every glyph -- the field held
+   about four, and even the placeholder "ABC234" was clipped to "ABC2" on a
+   control whose own label promises six. */
+#partyCodeInput {
+  flex: 0 0 7.5em;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 700;
+  text-align: center;
+  /* The tracking adds a trailing gap after the last glyph; without this the
+     text sits visibly left of centre. */
+  text-indent: 0.18em;
+}
 .partyInput:focus { outline: none; border-color: #c5f04e; }
 .partyBtn {
   border-radius: 9px; padding: 11px 18px; font: inherit; font-weight: 600;
