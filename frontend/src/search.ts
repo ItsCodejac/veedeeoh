@@ -137,6 +137,14 @@ function facet(items: VodItem[], pick: (i: VodItem) => string): Array<[string, n
 let current = { query: "", all: [] as VodItem[], filters: { ...EMPTY_FILTERS } };
 let returnPanelId = "homeView";
 
+// Panel the search page covered -> the route that reopens it. categoryView is
+// deliberately mapped to home: a category is opened with an item list held in
+// memory, so there is no route that could restore it.
+const PANEL_ROUTES: Record<string, string> = {
+  homeView: "home", showsView: "shows", moviesView: "movies",
+  kidsView: "kids", partyView: "party", categoryView: "home",
+};
+
 export async function openSearchResults(query: string): Promise<void> {
   const view = $("searchView");
   if (!view) return;
@@ -149,6 +157,12 @@ export async function openSearchResults(query: string): Promise<void> {
     if (p && !p.hasAttribute("hidden")) { returnPanelId = id; p.setAttribute("hidden", ""); }
   }
   view.removeAttribute("hidden");
+
+  // Put the query in the URL so a reload, Back, or a shared link reopens these
+  // results. Guarded: applyRoute() calls this while restoring a hash, and
+  // pushing the same one back would stack a duplicate history entry.
+  const hash = `#search/${encodeURIComponent(query)}`;
+  if (location.hash !== hash) history.pushState({}, "", hash);
 
   // Close the preview dropdown; the page supersedes it.
   const overlay = document.getElementById("searchResultsOverlay");
@@ -172,6 +186,15 @@ export function closeSearchResults(): void {
   if (!view || view.hasAttribute("hidden")) return;
   view.setAttribute("hidden", "");
   document.getElementById(returnPanelId)?.removeAttribute("hidden");
+
+  // Drop the search route, or a reload reopens the results just dismissed.
+  // replaceState rather than history.back(): someone who opened a shared search
+  // link directly has no previous entry on this site, and Back would take them
+  // off it entirely.
+  if (location.hash.startsWith("#search/")) {
+    const route = PANEL_ROUTES[returnPanelId] || "home";
+    history.replaceState({}, "", route === "home" ? location.pathname : `#${route}`);
+  }
 }
 
 function renderResults(): void {

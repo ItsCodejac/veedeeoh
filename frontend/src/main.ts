@@ -87,6 +87,74 @@ function applyProfileChrome(profile: { name?: string; avatar_color?: string; is_
   if (em && profile.name) em.textContent = profile.name;
 }
 
+// ---------------------------------------------------------------- routing ---
+//
+// The location hash is the single source of truth for which view is open.
+// localStorage would restore a reload just as well, but only the URL also gives
+// Back/Forward and a link someone can send -- and reload-restore without a
+// working Back button is the more annoying half of the problem.
+//
+// Hash, not path: the app is a static SPA behind Vercel's filesystem handler,
+// and a real path would 404 on a hard load before any JS ran.
+
+const ROUTES: Record<string, string> = {
+  home: "tabHome", shows: "tabShows", movies: "tabMovies",
+  favorites: "tabFavs", party: "tabParty", kids: "tabKids",
+};
+
+/** Set by wireSidebar so the router can drive the same code a click does. */
+let switchViewRef: ((tabId: string) => void) | null = null;
+/** True while the router is applying a hash, so switchView does not write one
+ *  back and push a duplicate history entry. */
+let applyingRoute = false;
+
+function routeForTab(tabId: string): string {
+  if (tabId.startsWith("tabSection:")) return `section/${tabId.slice("tabSection:".length)}`;
+  const found = Object.entries(ROUTES).find(([, t]) => t === tabId);
+  return found ? found[0] : "home";
+}
+
+/** Is this destination actually available to the profile that is signed in?
+ *  A kids profile restoring #party or #movies would land on a blank panel with
+ *  no active tab and no obvious way out. */
+function routeAllowed(tabId: string): boolean {
+  if (tabId === "tabHome") return true;
+  const el = document.getElementById(tabId);
+  if (!el) return false;
+  if (el.hasAttribute("hidden")) return false;
+  return el.style.display !== "none";
+}
+
+/** Apply the current hash. Falls back to Home whenever the route is unknown or
+ *  not permitted, rather than leaving the app in a half-navigated state. */
+export async function applyRoute(): Promise<void> {
+  const raw = decodeURIComponent(location.hash.replace(/^#/, ""));
+  if (!raw || raw === "home") { switchViewRef?.("tabHome"); return; }
+
+  if (raw.startsWith("search/")) {
+    const q = raw.slice("search/".length).trim();
+    if (!q) { switchViewRef?.("tabHome"); return; }
+    const input = document.getElementById("search") as HTMLInputElement | null;
+    if (input) input.value = q;
+    const { openSearchResults } = await import("./search");
+    await openSearchResults(q);
+    return;
+  }
+
+  if (raw.startsWith("section/")) {
+    const id = raw.slice("section/".length);
+    // Section tabs are built asynchronously from the household's collections,
+    // so on a cold load the button may not exist yet.
+    const btn = document.querySelector<HTMLElement>(`[data-section-id="${CSS.escape(id)}"]`);
+    if (btn) { switchViewRef?.(`tabSection:${id}`); return; }
+    switchViewRef?.("tabHome");
+    return;
+  }
+
+  const tabId = ROUTES[raw];
+  switchViewRef?.(tabId && routeAllowed(tabId) ? tabId : "tabHome");
+}
+
 // Land on Home: hide other panels, reveal home, mark the Home tab active.
 function goHome(): void {
   ["showsView", "moviesView", "kidsView"].forEach((id) => document.getElementById(id)?.setAttribute("hidden", ""));
@@ -104,6 +172,10 @@ async function enterAsProfile(profile: { name?: string; avatar_color?: string; i
   // by the time the bump ends — no plain "loading" screen between them.
   const railsReady = vod.getVodRails().catch(() => {});
   playIdent(!!profile.is_kids, async () => {
+    // A deliberate profile selection always starts at Home. Any hash still in
+    // the bar belongs to the PREVIOUS profile, and honouring it could drop a
+    // kids profile onto a panel that profile is not supposed to reach.
+    if (location.hash) history.replaceState({}, "", location.pathname + location.search);
     goHome();
     if (dataReady) await dataReady;
     await railsReady;
@@ -196,7 +268,14 @@ async function boot(): Promise<void> {
     // behind. Unhiding by hand leaves the sidebar with no active tab.
     goHome();
     await dataReady;
-    renderHome();
+    // Skip building Home when a saved route is about to replace it -- every
+    // switchView branch renders its own surface, including the Home fallback.
+    const restoring = !!location.hash && location.hash !== "#home";
+    if (!restoring) renderHome();
+    // Applied only now that the profile's chrome is on, so routeAllowed can see
+    // which tabs this profile actually has.
+    applyingRoute = true;
+    await applyRoute().finally(() => { applyingRoute = false; });
   } else {
     prof.openProfileSwitcher((sel) => { void enterAsProfile(sel, dataReady); });
     hideBootSplash();
@@ -283,6 +362,14 @@ function wireSidebar(): void {
   const views = ["homeView", "showsView", "moviesView", "partyView", "kidsView"];
 
   function switchView(activeTabId: string) {
+    // Record the destination so a reload, a Back press or a shared link all
+    // land here again. replaceState when the route is unchanged, so repeatedly
+    // clicking the same tab does not stack identical history entries.
+    if (!applyingRoute) {
+      const next = `#${routeForTab(activeTabId)}`;
+      if (location.hash !== next) history.pushState({}, "", next);
+    }
+
 
     // Auto-minimize the player to PiP mode when navigating away
     const playerSuite = document.getElementById("playerSuite");
@@ -375,6 +462,12 @@ function wireSidebar(): void {
     }
   });
 
+  switchViewRef = switchView;
+  window.addEventListener("popstate", () => {
+    applyingRoute = true;
+    void applyRoute().finally(() => { applyingRoute = false; });
+  });
+
   // Build the household's custom section tabs beneath the fixed nav, and rebuild
   // them whenever one is created from a card's + button.
   const mountSections = async () => {
@@ -397,7 +490,15 @@ function wireSidebar(): void {
       anchor.parentElement.insertBefore(b, anchor.nextSibling);
     }
   };
-  void mountSections();
+  // Section tabs are built from the household's collections, so on a cold load
+  // they do not exist yet when applyRoute first runs. Re-apply a #section route
+  // once they are there, or restoring a reload into a custom section silently
+  // falls back to Home.
+  void mountSections().then(() => {
+    if (!location.hash.startsWith("#section/")) return;
+    applyingRoute = true;
+    void applyRoute().finally(() => { applyingRoute = false; });
+  });
   window.addEventListener("veedeeoh:sections-changed", () => void mountSections());
   window.addEventListener("veedeeoh:profile-changed", () => void mountSections());
 
