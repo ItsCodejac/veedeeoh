@@ -569,12 +569,25 @@ async function boot(): Promise<void> {
     await dataReady;
     // Skip building Home when a saved route is about to replace it -- every
     // switchView branch renders its own surface, including the Home fallback.
-    const restoring = !!location.hash && location.hash !== "#home";
+    // A party invite is a destination. Without this the route resolves to Home
+    // first, Home renders, and joining happens behind it -- so a link that is
+    // slow, or that fails, leaves someone looking at the catalogue with no
+    // sign they were ever invited anywhere.
+    const joining = !!new URLSearchParams(location.search).get("party");
+    const restoring = joining || (!!location.hash && location.hash !== "#home");
     if (!restoring) renderHome();
     // Applied only now that the profile's chrome is on, so routeAllowed can see
     // which tabs this profile actually has.
     applyingRoute = true;
-    await applyRoute().finally(() => { applyingRoute = false; });
+    if (joining) {
+      // Park on veedeeoh.party rather than Home: it is the surface that makes
+      // sense both while the invite is resolving and if it turns out to be
+      // dead, and it is where the rejoin card lives.
+      switchViewRef?.("tabParty");
+      applyingRoute = false;
+    } else {
+      await applyRoute().finally(() => { applyingRoute = false; });
+    }
   } else {
     prof.openProfileSwitcher((sel) => { void enterAsProfile(sel, dataReady); });
     hideBootSplash();
@@ -608,8 +621,11 @@ async function boot(): Promise<void> {
   const partyCode = new URLSearchParams(location.search).get("party");
   if (partyCode) {
     const { joinParty } = await import("./party");
-    void joinParty(partyCode.toUpperCase());
-    history.replaceState({}, "", location.pathname);
+    // The code is stripped from the URL only AFTER the attempt starts, so a
+    // reload during a slow join still carries the invite.
+    void joinParty(partyCode.toUpperCase()).finally(() => {
+      history.replaceState({}, "", location.pathname + "#party");
+    });
   }
 
   // Stripe Checkout return
@@ -842,6 +858,7 @@ function wireSidebar(): void {
       chat: `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
       down: `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
       out: `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`,
+      gear: `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
     };
 
     const sections = Array.from(document.querySelectorAll<HTMLElement>("aside [data-section-id]"));
@@ -859,6 +876,14 @@ function wireSidebar(): void {
     if (kids && !kids.hasAttribute("hidden")) item("veedeeoh.kids", ICON.kids, () => kids.click());
 
     head("Account");
+    // SETTINGS, BY NAME. It was reachable only as a side effect of "Switch
+    // profile" -- that opens the account menu, which has a Settings button in
+    // it -- so on a phone the way to Settings was three taps behind a label
+    // that does not mention it. Nobody finds that.
+    item("Settings", ICON.gear, () => {
+      sheet.classList.remove("open");
+      void import("./settingsview").then((m) => m.openSettings());
+    });
     item("Switch profile", ICON.user, forward("#sidebarUser"));
     if (document.getElementById("fbEntry")) item("Report something", ICON.chat, forward("#fbEntry"));
     if (document.getElementById("pwaInstallEntry")) item("Install app", ICON.down, forward("#pwaInstallEntry .sidebar-install-main"));

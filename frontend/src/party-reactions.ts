@@ -26,6 +26,7 @@ const IDLE_MS = 2600;
 let bar: HTMLElement | null = null;
 let stage: HTMLElement | null = null;
 let onReact: ((e: Event) => void) | null = null;
+let onFullscreen: (() => void) | null = null;
 let idleTimer: number | null = null;
 let onMove: (() => void) | null = null;
 let onResize: (() => void) | null = null;
@@ -47,13 +48,40 @@ const GRIP = `<button class="reactGrip" type="button"
     <circle cx="2.5" cy="13" r="1.4"/><circle cx="7.5" cy="13" r="1.4"/>
   </svg></button>`;
 
+/** Where the bar has to live right now.
+ *
+ *  FULLSCREEN RENDERS ONLY THE FULLSCREEN ELEMENT'S SUBTREE. Anything parented
+ *  to document.body is simply not painted, which is why reactions worked in the
+ *  mini player and vanished the moment anyone went fullscreen -- that is, during
+ *  the part of a watch party people actually watch. Nothing was broken about the
+ *  bar; it was in the wrong branch of the tree. */
+function host(): HTMLElement {
+  return (document.fullscreenElement as HTMLElement | null)
+    || ((document as any).webkitFullscreenElement as HTMLElement | null)
+    || document.body;
+}
+
+/** Re-parent on every fullscreen change, in both directions. */
+function follow(): void {
+  const h = host();
+  if (bar && bar.parentElement !== h) h.appendChild(bar);
+  if (stage && stage.parentElement !== h) h.appendChild(stage);
+}
+
+function watchFullscreen(): void {
+  if (onFullscreen) return;
+  onFullscreen = () => follow();
+  document.addEventListener("fullscreenchange", onFullscreen);
+  document.addEventListener("webkitfullscreenchange", onFullscreen);
+}
+
 export function mountReactions(): void {
   unmountReactions();
   if (localStorage.getItem(HIDE_KEY) === "1") { mountToggleOnly(); return; }
 
   stage = document.createElement("div");
   stage.id = "reactStage";
-  document.body.appendChild(stage);
+  host().appendChild(stage);
 
   bar = document.createElement("div");
   bar.id = "reactBar";
@@ -65,7 +93,7 @@ export function mountReactions(): void {
     <button class="reactBtn reactOff" id="reactHide"
             title="Hide the bar and everyone else's reactions"
             aria-label="Hide the bar and everyone else's reactions">${EYE_OFF}</button>`;
-  document.body.appendChild(bar);
+  host().appendChild(bar);
 
   bar.querySelectorAll<HTMLElement>("[data-kind]").forEach((b) => {
     b.addEventListener("click", () => {
@@ -102,7 +130,7 @@ function mountToggleOnly(): void {
   bar.innerHTML = `${GRIP}
     <button class="reactBtn" id="reactShow"
             title="Show reactions" aria-label="Show reactions">${EYE_ON}</button>`;
-  document.body.appendChild(bar);
+  host().appendChild(bar);
   bar.querySelector("#reactShow")!.addEventListener("click", () => {
     localStorage.removeItem(HIDE_KEY);
     unmountReactions();
@@ -115,6 +143,7 @@ function mountToggleOnly(): void {
 /** Position, drag and idle-fade -- identical for both states of the bar. */
 function finishMount(): void {
   const el = bar!;
+  watchFullscreen();
   if (localStorage.getItem(ORIENT_KEY) === "1") el.classList.add("vert");
   restorePosition(el);
   makeDraggable(el, el.querySelector<HTMLElement>(".reactGrip")!);
@@ -155,6 +184,11 @@ export function unmountReactions(): void {
   onMove = null;
   if (onResize) window.removeEventListener("resize", onResize);
   onResize = null;
+  if (onFullscreen) {
+    document.removeEventListener("fullscreenchange", onFullscreen);
+    document.removeEventListener("webkitfullscreenchange", onFullscreen);
+  }
+  onFullscreen = null;
   if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
   dragging = false;
   bar?.remove(); bar = null;

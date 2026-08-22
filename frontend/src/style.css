@@ -3746,7 +3746,7 @@ body.kids-mode { --brand-accent: #ff9f1c; }
    shortcut, custom sections, feedback, install -- steals width from the rest.
    Sections are created at runtime, so this only gets worse with use. Four fixed
    destinations stay in the bar; the rest moves into a sheet. */
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   aside #tabKids,
   aside [data-section-id],
   aside #pwaInstallEntry,
@@ -5030,3 +5030,26 @@ body.can-host .vodQuickBtn.partyAct { display: flex; }
 }
 .avNoOpts { margin: 4px 0 0; font-size: 12px; color: rgba(255,255,255,.45); }
 @media (max-width: 560px) { .avOptions { grid-template-columns: 1fr; } }
+
+/* ---- bottom dock, mobile -------------------------------------------------
+   The dock had eight flex children in 64px: six tabs, Sign Out, and the legal
+   links -- two of the tabs carrying full wordmarks ("veedeeoh.party") that are
+   nowrap and twice the width of "Home". It crushed.
+
+   Worse, the way into Settings was hidden. The account menu -- switch profile,
+   settings, sign out -- opens from .sidebar-user, which was display:none here,
+   so on a phone there was no route to Settings at all. */
+.navShort { display: none; }
+
+@media (max-width: 768px) {
+  /* Short labels in the dock; the wordmarks are for the sidebar. */
+  #tabParty .partyWordmark, #tabKids .kidsWordmark { display: none; }
+  .navShort { display: block; font-size: 11px; font-weight: 700; }
+
+  /* .sidebar-user stays hidden here: the More sheet already reaches the
+     account menu, and a seventh dock item would undo this block. */
+  /* Both live in the account menu now, one tap away, and the legal links are
+     also in Settings > About. Neither earns a slot in a six-item dock. */
+  .sidebar-logout { display: none; }
+  .sidebar-legal { display: none; }
+}
