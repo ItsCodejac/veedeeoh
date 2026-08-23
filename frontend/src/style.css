@@ -5194,3 +5194,91 @@ body.can-host .vodQuickBtn.partyAct { display: flex; }
   .asTile { height: 64px; }
   .asCustomColor input[type="color"] { height: 64px; }
 }
+
+/* ---- account menu, anchored ---------------------------------------------
+   Was a centred modal behind a full-screen blur, for four shortcuts. The
+   control that opens it sits in the bottom-left corner, so the menu appeared
+   about six hundred pixels from the thing you clicked and dimmed everything on
+   the way. The scrim is transparent now: it exists to catch the dismissing
+   click, not to announce a mode change. */
+.acctScrim { position: fixed; inset: 0; z-index: 9999; }
+.acctMenu {
+  position: fixed; width: 264px; max-width: calc(100vw - 24px);
+  background: #10141e; border: 1px solid rgba(255,255,255,.15);
+  border-radius: 16px; padding: 16px;
+  box-shadow: 0 18px 44px rgba(0,0,0,.75);
+  color: #fff; text-align: left;
+}
+.acctMenu > div:first-child { margin: 0 auto 10px; }
+.acctMenu h3 { text-align: center; }
+.acctMenu > p { text-align: center; }
+.acctItems { display: flex; flex-direction: column; gap: 6px; margin: 14px 0 8px; }
+.acctItem {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 10px; cursor: pointer;
+  background: none; border: 1px solid transparent;
+  color: #fff; font: inherit; font-size: 14px; font-weight: 600; text-align: left;
+}
+.acctItem:hover { background: rgba(255,255,255,.08); }
+.acctItem.danger { color: #ff8f8f; }
+.acctItem.danger:hover { background: rgba(255,107,107,.12); }
+.acctClose {
+  display: block; width: 100%; padding: 6px 0 0;
+  background: none; border: none; color: #7d8694;
+  font: inherit; font-size: 12.5px; cursor: pointer;
+}
+
+/* On a phone the anchor is inside a sheet already pinned to the bottom, so a
+   dropdown hanging off it would open into the dock. Bottom sheet instead, and
+   anchorMenu() leaves the positioning alone at this width. */
+@media (max-width: 768px) {
+  .acctScrim { background: rgba(6,7,10,.6); }
+  .acctMenu {
+    position: fixed; inset: auto 0 0 0; width: auto; max-width: none;
+    border-radius: 18px 18px 0 0; padding: 18px 18px calc(18px + env(safe-area-inset-bottom));
+  }
+  .acctItem { padding: 13px 12px; font-size: 15px; }
+}
+
+/* ---- back out of a full-screen step -------------------------------------
+   Both of these are overlays that fill the screen, where the surrounding app
+   offers no visible way out. The profile editor had Cancel at the bottom of a
+   form long enough to scroll; the switcher had nothing at all. */
+.peTitleRow { display: flex; align-items: center; gap: 6px; margin: 0 0 20px; }
+.peTitleRow .peTitle { margin: 0; }
+.peBack, .switcherBack {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: none; border: none; cursor: pointer; padding: 6px;
+  color: rgba(255,255,255,.6); font: inherit; font-size: 13.5px; font-weight: 700;
+  border-radius: 9px; margin-left: -6px;
+}
+.peBack:hover, .switcherBack:hover { background: rgba(255,255,255,.08); color: #fff; }
+.switcherBack {
+  position: absolute; top: max(18px, env(safe-area-inset-top)); left: 18px;
+  padding: 9px 14px; background: rgba(255,255,255,.07);
+  border: 1px solid rgba(255,255,255,.12);
+}
+
+/* A button that reads as a link, for in-place retries. */
+.setLink {
+  background: none; border: none; padding: 0; cursor: pointer;
+  color: var(--accent, #c5f04e); font: inherit; font-weight: 700;
+  text-decoration: underline;
+}
+
+/* ---- the account chip is the way in --------------------------------------
+   SIGN OUT WAS THE LOUDEST THING IN THE SIDEBAR: red, full width, directly
+   under the account chip, and larger than any navigation item -- the least
+   used and most destructive action carrying the most visual weight on the
+   screen. It is also the third copy, after the account menu and the profile
+   switcher.
+
+   The element stays in the DOM because the mobile More sheet forwards a click
+   to it; it just no longer occupies the sidebar. Signing out on desktop is You
+   then Sign out, which is where the rest of the account lives. */
+.sidebar-logout { display: none !important; }
+
+.sidebar-user { cursor: pointer; }
+.sidebar-user-caret { flex: none; margin-left: auto; color: rgba(255,255,255,.4); }
+.sidebar-user:hover .sidebar-user-caret { color: #fff; }
+@media (max-width: 768px) { .sidebar-user-caret { display: none; } }

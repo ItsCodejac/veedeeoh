@@ -2,6 +2,7 @@ import { HouseholdProfile } from './types';
 import * as db from './db';
 import { getSession, signOut } from './auth';
 import { RATING_GROUPS, allowedRatingsFor } from './db';
+import { registerOverlay } from './overlay';
 
 /** How an avatar was generated. Kept beside the finished image so the editor
  *  can reopen on the same style, seed, features, colours and framing instead
@@ -68,10 +69,17 @@ export function promptForPin(profile: HouseholdProfile): Promise<boolean> {
         </div>
       </div>`;
     document.body.appendChild(modal);
+    // Cancel, Escape, a click on the backdrop and Back all mean the same thing
+    // here: no, do not switch into this profile.
+    // The outcome is recorded before closing rather than resolved at each exit,
+    // so every way out -- Unlock, Cancel, Escape, backdrop, Back -- settles the
+    // promise exactly once, through one path.
+    let unlocked = false;
+    const ov = registerOverlay(modal, { dismissOn: modal, onClose: () => resolve(unlocked) });
     const input = modal.querySelector("#pinEntry") as HTMLInputElement;
     const errEl = modal.querySelector("#pinError") as HTMLElement;
     setTimeout(() => input.focus(), 50);
-    const done = (ok: boolean) => { modal.remove(); resolve(ok); };
+    const done = (ok: boolean) => { unlocked = ok; ov.close(); };
     const submit = async () => {
       const val = input.value.trim();
       if (!/^\d{4}$/.test(val)) { errEl.textContent = "Enter your 4-digit PIN."; return; }
@@ -237,10 +245,12 @@ export function promptToSetPin(profile: HouseholdProfile): Promise<string | null
         </div>
       </div>`;
     document.body.appendChild(modal);
+    let chosen: string | null = null;
+    const ovPin = registerOverlay(modal, { dismissOn: modal, onClose: () => resolve(chosen) });
     const a = modal.querySelector('#setPin1') as HTMLInputElement;
     const b = modal.querySelector('#setPin2') as HTMLInputElement;
     const err = modal.querySelector('#setPinError') as HTMLElement;
-    const done = (v: string | null) => { modal.remove(); resolve(v); };
+    const done = (v: string | null) => { chosen = v; ovPin.close(); };
     (modal.querySelector('#setPinSkip') as HTMLElement).addEventListener('click', () => done(null));
     (modal.querySelector('#setPinSave') as HTMLElement).addEventListener('click', () => {
       if (!/^\d{4}$/.test(a.value)) { err.textContent = 'PIN must be exactly 4 digits.'; return; }
@@ -390,7 +400,22 @@ export function profileFace(p: { name?: string; avatar_color?: string | null; av
   };
 }
 
-export function openProfileSwitcher(onSelectProfile?: (p: HouseholdProfile) => void): void {
+export interface SwitcherOptions {
+  /** Whether there is anywhere to go back to. False only at boot, where no
+   *  profile is active yet and picking one is the whole point of the screen. */
+  dismissible?: boolean;
+}
+
+/** "Who's Watching?".
+ *
+ *  IT USED TO BE A ONE-WAY DOOR. Opening it from the account menu by mistake
+ *  left no way out but to pick somebody: no close control, no Escape, and Back
+ *  left the app. Everywhere it is reachable by choice it can now be left the
+ *  same way it was opened. */
+export function openProfileSwitcher(
+  onSelectProfile?: (p: HouseholdProfile) => void,
+  opts: SwitcherOptions = {},
+): void {
   const existing = document.getElementById('profileSwitcherModal');
   if (existing) existing.remove();
 
@@ -405,6 +430,8 @@ export function openProfileSwitcher(onSelectProfile?: (p: HouseholdProfile) => v
   const adultPinIsSet = profiles.some((p) => !p.is_kids && p.pin);
   const showLockWarning = kidsProfileExists && !adultPinIsSet;
 
+  const dismissible = opts.dismissible !== false;
+
   const modal = document.createElement('div');
   modal.id = 'profileSwitcherModal';
   modal.style.cssText = `
@@ -416,6 +443,10 @@ export function openProfileSwitcher(onSelectProfile?: (p: HouseholdProfile) => v
 
   modal.innerHTML = `
     <div style="text-align: center; max-width: 700px; width: 100%;">
+      ${dismissible ? `<button type="button" id="switcherBack" class="switcherBack" aria-label="Back">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        <span>Back</span>
+      </button>` : ''}
       <h1 style="font-size: clamp(2rem, 4vw, 3rem); font-weight: 800; margin: 0 0 12px; letter-spacing: -1px;">Who's Watching?</h1>
       <p style="color: #9aa5b5; font-size: 16px; margin: 0 0 40px;">Select your profile to load custom favorites and watch progress</p>
       
@@ -471,6 +502,13 @@ export function openProfileSwitcher(onSelectProfile?: (p: HouseholdProfile) => v
 
   document.body.appendChild(modal);
 
+  // No dismissOn. A stray click on the background of a full-screen chooser is
+  // far more likely to be a miss than a decision, and at boot there is nothing
+  // behind it to go back to anyway.
+  const ov = dismissible ? registerOverlay(modal, { }) : null;
+  const leave = () => { if (ov) ov.close(); else modal.remove(); };
+  modal.querySelector('#switcherBack')?.addEventListener('click', () => leave());
+
   let isEditing = false;
 
   const btns = modal.querySelectorAll('.profileAvatarBtn');
@@ -481,8 +519,8 @@ export function openProfileSwitcher(onSelectProfile?: (p: HouseholdProfile) => v
       if (!target) return;
 
       if (isEditing) {
-        modal.remove();
-        openProfileEditor(target);
+        leave();
+        openProfileEditor(target, () => openProfileSwitcher(undefined, { dismissible }));
         return;
       }
 
@@ -507,7 +545,7 @@ export function openProfileSwitcher(onSelectProfile?: (p: HouseholdProfile) => v
       }
 
       setActiveProfile(target);
-      modal.remove();
+      leave();
       if (onSelectProfile) onSelectProfile(target);
     });
   });
@@ -517,8 +555,8 @@ export function openProfileSwitcher(onSelectProfile?: (p: HouseholdProfile) => v
     setPinBtn.addEventListener('click', async () => {
       await ensureAdultPinExists();
       // Re-open so the banner reflects the new state (and clears on success).
-      modal.remove();
-      openProfileSwitcher(onSelectProfile);
+      leave();
+      openProfileSwitcher(onSelectProfile, { dismissible });
     });
   }
 
@@ -556,12 +594,12 @@ export function openProfileSwitcher(onSelectProfile?: (p: HouseholdProfile) => v
           </div>
         `;
         const closeBtn = modal.querySelector('#closeFullBtn');
-        if (closeBtn) closeBtn.addEventListener('click', () => { modal.remove(); openProfileSwitcher(); });
+        if (closeBtn) closeBtn.addEventListener('click', () => { leave(); openProfileSwitcher(undefined, { dismissible }); });
         return;
       }
 
-      modal.remove();
-      openProfileEditor();
+      leave();
+      openProfileEditor(undefined, () => openProfileSwitcher(undefined, { dismissible }));
     });
   }
 
@@ -588,13 +626,28 @@ export function openProfileSwitcher(onSelectProfile?: (p: HouseholdProfile) => v
 
   const signOutBtn = modal.querySelector('#signOutBtn');
   if (signOutBtn) {
-    signOutBtn.addEventListener('click', () => {
-      modal.remove();
+    signOutBtn.addEventListener('click', async () => {
+      // THE PIN GATE APPLIES HERE TOO. Every other way out of a kids profile
+      // asks for the adult PIN; this one did not, so signing out and back in
+      // was a way around the lock that a child could find by reading the
+      // screen. requireAdultAuth is a no-op when the active profile is not a
+      // restricted one.
+      if (!(await requireAdultAuth())) return;
+      leave();
       signOut();
     });
   }
 }
 
+/** Edit or create a profile.
+ *
+ *  @param onClose where to go afterwards. WHATEVER OPENED THIS DECIDES. It used
+ *  to fall back to opening the profile switcher when no handler was given, on
+ *  the assumption that the switcher is where editors come from -- true when it
+ *  was the only way in, false since the account menu grew an "Edit this
+ *  profile" shortcut. Pressing Cancel there put you in a full-screen "Who's
+ *  Watching?" you never asked for, and the only way out of it is to pick
+ *  somebody. Cancel now means cancel; the switcher passes itself explicitly. */
 export function openProfileEditor(editingProfile?: HouseholdProfile, onClose?: () => void): void {
   const existing = document.getElementById('profileEditorModal');
   if (existing) existing.remove();
@@ -618,7 +671,12 @@ export function openProfileEditor(editingProfile?: HouseholdProfile, onClose?: (
 
   modal.innerHTML = `
     <div class="peShell">
-      <h2 class="peTitle">${isEdit ? 'Edit profile' : 'Create a profile'}</h2>
+      <div class="peTitleRow">
+        <button type="button" id="peBack" class="peBack" aria-label="Back">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <h2 class="peTitle">${isEdit ? 'Edit profile' : 'Create a profile'}</h2>
+      </div>
       <div class="peCols">
       <div class="peCol">
 
@@ -684,6 +742,11 @@ export function openProfileEditor(editingProfile?: HouseholdProfile, onClose?: (
   `;
 
   document.body.appendChild(modal);
+
+  // Cancel, the back arrow, Escape, the backdrop and the Back button all land
+  // here. dismissOn is deliberately the scrim only: this form holds typed
+  // input, so a click that lands inside it must never throw the work away.
+  const ov = registerOverlay(modal, { dismissOn: modal, onClose });
 
   let selectedColor = pColor;
   // Told to the avatar picker once it has loaded. AVATAR COLOR was a dead
@@ -862,20 +925,15 @@ export function openProfileEditor(editingProfile?: HouseholdProfile, onClose?: (
         }
         if (getActiveProfile().id === editingProfile.id) setActiveProfile(list[0]!);
       }
-      modal.remove();
-      if (onClose) onClose();
-      else openProfileSwitcher();
+      ov.close();
     });
   }
 
   const saveBtn = modal.querySelector('#saveProfileBtn');
   const cancelBtn = modal.querySelector('#cancelEditBtn');
 
-  if (cancelBtn) cancelBtn.addEventListener('click', () => {
-    modal.remove();
-    if (onClose) onClose();
-    else openProfileSwitcher();
-  });
+  if (cancelBtn) cancelBtn.addEventListener('click', () => ov.close());
+  modal.querySelector('#peBack')?.addEventListener('click', () => ov.close());
 
   if (saveBtn) {
     saveBtn.addEventListener('click', async () => {
@@ -939,9 +997,7 @@ export function openProfileEditor(editingProfile?: HouseholdProfile, onClose?: (
         console.warn('[profiles] save failed', e);
       }
 
-      modal.remove();
-      if (onClose) onClose();
-      else openProfileSwitcher();
+      ov.close();
     });
   }
 }

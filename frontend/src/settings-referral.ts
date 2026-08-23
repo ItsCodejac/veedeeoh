@@ -348,8 +348,26 @@ async function renderSuggestionsInbox(root: HTMLElement): Promise<void> {
  */
 export async function renderPublicSection(el: HTMLElement): Promise<void> {
   el.innerHTML = "";
-  await renderPublicProfile(el);
-  await renderHostChannel(el);
-  await renderPicks(el);
-  await renderSuggestionsInbox(el);
+  // FOUR INDEPENDENT CARDS, NOT ONE CHAIN. These were awaited in a row, so the
+  // first one to throw took the other three with it and the section rendered
+  // as a heading over nothing -- indistinguishable from a feature that does
+  // not exist. A card that cannot load now says so and leaves its neighbours
+  // alone.
+  const parts: Array<[string, (host: HTMLElement) => Promise<void>]> = [
+    ["Your public profile", renderPublicProfile],
+    ["Your channel", renderHostChannel],
+    ["Recommendations", renderPicks],
+    ["Suggestions", renderSuggestionsInbox],
+  ];
+  for (const [label, render] of parts) {
+    try {
+      await render(el);
+    } catch (e) {
+      console.error(`[settings] ${label} failed`, e);
+      const p = document.createElement("p");
+      p.className = "setHint";
+      p.textContent = `${label} could not load.`;
+      el.appendChild(p);
+    }
+  }
 }

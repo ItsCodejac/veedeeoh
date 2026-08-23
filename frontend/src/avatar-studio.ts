@@ -25,6 +25,7 @@ import {
   AVATAR_STYLES, avatarFeatures, renderRecipe, humaniseValue, blankRecipe,
   type AvatarRecipe, type AvatarFeatures,
 } from "./avatars";
+import { registerOverlay } from "./overlay";
 
 type Tab = "style" | "features" | "colors" | "frame";
 
@@ -127,15 +128,17 @@ export function openAvatarStudio(o: AvatarStudioOptions): void {
 
   // ---- closing ------------------------------------------------------------
 
-  const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
-  function close(): void {
-    document.removeEventListener("keydown", onKey);
-    document.body.style.overflow = prevOverflow;
-    el.remove();
-  }
+  // Escape and the Back button come from the shared overlay stack, so this
+  // screen unwinds in the same order it was opened: creator, then editor, then
+  // switcher. No dismissOn -- the creator fills the screen and holds a lot of
+  // deliberate choices, so there is no background to click by accident and no
+  // reason to treat a stray click as "discard".
   const prevOverflow = document.body.style.overflow;
   document.body.style.overflow = "hidden";
-  document.addEventListener("keydown", onKey);
+  const ov = registerOverlay(el, {
+    onClose: () => { document.body.style.overflow = prevOverflow; },
+  });
+  const close = () => ov.close();
 
   el.querySelector("#asCancel")!.addEventListener("click", close);
   el.querySelector("#asSave")!.addEventListener("click", () => {

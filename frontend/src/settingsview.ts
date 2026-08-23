@@ -220,13 +220,23 @@ export async function renderSettings(section?: string): Promise<void> {
   await Promise.all(available.map(async (sec) => {
     const host = document.getElementById(`setSecBody-${sec.id}`);
     if (!host) return;
-    try {
-      await sec.render(host);
-    } catch (e) {
-      console.error(`[settings] ${sec.id} failed to render`, e);
-      host.innerHTML = `<p class="setHint">This section could not load. `
-        + `<a href="#settings/${sec.id}" onclick="location.reload()">Reload</a></p>`;
-    }
+    // Retry this section, not the page. Reloading threw away scroll position
+    // and every other section that had loaded fine, to re-attempt one that
+    // probably failed on a network blip.
+    const attempt = async (): Promise<void> => {
+      try {
+        await sec.render(host);
+      } catch (e) {
+        console.error(`[settings] ${sec.id} failed to render`, e);
+        host.innerHTML = `<p class="setHint">This section could not load. `
+          + `<button type="button" class="setLink" data-retry>Try again</button></p>`;
+        host.querySelector("[data-retry]")?.addEventListener("click", () => {
+          host.innerHTML = `<p class="setHint">Loading...</p>`;
+          void attempt();
+        });
+      }
+    };
+    await attempt();
   }));
 
   // A SECTION HEADED "ACCOUNT" WHOSE FIRST CARD IS ALSO TITLED "ACCOUNT".

@@ -90,10 +90,14 @@
 
     <div class="sidebar-spacer"></div>
 
-    <div class="sidebar-user" id="sidebarUser">
+    <!-- A chevron, because the chip is a menu. It carried a name and a face and
+         no indication that anything happened when you pressed it, which is why
+         people looked for Settings in the nav list instead. -->
+    <div class="sidebar-user" id="sidebarUser" role="button" tabindex="0" aria-haspopup="menu" title="Account, profiles and settings">
       <div class="sidebar-avatar" id="sidebarAvatar">?</div>
       <span class="sidebar-email" id="sidebarEmail"></span>
       <span class="navShort">You</span>
+      <svg class="sidebar-user-caret" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 15l-6-6-6 6"/></svg>
     </div>
     <button id="logoutBtn" class="navBtn sidebar-logout" title="Sign Out">
       <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">

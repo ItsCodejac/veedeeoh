@@ -2,6 +2,7 @@ import "./style.css";
 import { fetchCatalog, fetchWatched, getActiveRegion } from "./api";
 import { state } from "./state";
 import { $, showToast, escapeHtml } from "./util";
+import { closeTopOverlay, registerOverlay } from "./overlay";
 import { wireVodDetails, renderShows, renderMovies, wireSearchInputs, renderHome } from "./vod";
 import { getSession, isCloudMode, restoreSession, signOut, getSupabase } from "./auth";
 import { getActiveProfile } from "./profiles";
@@ -589,7 +590,9 @@ async function boot(): Promise<void> {
       await applyRoute().finally(() => { applyingRoute = false; });
     }
   } else {
-    prof.openProfileSwitcher((sel) => { void enterAsProfile(sel, dataReady); });
+    // Boot, with no active profile: picking one IS the screen, so there is
+    // nothing behind it to go back to and no close control to offer.
+    prof.openProfileSwitcher((sel) => { void enterAsProfile(sel, dataReady); }, { dismissible: false });
     hideBootSplash();
   }
 
@@ -674,6 +677,39 @@ async function boot(): Promise<void> {
       import("./profiles").then(p => p.openProfileEditor());
     }
   }
+}
+
+/** Put a menu beside the control that opened it.
+ *
+ *  Below the anchor when there is room, above it when there is not -- the
+ *  account chip lives at the bottom of the sidebar, so in practice it opens
+ *  upward. Clamped to the viewport on both axes so a menu never hangs off the
+ *  edge.
+ *
+ *  Skipped entirely under 768px, where the stylesheet makes this a bottom
+ *  sheet: on a phone the anchor is inside a sheet that is itself pinned to the
+ *  bottom, and a dropdown hanging off it would open into the dock.
+ */
+function anchorMenu(menu: HTMLElement, anchorEl: HTMLElement): void {
+  if (window.matchMedia("(max-width: 768px)").matches) return;
+
+  const a = anchorEl.getBoundingClientRect();
+  const m = menu.getBoundingClientRect();
+  const GAP = 8, EDGE = 12;
+
+  const below = a.bottom + GAP;
+  const top = below + m.height + EDGE <= window.innerHeight
+    ? below
+    : Math.max(EDGE, a.top - GAP - m.height);
+
+  const left = Math.min(
+    Math.max(EDGE, a.left),
+    Math.max(EDGE, window.innerWidth - m.width - EDGE),
+  );
+
+  menu.style.position = "fixed";
+  menu.style.top = `${Math.round(top)}px`;
+  menu.style.left = `${Math.round(left)}px`;
 }
 
 function wireSidebar(): void {
@@ -780,6 +816,10 @@ function wireSidebar(): void {
 
   switchViewRef = switchView;
   window.addEventListener("popstate", () => {
+    // Back closes what is on top before it navigates. Without this, Back on a
+    // full-screen overlay left the app -- which on a phone, where Back is the
+    // edge swipe, is the most common way anyone tries to retreat.
+    if (closeTopOverlay()) return;
     applyingRoute = true;
     void applyRoute().finally(() => { applyingRoute = false; });
   });
@@ -1010,16 +1050,22 @@ function wireHeader(): void {
         const existing = document.getElementById("userAccountMenuModal");
         if (existing) existing.remove();
 
+        // AN ANCHORED MENU, NOT A MODAL. Four shortcuts used to blur the whole
+        // app and open in the centre of the screen, so the control you clicked
+        // sat in the bottom-left corner and its own menu appeared six hundred
+        // pixels away. It read as a page transition for what is a dropdown.
+        // The scrim is transparent now and exists only to catch the click that
+        // dismisses.
         const modal = document.createElement("div");
         modal.id = "userAccountMenuModal";
-        modal.style.cssText = "position:fixed;inset:0;background:rgba(6,7,10,0.85);backdrop-filter:blur(14px);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;color:#fff;font-family:'Space Grotesk',sans-serif;";
+        modal.className = "acctScrim";
         // Identity and navigation only. It used to carry its own Subtitles and
         // Quality controls, which duplicated Settings > Playback AND disagreed
         // with it -- this menu wrote "true"/"false" and "1080p" while Settings
         // wrote "1"/"0" and "1080", so the two could never agree on what was
         // set. Preferences live in one place now.
         modal.innerHTML = `
-          <div style="background:#10141e;border:1px solid rgba(255,255,255,0.15);border-radius:20px;max-width:340px;width:100%;padding:24px;box-shadow:0 20px 50px rgba(0,0,0,0.9);text-align:center;">
+          <div class="acctMenu" role="menu">
             <div style="width:60px;height:60px;border-radius:14px;background:${p.profileFace(activeP).background};display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;color:#06070a;margin:0 auto 12px;">
               ${escapeHtml(p.profileFace(activeP).letter)}
             </div>
@@ -1028,42 +1074,42 @@ function wireHeader(): void {
               activeP.is_kids ? 'Kids profile' : activeP.role === 'owner' ? 'Account owner' : 'Household member'
             }</p>
 
-            <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:18px;">
-              <button id="menuSwitchProfileBtn" style="padding:12px;border-radius:10px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);color:#fff;font-weight:700;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+            <div class="acctItems">
+              <button id="menuSwitchProfileBtn" class="acctItem">
                 ${activeP.is_kids
                   ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg><span>Exit kids mode</span>'
                   : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg><span>Who&rsquo;s watching</span>'}
               </button>
 
               ${activeP.is_kids ? '' : `
-              <button id="menuEditProfileBtn" style="padding:12px;border-radius:10px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);color:#fff;font-weight:700;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+              <button id="menuEditProfileBtn" class="acctItem">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>
                 <span>Edit this profile</span>
               </button>
-              <button id="menuOpenSettingsBtn" style="padding:12px;border-radius:10px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);color:#fff;font-weight:700;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+              <button id="menuOpenSettingsBtn" class="acctItem">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                 <span>Settings</span>
               </button>
-              <button id="menuSignOutBtn" style="padding:12px;border-radius:10px;background:none;border:1px solid rgba(255,107,107,0.35);color:#ff8f8f;font-weight:700;font-size:14px;cursor:pointer;">Sign out</button>
+              <button id="menuSignOutBtn" class="acctItem danger">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                <span>Sign out</span>
+              </button>
               `}
             </div>
 
-            <button id="menuCloseBtn" style="background:none;border:none;color:#9aa5b5;font-size:13px;cursor:pointer;">Close</button>
+            <button id="menuCloseBtn" class="acctClose">Close</button>
           </div>
         `;
 
-        modal.onclick = (e) => {
-          if (e.target === modal || (e.target as HTMLElement).id === "menuCloseBtn") {
-            modal.remove();
-          }
-        };
-
         document.body.appendChild(modal);
+        const ov = registerOverlay(modal, { dismissOn: modal });
+        modal.querySelector("#menuCloseBtn")?.addEventListener("click", () => ov.close());
+        anchorMenu(modal.querySelector(".acctMenu") as HTMLElement, sidebarUser);
 
         const switchBtn = modal.querySelector("#menuSwitchProfileBtn");
         if (switchBtn) {
           switchBtn.addEventListener("click", () => {
-            modal.remove();
+            ov.close();
             // Switching runs the SAME branded entry cycle as boot (chrome + bump
             // + fresh Home). The catalog is already loaded, so no dataReady needed.
             p.openProfileSwitcher((newP) => { void enterAsProfile(newP); });
@@ -1075,20 +1121,20 @@ function wireHeader(): void {
         // chain said what it led to, and "Manage Profiles" renames itself to
         // "Done" the moment you are in it. Two clicks now, by its own name.
         modal.querySelector("#menuEditProfileBtn")?.addEventListener("click", () => {
-          modal.remove();
+          ov.close();
           p.openProfileEditor(p.getActiveProfile());
         });
 
         const setBtn = modal.querySelector("#menuOpenSettingsBtn");
         if (setBtn) {
           setBtn.addEventListener("click", () => {
-            modal.remove();
+            ov.close();
             import("./settingsview").then((s) => s.openSettings());
           });
         }
 
         modal.querySelector("#menuSignOutBtn")?.addEventListener("click", () => {
-          modal.remove();
+          ov.close();
           void signOut();
         });
       });
