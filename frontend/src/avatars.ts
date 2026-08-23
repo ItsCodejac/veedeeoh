@@ -141,10 +141,10 @@ const cache = new Map<string, string>();
  *  whitespace and no excess precision, so stripping and rounding returned
  *  byte-identical output for eleven of twelve styles. */
 function smallestUri(svg: string, percentEncoded: string): string {
-  // DiceBear writes `;utf8,` here, which is not a valid media-type parameter
-  // and which iOS Safari refuses outright. See fixSvgDataUri in util.ts -- the
-  // same repair is applied on display, because avatars saved before this line
-  // existed still carry the bad prefix.
+  // DiceBear writes `;utf8,` here, which is not a valid media-type parameter.
+  // Corrected on principle, not as a bug fix: WebKit renders the malformed form
+  // perfectly well, so this was never the reason avatars went missing. See
+  // fixSvgDataUri in util.ts, which applies the same repair on display.
   percentEncoded = percentEncoded.startsWith("data:image/svg+xml;utf8,")
     ? `data:image/svg+xml;charset=utf-8,${percentEncoded.slice(24)}`
     : percentEncoded;

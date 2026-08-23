@@ -172,23 +172,23 @@ export function setupHorizontalScroll(scroller: HTMLElement, parent: HTMLElement
   window.addEventListener("resize", updateArrows);
 }
 
-/** Repair an SVG data URI that iOS Safari will not render.
+/** Repair a malformed SVG data URI prefix.
  *
  *  DiceBear's toDataUri() emits `data:image/svg+xml;utf8,...`. `utf8` is not a
- *  valid media-type parameter -- the spelling is `charset=utf-8` -- and while
- *  Chrome and Firefox shrug and render it anyway, iOS Safari rejects the whole
- *  URI and draws nothing.
+ *  valid media-type parameter -- RFC 2397 wants `;name=value`, so the spelling
+ *  is `charset=utf-8`. Correcting it is right on its own terms and costs eight
+ *  bytes.
  *
- *  THIS IS WHY AVATARS WERE INCONSISTENT ON IPHONE RATHER THAN ABSENT. Each
- *  avatar is stored in whichever encoding came out smaller, base64 or
- *  percent-encoded. Base64 is unaffected. So the sparse styles -- Bottts,
- *  Shapes, Initials, Fun Emoji -- rendered, and the detailed ones -- Open
- *  Peeps, Notionists -- did not, which looks random unless you know that the
- *  encoding is chosen per picture.
+ *  IT IS NOT, HOWEVER, WHY AVATARS WERE MISSING ON IPHONE. That was the theory
+ *  this was written for, and it is wrong: tested in WebKit 26.5, the engine
+ *  behind Safari, all three forms load as <img> and apply as background-image
+ *  -- the malformed one included. The real cause was that the fixes making
+ *  avatars render in Settings, the PIN prompt and the household-full screen
+ *  had never been deployed.
  *
- *  Applied on DISPLAY, not only at generation, because every avatar already
- *  saved carries the bad prefix in avatar_url. Fixing the generator alone would
- *  leave existing profiles broken until somebody re-edited them.
+ *  Kept because a malformed URI is still malformed, and applied on DISPLAY as
+ *  well as at generation so avatars already saved with the bad prefix are
+ *  normalised too.
  */
 export function fixSvgDataUri(uri: string): string {
   return uri.startsWith("data:image/svg+xml;utf8,")
