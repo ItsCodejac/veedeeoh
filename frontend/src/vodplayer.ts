@@ -625,6 +625,18 @@ class VodPlayer {
     } catch { return; }
 
     const isKids = !!getActiveProfile()?.is_kids;
+
+    // The normal ident is drawn. Silent here on purpose: this plays over a film
+    // somebody just chose, and a sting on top of the opening seconds of their
+    // own content is the wrong instinct -- the one at profile entry already had
+    // the moment.
+    if (!isKids) {
+      const root = this.root;
+      if (!root) return;
+      void import("./ident").then((m) => m.playIdent(() => {}, { parent: root, sound: false }));
+      return;
+    }
+
     const wrap = document.createElement("div");
     wrap.dataset.role = "bump";
     wrap.style.cssText = "position:absolute;inset:0;z-index:50;background:#06070a;display:flex;align-items:center;justify-content:center;transition:opacity .45s ease;";

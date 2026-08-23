@@ -40,23 +40,32 @@ function applyWordmark(isKids: boolean): void {
 }
 
 // Branded ident, played on profile SELECTION (a user gesture, so audio is
-// allowed — cold-boot autoplay can't have sound). Normal or kids variant,
-// tap-to-skip, self-healing. Calls done() when it finishes so the already-loaded
-// home reveals immediately after.
+// allowed -- cold-boot autoplay cannot have sound).
+//
+// The normal variant is drawn, not played: src/ident.ts is a port of the design
+// the video was rendered from, at 96 KB of audio instead of 1.57 MB of H.264.
+//
+// KIDS IS STILL THE VIDEO. It is not a recolour of the same animation -- the
+// design has an entirely separate scene set for it (a ball drops, bounces, hops
+// to the v, rolls the name out, and ".kids" pops in) and porting it is its own
+// job. Branching here rather than pretending one animation covers both.
 function playIdent(isKids: boolean, done: () => void): void {
+  if (!isKids) {
+    void import("./ident").then((m) => m.playIdent(done)).catch(done);
+    return;
+  }
+
   const o = document.createElement("div");
   o.id = "bootIdent";
   o.style.cssText = "position:fixed;inset:0;z-index:99999;background:#06070a;display:flex;align-items:center;justify-content:center;transition:opacity .5s ease;";
   const v = document.createElement("video");
-  v.src = isKids ? "/kids-bump.mp4" : "/bump.mp4";
+  v.src = "/kids-bump.mp4";
   v.autoplay = true; v.setAttribute("playsinline", "");
   v.style.cssText = "width:100%;height:100%;object-fit:contain;";
   let finished = false;
   const finish = () => {
     if (finished) return;
     finished = true;
-    // Recorded so the player does not replay the bump back-to-back when a title
-    // is opened moments after entering a profile.
     try { sessionStorage.setItem("veedeeoh_ident_at", String(Date.now())); } catch {}
     o.style.opacity = "0";
     setTimeout(() => o.remove(), 500);
