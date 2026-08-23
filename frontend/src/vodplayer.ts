@@ -35,6 +35,25 @@ import { showToast } from "./util";
 
 const BRAND = "#c5f04e";
 
+
+/** Can this browser make an arbitrary ELEMENT fullscreen?
+ *
+ *  iPhone Safari cannot. It has no Element.requestFullscreen at all; the only
+ *  fullscreen it offers is HTMLVideoElement.webkitEnterFullscreen, which hands
+ *  the video to the operating system's own player. That player is not a DOM
+ *  node and nothing of ours can be drawn on it -- no reactions, no knock, no
+ *  removal card. iPad and Android both support element fullscreen and are fine.
+ *
+ *  Checked by capability rather than by sniffing the user agent, so an iPhone
+ *  that gains the API stops taking the fallback on its own. */
+function canElementFullscreen(): boolean {
+  const d = document as any;
+  const enabled = d.fullscreenEnabled ?? d.webkitFullscreenEnabled ?? false;
+  const method = (Element.prototype as any).requestFullscreen
+              || (Element.prototype as any).webkitRequestFullscreen;
+  return !!enabled && typeof method === "function";
+}
+
 const FULL_CSS = "position:fixed;inset:0;z-index:9998;display:block;background:#000;";
 const MINI_CSS =
   "position:fixed;inset:auto 24px 24px auto;width:22rem;max-width:44vw;aspect-ratio:16/9;" +
@@ -545,7 +564,31 @@ class VodPlayer {
       el.style.setProperty("--media-brand", BRAND);
       (this.player as any).fullscreenOrientation = "landscape";
       setTimeout(() => { if (!this.destroyed) el.focus(); }, 100);
+      this.guardFullscreen();
     } catch {}
+  }
+
+  /** On a device that cannot make an element fullscreen, do not go fullscreen.
+   *
+   *  THE OVERLAY IS ALREADY THE WHOLE VIEWPORT -- FULL_CSS is position:fixed,
+   *  inset:0. So on an iPhone the native handoff buys one thing, hiding the
+   *  address bar, and costs every overlay a watch party is made of: reactions,
+   *  the knock telling a host somebody is waiting, the card telling a viewer
+   *  they were removed. None of them can be painted over the system player.
+   *  Staying inline keeps all of them and loses a strip of browser chrome.
+   *
+   *  Swallowed in the CAPTURE phase on an ancestor, so it never reaches
+   *  vidstack's own handler. Cancelling the request event is not enough:
+   *  enterFullscreen() enqueues the request for bookkeeping and then calls the
+   *  adapter regardless of whether anyone prevented it. */
+  private guardFullscreen(): void {
+    if (canElementFullscreen()) return;
+    document.body.classList.add("no-element-fullscreen");
+    this.overlay.addEventListener("media-enter-fullscreen-request", (e: Event) => {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      // Already covering the viewport; nothing to expand.
+    }, true);
   }
 
   /** Plays the brand bump over the player while the stream buffers.

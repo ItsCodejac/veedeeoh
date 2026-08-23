@@ -5342,3 +5342,11 @@ body.locked-free .vodCard.showLock .vodQuick { display: none; }
   color: rgba(255,255,255,.55); font: inherit; font-size: 12.5px;
 }
 .prmDismiss:hover { color: #fff; }
+
+/* A fullscreen button that cannot make anything fullscreen.
+   On iPhone the player stays inline on purpose -- see guardFullscreen() -- so
+   the control would either do nothing or hand the video to the system player
+   and take every party overlay off screen with it. The overlay is already the
+   whole viewport, so there is nothing for it to do either way. */
+body.no-element-fullscreen media-fullscreen-button,
+body.no-element-fullscreen .vds-fullscreen-button { display: none !important; }
