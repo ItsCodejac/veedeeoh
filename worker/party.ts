@@ -43,6 +43,83 @@ export interface PartyState {
 
 interface Env {
   PARTY: DurableObjectNamespace;
+  /** The Supabase project's JWT secret. Set with
+   *  `wrangler secret put SUPABASE_JWT_SECRET`; never in wrangler.toml. */
+  SUPABASE_JWT_SECRET?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Who is calling
+// ---------------------------------------------------------------------------
+//
+// UNTIL NOW: NOBODY ASKED. The host was whoever presented the random hostToken
+// their own browser generated, and every other identity -- the `uid` on the
+// socket, the `uid` on /access, the `hostUserId` in the init body -- was a
+// string the client chose. Three things followed from that:
+//
+//   Anyone could use this relay. Entitlement is checked in our client and in an
+//   RLS policy on our database, both on the caller's side, so a self-hosted
+//   instance pointing VITE_PARTY_WORKER_URL here got watch party hosting on our
+//   Cloudflare account. CORS did not stop it: the allowlist takes any
+//   *.vercel.app, and a WebSocket upgrade ignores CORS entirely.
+//
+//   Removal was cosmetic. The ban list is keyed on `uid`, and `uid` came from
+//   the query string, so somebody removed for conduct rejoined by sending a
+//   different one.
+//
+//   A party could be bound to someone else's user id.
+//
+// Verifying the token fixes all three at once, and fixes the first one exactly:
+// a self-hoster's users hold tokens signed by THEIR project secret, which do
+// not verify against ours. No allowlist to maintain.
+//
+// HS256, which is what Supabase issues, so this is an HMAC check against the
+// project secret rather than a fetch. No round trip on the hot path.
+
+interface Caller { sub: string; role: string }
+
+function b64urlToBytes(s: string): Uint8Array<ArrayBuffer> {
+  const pad = s.replace(/-/g, "+").replace(/_/g, "/");
+  const bin = atob(pad + "=".repeat((4 - (pad.length % 4)) % 4));
+  // Backed by a concrete ArrayBuffer so it satisfies BufferSource; the default
+  // Uint8Array type admits SharedArrayBuffer, which crypto.subtle will not take.
+  const out = new Uint8Array(new ArrayBuffer(bin.length));
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+/** Verify a Supabase access token and return who it belongs to.
+ *
+ *  Null for anything that does not check out: wrong signature, expired, or
+ *  malformed. Also null when no secret is configured, which fails CLOSED --
+ *  a relay that cannot tell who is calling should refuse rather than guess,
+ *  and a missing secret is a deployment mistake that ought to be loud. */
+async function verifyCaller(token: string, secret?: string): Promise<Caller | null> {
+  if (!token || !secret) return null;
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  const [h, p, sig] = parts as [string, string, string];
+
+  try {
+    const header = JSON.parse(new TextDecoder().decode(b64urlToBytes(h)));
+    if (header.alg !== "HS256") return null;
+
+    const key = await crypto.subtle.importKey(
+      "raw", new TextEncoder().encode(secret),
+      { name: "HMAC", hash: "SHA-256" }, false, ["verify"],
+    );
+    const ok = await crypto.subtle.verify(
+      "HMAC", key, b64urlToBytes(sig), new TextEncoder().encode(`${h}.${p}`),
+    );
+    if (!ok) return null;
+
+    const claims = JSON.parse(new TextDecoder().decode(b64urlToBytes(p)));
+    if (typeof claims.exp === "number" && claims.exp * 1000 <= Date.now()) return null;
+    if (!claims.sub) return null;              // the anon key has no sub
+    return { sub: String(claims.sub), role: String(claims.role || "") };
+  } catch {
+    return null;
+  }
 }
 
 interface Attachment {
@@ -156,6 +233,11 @@ export class Party extends DurableObject<Env> {
       const token = String(body?.hostToken || "");
       if (token.length < 20) return new Response("bad token", { status: 400, headers: cors });
 
+      // Who is starting this. hostUserId used to be read straight out of the
+      // body, so a party could be bound to somebody else's id.
+      const caller = await verifyCaller(String(body?.accessToken || ""), this.env.SUPABASE_JWT_SECRET);
+      if (!caller) return new Response("not signed in", { status: 401, headers: cors });
+
       const existing = await this.ctx.storage.get<Config>(CONFIG_KEY);
       // One-shot. A second init cannot re-bind a party to a different host,
       // which is what would let someone steal a room mid-session.
@@ -164,7 +246,7 @@ export class Party extends DurableObject<Env> {
       const seats = Number(body?.seatLimit);
       await this.ctx.storage.put<Config>(CONFIG_KEY, {
         seatLimit: Number.isFinite(seats) && seats > 0 ? seats : null,
-        hostUserId: String(body?.hostUserId || ""),
+        hostUserId: caller.sub,
         hostToken: token,
         requireApproval: body?.requireApproval !== false,
         createdAt: Date.now(),
@@ -189,7 +271,11 @@ export class Party extends DurableObject<Env> {
       const config = await this.ctx.storage.get<Config>(CONFIG_KEY);
       if (!config) return Response.json({ status: "gone" }, { headers: cors });
 
-      const who = url.searchParams.get("uid") || "";
+      // From the token, not the query string. The ban list is keyed on this,
+      // so a client-supplied value made removal a formality.
+      const asker = await verifyCaller(url.searchParams.get("jwt") || "", this.env.SUPABASE_JWT_SECRET);
+      if (!asker) return Response.json({ status: "unauthorised" }, { status: 401, headers: cors });
+      const who = asker.sub;
       const bans = (await this.ctx.storage.get<string[]>(BANNED_KEY)) ?? [];
       if (who !== "" && bans.includes(who)) {
         return Response.json({ status: "removed" }, { headers: cors });
@@ -213,8 +299,15 @@ export class Party extends DurableObject<Env> {
     if (!config) return new Response("party not started", { status: 404 });
 
     const token = url.searchParams.get("t") || "";
-    const userId = url.searchParams.get("uid") || "";
     const name = (url.searchParams.get("name") || "Guest").slice(0, 40);
+
+    // A browser cannot set headers on a WebSocket upgrade, so the access token
+    // rides in the query string. Supabase access tokens are short-lived, which
+    // is the mitigation for it appearing in a log line.
+    const caller = await verifyCaller(url.searchParams.get("jwt") || "", this.env.SUPABASE_JWT_SECRET);
+    if (!caller) return new Response("not signed in", { status: 401 });
+    const userId = caller.sub;
+
 
     // The ONLY way to be the host: present the secret the party was bound with.
     // Constant-time is unnecessary here (the token is 256 bits of randomness and
@@ -226,6 +319,16 @@ export class Party extends DurableObject<Env> {
       return new Response("party full", { status: 409 });
     }
 
+    // BEFORE the pair is created. This used to run after acceptWebSocket, so a
+    // removed guest had a socket accepted and then got a 403 for it -- the
+    // response is what the browser sees, but the accepted server side was left
+    // dangling. Checked here as well as in /access because /access is advisory:
+    // a client that skips it goes straight to the upgrade.
+    const banned = (await this.ctx.storage.get<string[]>(BANNED_KEY)) ?? [];
+    if (!isHost && banned.includes(userId)) {
+      return new Response("removed from this party", { status: 403 });
+    }
+
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair) as [WebSocket, WebSocket];
 
@@ -235,11 +338,6 @@ export class Party extends DurableObject<Env> {
     // open socket but receive no state, so waiting in the lobby is not a way to
     // watch for free. Someone the host has ALREADY admitted goes straight back
     // in: they are not a new arrival, they are the same guest reconnecting.
-    const banned = (await this.ctx.storage.get<string[]>(BANNED_KEY)) ?? [];
-    if (!isHost && userId !== "" && banned.includes(userId)) {
-      return new Response("removed from this party", { status: 403 });
-    }
-
     const admitted = (await this.ctx.storage.get<string[]>(ADMITTED_KEY)) ?? [];
     const approved = isHost || !config.requireApproval
       || (userId !== "" && admitted.includes(userId));

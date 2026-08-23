@@ -93,11 +93,20 @@ function scheduleReconnect(joinCode: string, isHost: boolean): void {
  *  that guess. The row write was harmless only because RLS refuses it from
  *  anyone but the host; the message was not harmless at all, because a viewer
  *  told the party is over stops trying. */
+/** The caller's Supabase access token, for the party worker.
+ *
+ *  The worker verifies this rather than trusting a user id in the query string.
+ *  Identity used to be whatever the client said it was, which made the ban list
+ *  a formality and let any instance use our relay. */
+async function accessToken(): Promise<string> {
+  const { data } = await getSupabase().auth.getSession();
+  return data.session?.access_token || "";
+}
+
 async function explainFailedJoin(joinCode: string, isHost: boolean): Promise<void> {
   let status = "";
   try {
-    const { data: u } = await getSupabase().auth.getUser();
-    const qs = new URLSearchParams({ party: joinCode, uid: u.user?.id || "" });
+    const qs = new URLSearchParams({ party: joinCode, jwt: await accessToken() });
     const res = await fetch(`${WORKER_URL}/access?${qs.toString()}`);
     status = String(((await res.json()) as any)?.status || "");
   } catch {
@@ -108,6 +117,14 @@ async function explainFailedJoin(joinCode: string, isHost: boolean): Promise<voi
     return;
   }
 
+  if (status === "unauthorised") {
+    // The worker could not verify the session. Retrying will not fix it, and
+    // "that party has ended" would be a lie -- the party is fine, we are not
+    // signed in as far as it can tell. Usually an expired token.
+    cancelRetry();
+    showToast("Your session expired. Sign in again to join");
+    return;
+  }
   if (status === "removed") {
     cancelRetry();
     showToast("The host removed you from this party");
@@ -273,7 +290,7 @@ export async function createParty(opts: PartyOptions): Promise<{ joinCode: strin
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       hostToken: token,
-      hostUserId: u.user.id,
+      accessToken: await accessToken(),
       seatLimit: opts.seatLimit ?? null,
       requireApproval: opts.requireApproval !== false,
     }),
@@ -439,11 +456,14 @@ async function connect(joinCode: string, isHost: boolean, resume = false): Promi
   const gen = ++generation;
   currentCode = joinCode;
 
-  const { data: u } = await getSupabase().auth.getUser();
   const profile = getActiveProfile();
 
   const base = WORKER_URL.replace(/^http/, "ws");
-  const qs = new URLSearchParams({ party: joinCode, uid: u.user?.id || "", name: profile?.name || "Guest" });
+  const qs = new URLSearchParams({
+    party: joinCode,
+    jwt: await accessToken(),
+    name: profile?.name || "Guest",
+  });
   // The token is the ONLY thing that makes a connection the host's. A guest
   // never receives it, so a guest cannot send one.
   if (isHost) {
