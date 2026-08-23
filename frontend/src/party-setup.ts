@@ -13,6 +13,7 @@
 
 import type { VodItem } from "./types";
 import { escapeHtml, showToast } from "./util";
+import { mountOnTop, unmountFromTop } from "./overlay";
 
 /** Phone-sized and touch-primary. Not a blocklist -- hosting from a phone is
  *  allowed, because it works as long as the tab stays open. This only warns,
@@ -834,7 +835,7 @@ export function showWrap(isHost: boolean, title: string): void {
         </div>`}
       ${isHost ? "" : `<div class="phcBox" id="pwChannel"></div>`}
     </div>`;
-  document.body.appendChild(wrapEl);
+  mountOnTop(wrapEl);
   if (!isHost) void fillHostChannel(wrapEl.querySelector("#pwChannel"));
 
   wrapEl.querySelector("#pwNext")?.addEventListener("click", () => void showNextPicker());
@@ -855,7 +856,7 @@ export function showWrap(isHost: boolean, title: string): void {
   });
 }
 
-export function dismissWrap(): void { wrapEl?.remove(); wrapEl = null; }
+export function dismissWrap(): void { if (wrapEl) unmountFromTop(wrapEl); wrapEl = null; }
 
 // ---------------------------------------------------------------------------
 // Removing someone
@@ -895,7 +896,9 @@ function askRemovalReason(name: string): Promise<string | null> {
         </div>
         <button class="partyBtn pkkCancel">Cancel</button>
       </div>`;
-    document.body.appendChild(sheet);
+    // The host is watching when they decide to remove somebody, which means
+    // fullscreen, which means document.body is not painted.
+    mountOnTop(sheet);
 
     const done = (v: string | null) => { sheet.remove(); resolve(v); };
     sheet.querySelectorAll<HTMLElement>(".pkkReason").forEach((b) => {
@@ -925,7 +928,10 @@ export function showRemoved(o: { title: string; code: string; text: string; canR
         <button class="partyBtn" id="prmClose">Back to veedeeoh</button>
       </div>
     </div>`;
-  document.body.appendChild(el);
+  // Mounted where fullscreen can paint it. Being removed mid-film is the one
+  // moment a viewer most needs to be told something, and it is also the moment
+  // they are guaranteed to be fullscreen.
+  mountOnTop(el);
 
   el.querySelector("#prmBack")?.addEventListener("click", async () => {
     el.remove();
@@ -1022,7 +1028,7 @@ export function showKnock(userId: string, name: string): void {
   const stack = existing || (() => {
     const s = document.createElement("div");
     s.id = "partyKnocks";
-    document.body.appendChild(s);
+    mountOnTop(s);
     return s;
   })();
   if (stack.querySelector(`[data-uid="${CSS.escape(userId)}"]`)) return;
@@ -1053,7 +1059,7 @@ export function dismissKnock(userId?: string): void {
   if (!stack) return;
   if (userId) stack.querySelector(`[data-uid="${CSS.escape(userId)}"]`)?.remove();
   else stack.replaceChildren();
-  if (!stack.childElementCount) stack.remove();
+  if (!stack.childElementCount) unmountFromTop(stack);
 }
 
 /** Drop any request that is no longer in the host's waiting list. */
@@ -1063,7 +1069,7 @@ export function reconcileKnocks(stillWaiting: Set<string>): void {
   for (const row of [...stack.querySelectorAll<HTMLElement>("[data-uid]")]) {
     if (!stillWaiting.has(row.dataset.uid || "")) row.remove();
   }
-  if (!stack.childElementCount) stack.remove();
+  if (!stack.childElementCount) unmountFromTop(stack);
 }
 
 // ---------------------------------------------------------------------------

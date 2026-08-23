@@ -122,3 +122,65 @@ export function closeTopOverlay(): boolean {
 export function hasOverlay(): boolean {
   return stack.length > 0;
 }
+
+// ---------------------------------------------------------------------------
+// Where an overlay has to live
+// ---------------------------------------------------------------------------
+//
+// FULLSCREEN RENDERS ONLY THE FULLSCREEN ELEMENT'S SUBTREE. Anything parented
+// to document.body is not painted while a video is fullscreen -- which is the
+// state a watch party spends almost all of its time in, and on a phone is the
+// only state anyone watches in.
+//
+// This was found once, for the reactions bar, and fixed only there. Every
+// other thing a party puts on screen went on being appended to document.body:
+// the knock that tells a host somebody is asking to come in, the card that
+// tells a viewer they have been removed, the wrap-up when a party ends. All of
+// them fire DURING playback, which is exactly when they cannot be seen. A host
+// watching fullscreen was never told anyone had arrived.
+//
+// So the rule lives in one place and anything that must survive fullscreen
+// registers here rather than reimplementing it.
+
+const topLevel = new Set<HTMLElement>();
+let fullscreenWatched = false;
+
+/** The element an overlay must be parented to right now. */
+export function overlayHost(): HTMLElement {
+  return (document.fullscreenElement as HTMLElement | null)
+    || ((document as any).webkitFullscreenElement as HTMLElement | null)
+    || document.body;
+}
+
+function reparentAll(): void {
+  const h = overlayHost();
+  for (const el of topLevel) {
+    if (!el.isConnected && el.parentElement === null) { topLevel.delete(el); continue; }
+    if (el.parentElement !== h) h.appendChild(el);
+  }
+}
+
+/** Append where it will actually be seen, and keep it there.
+ *
+ *  Re-parents in BOTH directions: an overlay opened before fullscreen has to
+ *  move in, and one opened during it has to move back out, or it is destroyed
+ *  along with the fullscreen element when the user exits. */
+export function mountOnTop(el: HTMLElement): void {
+  overlayHost().appendChild(el);
+  topLevel.add(el);
+  if (!fullscreenWatched) {
+    fullscreenWatched = true;
+    document.addEventListener("fullscreenchange", reparentAll);
+    document.addEventListener("webkitfullscreenchange", reparentAll);
+    // A rotation can end fullscreen, or change which element is fullscreen,
+    // without firing fullscreenchange first. Re-checking the parent costs a
+    // comparison and saves an overlay stranded in a detached subtree.
+    window.addEventListener("orientationchange", reparentAll);
+  }
+}
+
+/** Stop tracking an element. Safe to call on one that was never mounted. */
+export function unmountFromTop(el: HTMLElement): void {
+  topLevel.delete(el);
+  el.remove();
+}

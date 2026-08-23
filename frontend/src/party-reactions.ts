@@ -154,8 +154,24 @@ function finishMount(): void {
   window.addEventListener("keydown", onMove);
   el.addEventListener("pointerenter", () => wake());
 
-  onResize = () => restorePosition(el);
+  // RESIZE ALONE IS NOT ENOUGH ON A PHONE. A rotation fires resize before the
+  // new viewport has settled, so clamping against window.innerWidth at that
+  // instant uses the dimensions we are leaving. The second pass on the next
+  // frame catches the real numbers, and orientationchange covers the browsers
+  // that do not fire resize for a rotation at all.
+  //
+  // visualViewport is the one that matters on iOS: the URL bar collapsing and
+  // expanding changes the usable height without a window resize event, which
+  // leaves the bar sitting under the chrome.
+  const settle = () => {
+    restorePosition(el);
+    requestAnimationFrame(() => restorePosition(el));
+    setTimeout(() => restorePosition(el), 250);
+  };
+  onResize = settle;
   window.addEventListener("resize", onResize);
+  window.addEventListener("orientationchange", onResize);
+  window.visualViewport?.addEventListener("resize", onResize);
 
   wake();
 }
@@ -182,7 +198,11 @@ export function unmountReactions(): void {
     window.removeEventListener("keydown", onMove);
   }
   onMove = null;
-  if (onResize) window.removeEventListener("resize", onResize);
+  if (onResize) {
+    window.removeEventListener("resize", onResize);
+    window.removeEventListener("orientationchange", onResize);
+    window.visualViewport?.removeEventListener("resize", onResize);
+  }
   onResize = null;
   if (onFullscreen) {
     document.removeEventListener("fullscreenchange", onFullscreen);
