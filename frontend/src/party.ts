@@ -202,11 +202,13 @@ export async function canHost(): Promise<boolean> {
   if (getActiveProfile()?.is_kids) return false;
   const { data } = await getSupabase().auth.getUser();
   if (!data.user) return false;
-  const { hasActiveAccess } = await import("./db");
-  // Fail CLOSED here, unlike the browse gate. A transient error that wrongly
-  // lets someone browse is a small mistake; one that lets a lapsed account host
-  // is the hole this exists to close.
-  try { return await hasActiveAccess(); } catch { return false; }
+  // CREDIT, NOT TIER. Hosting is what costs us money, so it is metered rather
+  // than sold: three hours a month free, ten on the plan. A free account is a
+  // host with a smaller allowance, not a non-host.
+  //
+  // Fail CLOSED. A transient error that wrongly lets someone browse costs
+  // nothing; one that lets an account host for free costs Durable Object time.
+  try { return (await hasHostingCredit()).ok; } catch { return false; }
 }
 
 export interface PartyOptions {
@@ -725,6 +727,16 @@ export async function hasHostingCredit(): Promise<{ ok: boolean; exempt: boolean
   const c = (await ensurePartyCredits()) ?? (await partyCreditSummary());
   if (!c) return { ok: true, exempt: false, balance: 0 };   // no data: do not block
   return { ok: c.exempt || c.balance > 0, exempt: c.exempt, balance: c.balance };
+}
+
+/** Hours of hosting left this month, or null when it does not apply -- an
+ *  exempt account, or a balance we could not read. Credits are 10 minutes each
+ *  (METER_MINUTES), which is a detail no piece of copy should have to know. */
+export async function hostingHoursLeft(): Promise<number | null> {
+  const { partyCreditSummary } = await import("./db");
+  const c = await partyCreditSummary();
+  if (!c || c.exempt) return null;
+  return (c.balance * METER_MINUTES) / 60;
 }
 
 function startMetering(joinCode: string): void {

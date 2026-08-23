@@ -111,6 +111,12 @@ async function renderBilling(el: HTMLElement): Promise<void> {
         : `<button class="setBtn primary" id="setSubscribe">Subscribe — $4/mo</button>`}
     </div>
     ${comped ? `<p class="setHint">Comped account. You are not charged, and there is nothing to manage.</p>` : ""}
+    ${comped || acct.tier === "cloud_paid" ? "" : `<p class="setHint">
+      Watching is free and stays free &mdash; the catalogue comes from Pluto, Tubi and the
+      Internet Archive, and we are not charged for it either. The subscription pays for
+      running veedeeoh: ten hours of watch party hosting a month instead of three.
+      You can also <a href="/self-hosting.html" class="setLink">host it yourself</a> for nothing.
+    </p>`}
     <div id="setCredits"></div>`);
 
   void renderCredits(el.querySelector<HTMLElement>("#setCredits")!);

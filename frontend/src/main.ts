@@ -334,65 +334,22 @@ async function enterAsProfile(profile: { name?: string; avatar_color?: string; i
   });
 }
 
-async function showPaywall(): Promise<void> {
-  hideBootSplash();
-  const { startCheckout } = await import("./db");
-  const o = document.createElement("div");
-  o.id = "paywall";
-  o.style.cssText = "position:fixed;inset:0;z-index:99998;background:#06070a;color:#fff;display:flex;align-items:center;justify-content:center;padding:24px;font-family:'Space Grotesk',sans-serif;text-align:center;";
-  o.innerHTML = `
-    <div style="max-width:440px;">
-      <div style="font-family:'Bricolage Grotesque',sans-serif;font-size:40px;font-weight:800;margin-bottom:10px;">veedeeoh<span style="color:#c5f04e;">.</span></div>
-      <h1 style="font-size:26px;font-weight:800;margin:0 0 10px;">Your free trial has ended</h1>
-      <p style="color:#9aa5b5;font-size:16px;line-height:1.6;margin:0 0 22px;">Subscribe to keep watching. Every free service in one app, across your whole household.</p>
-      <div id="pwLosing"></div>
-      <button id="pwSub" style="width:100%;padding:15px;border-radius:12px;background:#c5f04e;color:#06070a;border:none;font-weight:800;font-size:16px;cursor:pointer;">Subscribe — $4/mo · 3 profiles</button>
-      <p style="color:#6b7482;font-size:13px;line-height:1.6;margin:20px 0 0;">
-        Your account stays open. Watch party links you are sent will still work &mdash;
-        you just cannot browse the catalogue on your own until you subscribe.
-      </p>
-      <button id="pwOut" style="margin-top:18px;background:none;border:none;color:#9aa5b5;font-size:13px;cursor:pointer;">Sign out</button>
-    </div>`;
-  document.body.appendChild(o);
-  void showWhatIsWaiting(o);
-  const sub = o.querySelector("#pwSub") as HTMLButtonElement;
-  sub.onclick = async () => {
-    sub.disabled = true; sub.textContent = "Opening checkout…";
-    try { await startCheckout(); }
-    catch (e: any) { alert("Couldn't start checkout: " + (e?.message || e)); sub.disabled = false; sub.textContent = "Subscribe — $4/mo · 3 profiles"; }
-  };
-  (o.querySelector("#pwOut") as HTMLButtonElement).onclick = () => signOut();
-}
-
-/** A lapsed account following a party link. The app shell never mounts: there is
- *  no catalogue to browse, no sidebar to browse it with, and nothing to gate --
- *  only the party they were invited to, plus the one CTA that makes this worth
- *  doing. Every party a lapsed guest attends is another chance to convert them,
- *  which a hard wall throws away. */
-async function enterAsPartyGuest(code: string): Promise<void> {
-  hideBootSplash();
-  document.body.classList.add("party-guest");
-
-  const bar = document.createElement("div");
-  bar.id = "guestBar";
-  bar.innerHTML = `
-    <span>You are here as a guest. Subscribe to watch anything, any time.</span>
-    <button id="guestSub">Subscribe &mdash; $4/mo</button>`;
-  document.body.appendChild(bar);
-  bar.querySelector("#guestSub")?.addEventListener("click", async () => {
-    const { startCheckout } = await import("./db");
-    try { await startCheckout(); } catch { showToast("Couldn't start checkout"); }
-  });
-
-  // Profiles still have to hydrate: a guest can hold a kids profile, and the
-  // rating gate inside joinParty reads it. Being lapsed does not make a child
-  // eligible for whatever the host is playing.
-  await import("./profiles").then((p) => p.hydrateProfilesFromCloud()).catch(() => {});
-
-  const { joinParty } = await import("./party");
-  await joinParty(code);
-  history.replaceState({}, "", location.pathname);
-}
+// THE PAYWALL, THE GUEST SHELL AND THE "WHAT YOU ARE LOSING" POSTER STRIP ARE
+// GONE -- about 130 lines between them, all reachable only from a boot gate
+// that no longer exists.
+//
+// The guest shell is the interesting loss. It hid the sidebar, the header and
+// the catalogue and showed a lapsed visitor nothing but the party they were
+// invited to, on the reasoning that there was no catalogue they were allowed
+// to browse. There is now, so a party link boots the ordinary app and joins
+// the party at the ordinary place (see the ?party= handler below) -- which is
+// strictly better, because when the party ends they are already standing in
+// the product instead of in front of a wall.
+//
+// showWhatIsWaiting() showed the account's own half-finished films behind the
+// price, which was the best idea in the paywall. It belongs on whatever
+// eventually asks a free account to subscribe; it does not belong to a screen
+// that blocks the door.
 
 /** Trial countdown in the sidebar.
  *
@@ -415,6 +372,10 @@ async function mountTrialNotice(): Promise<void> {
   // Paid and comped accounts have an expiry too; only a trial should be nagged.
   if (days === null || days > 5 || days < 0) return;
   if (!acct || !String(acct.tier || "").startsWith("trial")) return;
+  // Kids profiles never see billing. It is not their account and the control
+  // does nothing for them but take up the sidebar.
+  const { getActiveProfile } = await import("./profiles");
+  if (getActiveProfile()?.is_kids) return;
 
   const dismissedFor = localStorage.getItem("veedeeoh_trial_notice_day");
   if (dismissedFor === String(days)) return;   // dismissed today, back tomorrow
@@ -426,7 +387,8 @@ async function mountTrialNotice(): Promise<void> {
       <strong>${days === 0 ? "Trial ends today" : days === 1 ? "1 day left" : `${days} days left`}</strong>
       <button class="trialNoticeX" aria-label="Dismiss">&times;</button>
     </div>
-    <p>Keep your profiles, lists and watch history. $4/mo for the household.</p>
+    <p>Your profiles, lists and history stay either way. What changes is watch
+       party hosting: 10 hours a month instead of 3. $4.</p>
     <button class="trialNoticeCta">Subscribe</button>`;
 
   document.querySelector("aside .sidebar-spacer")?.before(el);
@@ -440,39 +402,12 @@ async function mountTrialNotice(): Promise<void> {
   });
 }
 
-/** Show the titles the account was part-way through.
- *
- *  A price alone asks someone to value an abstraction. Their own half-finished
- *  films are concrete and already theirs, and the data is sitting in
- *  watch_progress -- it was simply never used at the one moment it matters.
- *  Silent on failure: a paywall that cannot render artwork must still take a
- *  payment. */
-async function showWhatIsWaiting(o: HTMLElement): Promise<void> {
-  const box = o.querySelector<HTMLElement>("#pwLosing");
-  if (!box) return;
-  try {
-    // Queried directly rather than via getWatchHistory(profileId): profiles have
-    // not hydrated at the paywall, and the point is the ACCOUNT's history across
-    // every profile. RLS already scopes the table to this user.
-    const { data } = await getSupabase()
-      .from("watch_progress")
-      .select("title, poster")
-      .not("poster", "is", null)
-      .order("updated_at", { ascending: false })
-      .limit(5);
-    const history = data ?? [];
-    if (history.length < 2) return;
-
-    box.innerHTML = `
-      <p style="color:#6b7482;font-size:13px;margin:0 0 12px;">Waiting for you</p>
-      <div style="display:flex;gap:8px;justify-content:center;margin-bottom:26px;">
-        ${history.map((h: any) => `
-          <img src="${escapeHtml(h.poster)}" alt="" title="${escapeHtml(h.title || "")}"
-               style="width:58px;height:84px;object-fit:cover;border-radius:6px;opacity:.42;filter:grayscale(1);">
-        `).join("")}
-      </div>`;
-  } catch { /* the paywall still has to work */ }
-}
+// showWhatIsWaiting() lived here: the account's own half-finished films,
+// rendered behind the price, because a number asks somebody to value an
+// abstraction while their own unfinished film is concrete and already theirs.
+// It was the best thing on the paywall and it went with it. Recorded in
+// docs/plans so it can come back attached to something that is asking rather
+// than blocking.
 
 async function boot(): Promise<void> {
   if (isCloudMode()) {
@@ -499,19 +434,19 @@ async function boot(): Promise<void> {
       if (!error && !data.user) { signOut(); return; }
     } catch { /* transient network error — proceed rather than bounce */ }
 
-    // Access gate. Two outcomes, not one: an entitled account gets the app, and
-    // a lapsed one gets the paywall UNLESS it arrived on a party link, which it
-    // is still allowed to follow. The old code returned before the ?party=
-    // handler ever ran, so a lapsed guest could not join a party either.
-    try {
-      const { hasActiveAccess } = await import("./db");
-      if (!(await hasActiveAccess())) {
-        const code = new URLSearchParams(location.search).get("party");
-        if (code) { await enterAsPartyGuest(code.toUpperCase()); return; }
-        void showPaywall();
-        return;
-      }
-    } catch { /* if the check errors, fail open rather than lock out a paying user */ }
+    // THERE IS NO ACCESS GATE HERE ANY MORE.
+    //
+    // It used to be: no plan, no app. Browsing, searching and streaming were
+    // all behind it -- and we pay for none of those. The streams come from
+    // Pluto, Tubi and the Internet Archive, all free, and the whole of
+    // veedeeoh can be self-hosted by anyone who would rather not pay us. A
+    // wall here did not protect revenue; it hid the product from the only
+    // people who might buy it, and pushed the technical ones towards running
+    // their own copy.
+    //
+    // The paid line moved to the thing that appears on our bill: hosting a
+    // watch party. That is metered in credits, checked when a party is
+    // started, and enforced by can_host_party() in the database.
   }
 
   // Hydrate profiles first so the active profile + gate list are real.

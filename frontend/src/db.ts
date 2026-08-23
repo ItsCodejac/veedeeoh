@@ -126,9 +126,21 @@ export function filterRailsForKids<T extends { name?: string; items: any[] }>(ra
 
 const PAID_TIERS = new Set(["founder_vip", "giveaway", "cloud_paid", "trial_7day", "trial_dollar_month"]);
 
-/** Client-side access gate: an active, non-expired paid/trial tier. Server RLS
- *  (has_active_access) is the real enforcement; this drives the UI. */
-export async function hasActiveAccess(): Promise<boolean> {
+/** Is this account on a paid or trial plan?
+ *
+ *  RENAMED FROM hasActiveAccess, because that is not what it decides any more.
+ *  It used to gate the app: no plan, no browsing, no searching, no streaming.
+ *  None of those cost us anything -- the streams come from Pluto, Tubi and the
+ *  Internet Archive, and the whole app can be self-hosted for free -- so
+ *  charging for them was charging for the wrong thing and hiding the product
+ *  from the people deciding whether to pay for it.
+ *
+ *  What costs money is hosting a watch party, and that is metered in credits.
+ *  This function now answers only "which allowance do they get, and what should
+ *  the upsell say", never "may they come in".
+ *
+ *  Server RLS is the real enforcement either way; this drives copy. */
+export async function isSubscribed(): Promise<boolean> {
   const acct = await getAccount();
 
   // No row for a signed-in user is an ANOMALY, not a lapsed subscription. A
@@ -145,19 +157,24 @@ export async function hasActiveAccess(): Promise<boolean> {
   return true;
 }
 
-/** Entitlement is TWO-DIMENSIONAL, not one boolean.
+/** WHAT A PLAN ACTUALLY BUYS.
  *
- *  hasActiveAccess  -> may browse and stream the catalogue
- *  canJoinParty     -> may join a watch party someone else is hosting
+ *  Everything free to serve is free to use, because it is free to us and
+ *  because anyone can run their own copy of veedeeoh for nothing. Selling
+ *  access to free television is not a business we are in or could win.
  *
- *  A lapsed account keeps the second. The marginal cost of a viewer is zero --
- *  streams come from the providers, not from us -- so walling someone out
- *  entirely converts a live prospect into a lost one for no saving. A guest can
- *  only watch what a host chose, when the host chose it, which is a genuinely
- *  lesser product than a subscription rather than a substitute for one.
+ *    browse, search, stream    always, signed in or not entitled
+ *    join someone's party      always -- canJoinParty, below
+ *    host a party              metered: 3 hours a month free, 10 on the plan
  *
- *  Deliberately derived rather than a new tier: "signed in but not entitled" is
- *  already expressible, and a `party_guest` tier would be a second source of
+ *  The line sits at hosting because that is the line on our bill: Durable
+ *  Objects, sockets, signalling. The reasoning that always applied to guests --
+ *  the marginal cost of a viewer is zero, so walling one out converts a live
+ *  prospect into a lost one for no saving -- turned out to apply to the whole
+ *  catalogue. It just took noticing that we pay for none of it.
+ *
+ *  Deliberately derived rather than a new tier: "signed in but not subscribed"
+ *  is already expressible, and a `party_guest` tier would be a second source of
  *  truth that the Stripe webhook would have to learn not to overwrite.
  */
 export async function canJoinParty(): Promise<boolean> {

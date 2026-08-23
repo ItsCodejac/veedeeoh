@@ -658,9 +658,11 @@ export function showPartyEnded(opts: {
  *  Not four. An ending screen is where someone wants an obvious next step, and
  *  a menu is the opposite of that. The pair changes instead:
  *
- *  A LAPSED GUEST cannot browse, so "Home" was a lie -- it walked them into a
- *  paywall. Joining another party is the only thing they can genuinely do, so
- *  it becomes their second action rather than a nice extra.
+ *  It used to branch on entitlement, because "Home" walked a lapsed guest into
+ *  a paywall and the only honest offer left was another party. There is no
+ *  paywall to walk into now, so the branch is gone and everyone is offered the
+ *  catalogue -- which is the better offer, and the reason someone who just
+ *  enjoyed a party might stay.
  */
 async function renderEndedActions(
   box: HTMLElement,
@@ -669,17 +671,13 @@ async function renderEndedActions(
 ): Promise<void> {
   if (!box) return;
 
-  let entitled = true;
-  try {
-    const { hasActiveAccess } = await import("./db");
-    entitled = await hasActiveAccess();
-  } catch { /* fail open: a browse button that works is better than one hidden */ }
-
+  // "Join another party" used to be the alternative offered to a lapsed guest,
+  // because exploring was the one thing they could not do. Everyone can explore
+  // now, so there is no branch left: the catalogue is the better offer and it
+  // is available to whoever just finished watching.
   const secondary = opts.host
     ? { id: "peAnother", label: "Start another party" }
-    : entitled
-      ? { id: "peExplore", label: "Explore veedeeoh" }
-      : { id: "peAnother", label: "Join another party" };
+    : { id: "peExplore", label: "Explore veedeeoh" };
 
   box.innerHTML = `
     <button class="prBtn primary" id="peKeep">${opts.host ? "Explore veedeeoh" : "Keep watching this"}</button>
@@ -718,9 +716,10 @@ async function renderEndedActions(
 async function renderEndedUpsell(box: HTMLElement, isHost: boolean): Promise<void> {
   if (!box) return;
   try {
-    const { hasActiveAccess, trialDaysLeft, getAccount, startCheckout } = await import("./db");
+    const { isSubscribed, trialDaysLeft, getAccount, startCheckout } = await import("./db");
+    const { hostingHoursLeft } = await import("./party");
 
-    if (await hasActiveAccess()) {
+    if (await isSubscribed()) {
       // On a trial, and only near the end. Someone on day one does not need
       // reminding, and a subscriber needs nothing at all.
       const days = await trialDaysLeft();
@@ -728,12 +727,21 @@ async function renderEndedUpsell(box: HTMLElement, isHost: boolean): Promise<voi
       if (days === null || days > 3 || !String(acct?.tier || "").startsWith("trial")) return;
       box.innerHTML = `<p class="peUpsell">${days <= 1 ? "Your trial ends tomorrow" : `${days} days left in your trial`}.
         <button class="peLink" id="peSub">Keep your profiles and lists</button></p>`;
-    } else if (!isHost) {
-      // A lapsed guest: they can follow party links forever but cannot browse.
-      // Say exactly that, because it is true and it is the actual difference.
-      box.innerHTML = `<p class="peUpsell">You can always join a party you are invited to.
-        <button class="peLink" id="peSub">Watch anything, any time &mdash; $4/mo</button></p>`;
+    } else if (isHost) {
+      // A free host who has just spent some of their allowance. This is the one
+      // moment the number means something: they have used the paid feature and
+      // can see what it cost them. Silent while there is plenty left -- a
+      // countdown shown from full is nagging, not information.
+      const hours = await hostingHoursLeft();
+      if (hours === null || hours > 1) return;
+      box.innerHTML = `<p class="peUpsell">${hours <= 0
+        ? "That is your free hosting for the month."
+        : "Under an hour of free hosting left this month."}
+        <button class="peLink" id="peSub">10 hours a month &mdash; $4</button></p>`;
     } else {
+      // A guest, on any plan. Nothing to sell: watching is free and always was,
+      // and an upsell over the end of a film someone enjoyed is how you lose
+      // the goodwill the film just earned.
       return;
     }
 

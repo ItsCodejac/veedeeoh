@@ -118,3 +118,46 @@ Found by the audits, not IA work, fixed on their own:
 6. Five hard-coded gold stars on every title.
 7. Dead code: `ocean.ts` (581 lines, no importer), the party visualizer markup
    in index.html, the mini-player docking code, the household invite API.
+
+---
+
+## Addendum, 2026-08-23: where the paid line goes
+
+The gate moved from the front door to watch party hosting. The reasoning, kept
+here because the code can only show the result:
+
+**We are not paid for access.** The catalogue is Pluto, Tubi and the Internet
+Archive. All three are free with no paid tier of their own, so there is nothing
+to resell and no cost to us in serving it. veedeeoh is also free to self-host,
+which means a wall does not send a technical visitor to a competitor -- it
+sends them to `git clone`, and we lose the revenue and the relationship at once.
+
+**We are paid for hosting.** Watch party hosting is the only line on our bill:
+Durable Objects, sockets, signalling. It already had a per-minute meter that
+only paying accounts ever reached, so the app was charging for the free thing
+and giving away the expensive one.
+
+The shape now:
+
+| | Free | $4 | Self-host |
+|---|---|---|---|
+| Browse, search, stream | yes | yes | yes |
+| Join a party | yes | yes | yes |
+| Host a party | 3 hours/month | 10 hours/month | your bill |
+| Profiles | 3 seats | 3 seats | yours |
+
+Three hours, not one, because a film is about two: an allowance that cannot
+host one complete party demos a countdown rather than a feature. Both numbers
+are constants in `20260823010000_free_tier_hosting.sql`.
+
+Seats are unchanged and still not tier-gated. If the free tier needs to be
+narrower, seats are the next lever, not access.
+
+### Carried over, not yet rebuilt
+
+`showWhatIsWaiting()` was deleted with the paywall. It rendered the account's
+own half-finished films behind the price, on the reasoning that a number asks
+somebody to value an abstraction while their own unfinished film is concrete
+and already theirs. It was the best thing on that screen. It belongs on
+whatever eventually *asks* a free account to subscribe -- not on anything that
+blocks a door. Recovered from git history at the commit that removed it.
