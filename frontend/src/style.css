@@ -5059,8 +5059,15 @@ body.can-host .vodQuickBtn.partyAct { display: flex; }
    controls sat three and four clicks deep. It scrolls now. Same layout at
    every width, because every item that went missing went missing on mobile --
    the version with a second layout is the version nobody tests. */
-.setSection { scroll-margin-top: 12px; }
+/* Clears the sticky jump bar. At 12px every jump parked its own heading
+   underneath the bar -- the section was technically at the top of the
+   scroller, and invisible. A tolerance check said it landed; only measuring
+   against the bar's own bottom edge showed it had not. */
+.setSection { scroll-margin-top: 82px; }
 .setSection + .setSection { margin-top: 34px; }
+/* Tail room is set in JS to exactly what the last section needs -- see
+   renderSettings. A fixed 70vh worked but left most of a screen of nothing
+   under a short page. */
 .setSectionHead {
   margin: 0 0 14px; font-family: var(--display);
   font-size: 12px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase;
@@ -5068,20 +5075,20 @@ body.can-host .vodQuickBtn.partyAct { display: flex; }
   padding-bottom: 9px; border-bottom: 1px solid rgba(255,255,255,.08);
 }
 
-/* The jump bar sticks, so the map is available from anywhere on a long page. */
+/* HORIZONTAL AT EVERY WIDTH. It kept the old sidebar styling on desktop, so a
+   jump bar with six entries became six stacked rows above the content -- most
+   of the first screen spent on navigation for a page you are meant to scroll.
+   It is a bar now, and it sticks, so the map is available from anywhere. */
 #settingsNav {
   position: sticky; top: 0; z-index: 5;
-  background: linear-gradient(#06070a 70%, rgba(6,7,10,0));
-  padding-bottom: 10px;
+  display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  background: linear-gradient(#06070a 72%, rgba(6,7,10,0));
+  padding-bottom: 12px; margin-bottom: 4px;
 }
-@media (max-width: 768px) {
-  /* Horizontal and swipeable rather than stacked: six items down the side of a
-     phone is most of the first screen. */
-  #settingsNav {
-    display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-  }
-  #settingsNav::-webkit-scrollbar { display: none; }
-  #settingsNav .setNavBtn { flex: 0 0 auto; }
-  #settingsNav .setNavBtn svg { display: none; }
+#settingsNav::-webkit-scrollbar { display: none; }
+#settingsNav .setNavBtn {
+  flex: 0 0 auto; width: auto; margin: 0;
+  padding: 8px 13px; border-radius: 999px; font-size: 13px;
 }
+@media (max-width: 768px) { #settingsNav .setNavBtn svg { display: none; } }

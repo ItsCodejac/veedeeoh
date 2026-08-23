@@ -60,16 +60,9 @@ export async function renderAccount(el: HTMLElement): Promise<void> {
 
   void renderPasskeys(el.querySelector<HTMLElement>("#setPasskeys")!);
   void renderBilling(el.querySelector<HTMLElement>("#setBilling")!);
-  // Referrals moved to their own Settings section. A pointer stays here
-  // because this is where anyone who already knew it lived will look first.
-  const referBox = el.querySelector<HTMLElement>("#setReferral");
-  if (referBox) {
-    referBox.innerHTML = card("Refer and earn", `
-      <p class="setHint" style="margin:0">
-        Your link, your terms and what they have earned now live in
-        <a href="#settings/refer">Refer and earn</a>.
-      </p>`);
-  }
+  // No pointer card. Referrals have their own section, and on a single page
+  // that section is a few centimetres further down -- a card whose entire
+  // content is a link to something already visible is furniture.
 }
 
 // ---------------------------------------------------------------- billing ---

@@ -296,6 +296,18 @@ export async function renderSettings(section?: string): Promise<void> {
     }
   }));
 
+  // A SECTION HEADED "ACCOUNT" WHOSE FIRST CARD IS ALSO TITLED "ACCOUNT".
+  // Four of the six sections repeat themselves that way, because the cards
+  // were written when the section name was a nav item somewhere else rather
+  // than a heading two lines above. Done here rather than by editing four
+  // render functions, so a card keeps its title wherever else it is used.
+  for (const sec of available) {
+    const first = document.querySelector<HTMLElement>(`#setSecBody-${sec.id} .setCard h2`);
+    if (first && first.textContent?.trim().toLowerCase() === sec.label.toLowerCase()) {
+      first.remove();
+    }
+  }
+
   const scroller = document.getElementById("scrollableArea");
   nav.querySelectorAll<HTMLElement>("[data-jump]").forEach((b) => {
     b.addEventListener("click", () => {
@@ -327,6 +339,20 @@ export async function renderSettings(section?: string): Promise<void> {
     }, { root: scroller || null, rootMargin: "-10% 0px -80% 0px" });
     body.querySelectorAll(".setSection").forEach((el) => seen.observe(el));
   }
+
+  // Exactly enough room under the last section for it to reach the top, and no
+  // more. Without any, the final jump -- About -- scrolls as far as the page
+  // allows and stops short, so the button that looks broken is the last one
+  // anyone tries. With a fixed 70vh it worked and left most of a blank screen
+  // under a short page. Measured instead, and re-measured on resize.
+  const padTail = () => {
+    const last = body.querySelector<HTMLElement>(".setSection:last-child");
+    if (!last || !scroller) return;
+    const room = scroller.clientHeight - last.offsetHeight - (nav.offsetHeight || 0) - 24;
+    body.style.paddingBottom = `${Math.max(0, Math.round(room))}px`;
+  };
+  padTail();
+  window.addEventListener("resize", padTail);
 
   // Deep links still work: #settings/refer scrolls there instead of opening a
   // different page.
