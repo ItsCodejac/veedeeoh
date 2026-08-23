@@ -48,7 +48,8 @@ function applyWordmark(isKids: boolean): void {
 // KIDS IS STILL THE VIDEO. It is not a recolour of the same animation -- the
 // design has an entirely separate scene set for it (a ball drops, bounces, hops
 // to the v, rolls the name out, and ".kids" pops in) and porting it is its own
-// job. Branching here rather than pretending one animation covers both.
+// job. Its sting is different too, and kids-bump.mp4 carries both until that
+// port lands. Branching here rather than pretending one animation covers both.
 function playIdent(isKids: boolean, done: () => void): void {
   if (!isKids) {
     void import("./ident").then((m) => m.playIdent(done)).catch(done);

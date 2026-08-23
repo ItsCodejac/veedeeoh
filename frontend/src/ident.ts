@@ -13,9 +13,23 @@
 // transcribed. Anything that reads oddly (the -10% on the clip inset, the
 // dot riding revealPx + GAP) is from the original and deliberately unchanged.
 //
-// The audio is the design's own master, uploads/veedeeohbump.mp3, re-encoded
-// from 320k to 128k: 96 KB. Sound was the one part of those files that could
-// not be expressed as code.
+// EACH VARIANT HAS ITS OWN STING. Both jsx files in the design bundle point at
+// uploads/veedeeohbump.mp3, and that is stale: the rendered kids-bump.mp4
+// plainly carries different audio. Measured a second at a time, the normal
+// sting hits around -23 dB and decays to silence by four seconds, while the
+// kids one runs even and quieter across the whole five and a half. They are
+// separate pieces of music, not one piece at two volumes.
+//
+// So the normal ident uses the design master re-encoded 320k -> 128k, and the
+// kids ident uses audio lifted out of kids-bump.mp4 -- the only copy of it that
+// still exists anywhere, which is a reason not to delete that video until this
+// file is in the repo twice over.
+//
+// Levels are left as they were mixed. The kids sting really is about 10 dB
+// quieter, and that reads as deliberate for a children's profile rather than as
+// a mistake to normalise away.
+//
+// Sound is the one part of those videos that could not be expressed as code.
 //
 // WHAT GOES WITH THE VIDEO. A video can stall, be refused autoplay, or fail to
 // decode, so the old version carried a six second escape hatch, an onerror path
@@ -148,6 +162,9 @@ export interface IdentOptions {
   parent?: HTMLElement;
   /** Play the sting. */
   sound?: boolean;
+  /** Which ident. Kids has its own animation, still rendered from video for
+   *  now, but its own audio either way. */
+  kids?: boolean;
   /** Wordmark height in px. The design authors at 240 against a 1080 frame;
    *  scaled to the container so it reads the same on a phone. */
   size?: number;
@@ -217,7 +234,7 @@ export function playIdent(done: () => void, opts: IdentOptions = {}): void {
   let audio: HTMLAudioElement | null = null;
   if (opts.sound !== false) {
     try {
-      audio = new Audio("/ident.mp3");
+      audio = new Audio(opts.kids ? "/ident-kids.mp3" : "/ident.mp3");
       audio.volume = 0.9;
       // Allowed to fail. Autoplay policy varies by browser and by how the user
       // arrived, and the picture does not depend on it.
