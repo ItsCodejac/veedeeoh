@@ -121,43 +121,37 @@ Found by the audits, not IA work, fixed on their own:
 
 ---
 
-## Addendum, 2026-08-23: where the paid line goes
+## Addendum, 2026-08-23: what is actually being sold
 
-The gate moved from the front door to watch party hosting. The reasoning, kept
-here because the code can only show the result:
+I got this wrong once and it is worth writing down so it is not re-derived.
 
-**We are not paid for access.** The catalogue is Pluto, Tubi and the Internet
-Archive. All three are free with no paid tier of their own, so there is nothing
-to resell and no cost to us in serving it. veedeeoh is also free to self-host,
-which means a wall does not send a technical visitor to a competitor -- it
-sends them to `git clone`, and we lose the revenue and the relationship at once.
+**The error.** The catalogue is Pluto, Tubi and the Internet Archive, all free
+with no paid tier of their own. From that I concluded we could not charge for
+access, moved the paid line to metered watch party hosting, and opened the
+whole hosted app up for free. That reasoning is about the wrong product.
 
-**We are paid for hosting.** Watch party hosting is the only line on our bill:
-Durable Objects, sockets, signalling. It already had a per-minute meter that
-only paying accounts ever reached, so the app was charging for the free thing
-and giving away the expensive one.
+**The correction.** veedeeoh is free: clone it, run it, done. What costs $4 is
+*us* running it -- the deploy, the database, the catalogue warming, the Durable
+Objects. A hosted account that browses, streams, syncs and hosts for nothing is
+not a generous free tier, it is the product given away. Free means self-host.
 
-The shape now:
+    Self-host      free, forever, no account with us
+    Cloud, $4/mo   we run it: browse, sync, 3 profiles, unlimited parties
+    Free account   join 4 watch parties a month, nothing else
 
-| | Free | $4 | Self-host |
-|---|---|---|---|
-| Browse, search, stream | yes | yes | yes |
-| Join a party | yes | yes | yes |
-| Host a party | 3 hours/month | 10 hours/month | your bill |
-| Profiles | 3 seats | 3 seats | yours |
+**Why the free account exists at all.** Someone invited to a party needs to be
+able to accept without a card. That was already true -- `canJoinParty` returned
+true for anyone signed in -- but it was *unlimited*, which is not a taste: a
+household where one person pays could seat everyone else forever. Four a month
+is enough to be in the thing a friend keeps inviting you to and decide whether
+you want your own, and not enough to be a standing arrangement on their bill.
 
-Three hours, not one, because a film is about two: an allowance that cannot
-host one complete party demos a countdown rather than a feature. Both numbers
-are constants in `20260823010000_free_tier_hosting.sql`.
+**Counted in parties, not joins**, which the schema gives for free:
+`party_joins` is keyed `(party_id, user_id)`, so a refresh, a dropped socket or
+the auto-reconnect never creates a second row. The RLS insert policy fires only
+for a party this account has not been in, so the limit counts the right thing
+without a single line of dedup logic. The client check has to special-case a
+party already joined, or it ends up stricter than the database.
 
-Seats are unchanged and still not tier-gated. If the free tier needs to be
-narrower, seats are the next lever, not access.
-
-### Carried over, not yet rebuilt
-
-`showWhatIsWaiting()` was deleted with the paywall. It rendered the account's
-own half-finished films behind the price, on the reasoning that a number asks
-somebody to value an abstraction while their own unfinished film is concrete
-and already theirs. It was the best thing on that screen. It belongs on
-whatever eventually *asks* a free account to subscribe -- not on anything that
-blocks a door. Recovered from git history at the commit that removed it.
+Numbers live in `20260823030000_free_party_join_limit.sql` (4/month) and
+`grant_monthly_credits` (60 credits = 10h hosting, inside the subscription).

@@ -115,25 +115,18 @@ export async function sendTrialEndingEmail(email: string, daysLeft: number): Pro
 }
 
 /** Sent after it lapses. Leads with what they KEEP rather than what they lost:
- *  a lapsed account keeps the whole catalogue and a smaller hosting allowance,
- *  which is the point of the free tier and the most likely path back.
- *
- *  THE SUBJECT NO LONGER SAYS ANYTHING WAS LOST, because nothing was. The old
- *  version told people they "cannot browse the catalogue on your own until you
- *  subscribe" -- true when it was written and now the opposite of true. An
- *  email that overstates what ended is one somebody opens the app to check,
- *  finds working, and stops believing. */
+ *  a lapsed account can still follow watch party links, which is the whole
+ *  point of the free tier and the most likely path back. */
 export async function sendTrialEndedEmail(email: string): Promise<void> {
   const r = await sendEmail({
     to: email,
-    subject: "Your trial has ended, your account has not",
+    subject: "Your trial has ended",
     html: render({
-      preheader: "Everything still works. Watch party hosting drops to 3 hours a month.",
+      preheader: "Your account is still open, and watch party links still work.",
       heading: "Your trial has ended",
-      body: P("Nothing has been taken away. Your profiles, your lists and where you left off are all still there, and the whole catalogue is still yours to watch.")
-        + P("The one thing that changes is watch party hosting: three hours a month on the free tier instead of ten. Joining a party someone else is running is always free and always unlimited.")
-        + P("veedeeoh is free to self-host, too. The subscription pays for us to run it for you."),
-      cta: "Ten hours a month for $4", ctaUrl: "https://veedeeoh.com/#settings/account",
+      body: P("Your account is still open. Any watch party link you are sent will still work. You just cannot browse the catalogue on your own until you subscribe.")
+        + P("Everything you had is waiting: profiles, lists, and where you left off."),
+      cta: "Subscribe for $4 a month", ctaUrl: "https://veedeeoh.com/#settings/account",
     }),
   });
   if (!r.success) throw new Error(r.error || "email send failed");

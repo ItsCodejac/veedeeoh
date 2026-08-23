@@ -126,21 +126,9 @@ export function filterRailsForKids<T extends { name?: string; items: any[] }>(ra
 
 const PAID_TIERS = new Set(["founder_vip", "giveaway", "cloud_paid", "trial_7day", "trial_dollar_month"]);
 
-/** Is this account on a paid or trial plan?
- *
- *  RENAMED FROM hasActiveAccess, because that is not what it decides any more.
- *  It used to gate the app: no plan, no browsing, no searching, no streaming.
- *  None of those cost us anything -- the streams come from Pluto, Tubi and the
- *  Internet Archive, and the whole app can be self-hosted for free -- so
- *  charging for them was charging for the wrong thing and hiding the product
- *  from the people deciding whether to pay for it.
- *
- *  What costs money is hosting a watch party, and that is metered in credits.
- *  This function now answers only "which allowance do they get, and what should
- *  the upsell say", never "may they come in".
- *
- *  Server RLS is the real enforcement either way; this drives copy. */
-export async function isSubscribed(): Promise<boolean> {
+/** Client-side access gate: an active, non-expired paid/trial tier. Server RLS
+ *  (has_active_access) is the real enforcement; this drives the UI. */
+export async function hasActiveAccess(): Promise<boolean> {
   const acct = await getAccount();
 
   // No row for a signed-in user is an ANOMALY, not a lapsed subscription. A
@@ -157,29 +145,55 @@ export async function isSubscribed(): Promise<boolean> {
   return true;
 }
 
-/** WHAT A PLAN ACTUALLY BUYS.
+/** Entitlement is TWO-DIMENSIONAL, not one boolean.
  *
- *  Everything free to serve is free to use, because it is free to us and
- *  because anyone can run their own copy of veedeeoh for nothing. Selling
- *  access to free television is not a business we are in or could win.
+ *  hasActiveAccess  -> may browse and stream the catalogue
+ *  canJoinParty     -> may join a watch party someone else is hosting
  *
- *    browse, search, stream    always, signed in or not entitled
- *    join someone's party      always -- canJoinParty, below
- *    host a party              metered: 3 hours a month free, 10 on the plan
+ *  A lapsed account keeps the second. The marginal cost of a viewer is zero --
+ *  streams come from the providers, not from us -- so walling someone out
+ *  entirely converts a live prospect into a lost one for no saving. A guest can
+ *  only watch what a host chose, when the host chose it, which is a genuinely
+ *  lesser product than a subscription rather than a substitute for one.
  *
- *  The line sits at hosting because that is the line on our bill: Durable
- *  Objects, sockets, signalling. The reasoning that always applied to guests --
- *  the marginal cost of a viewer is zero, so walling one out converts a live
- *  prospect into a lost one for no saving -- turned out to apply to the whole
- *  catalogue. It just took noticing that we pay for none of it.
- *
- *  Deliberately derived rather than a new tier: "signed in but not subscribed"
- *  is already expressible, and a `party_guest` tier would be a second source of
+ *  Deliberately derived rather than a new tier: "signed in but not entitled" is
+ *  already expressible, and a `party_guest` tier would be a second source of
  *  truth that the Stripe webhook would have to learn not to overwrite.
  */
+export interface PartyJoinAllowance {
+  entitled: boolean;
+  used: number;
+  limit: number;
+  remaining: number;
+  can_join: boolean;
+}
+
+/** How many parties this account may still be in this month.
+ *
+ *  Asked of the database rather than counted here, because the RLS policy on
+ *  party_joins is the real limit and two implementations of one rule drift.
+ *  This one exists to EXPLAIN the limit before somebody hits it; the policy is
+ *  what holds when they open the console.
+ *
+ *  Null on any failure, and every caller treats null as "let them through". A
+ *  transient read error must not look like a spent allowance -- the insert will
+ *  be refused by the policy if it genuinely is. */
+export async function partyJoinAllowance(): Promise<PartyJoinAllowance | null> {
+  const { data, error } = await getSupabase().rpc("party_join_allowance");
+  if (error) { console.warn("[party] allowance", error); return null; }
+  return (data as PartyJoinAllowance) ?? null;
+}
+
+/** May this account join another party right now?
+ *
+ *  Unlimited on a plan. Four a month otherwise -- enough to be in the thing a
+ *  friend keeps inviting you to and decide whether you want your own account,
+ *  not enough to be a standing Friday arrangement on somebody else's bill. */
 export async function canJoinParty(): Promise<boolean> {
   const { data } = await getSupabase().auth.getUser();
-  return !!data.user;
+  if (!data.user) return false;
+  const a = await partyJoinAllowance();
+  return a ? a.can_join : true;   // unreadable: let RLS decide
 }
 
 /** Days left in the current trial/subscription (null if none or already expired). */

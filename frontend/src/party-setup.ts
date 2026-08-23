@@ -658,11 +658,9 @@ export function showPartyEnded(opts: {
  *  Not four. An ending screen is where someone wants an obvious next step, and
  *  a menu is the opposite of that. The pair changes instead:
  *
- *  It used to branch on entitlement, because "Home" walked a lapsed guest into
- *  a paywall and the only honest offer left was another party. There is no
- *  paywall to walk into now, so the branch is gone and everyone is offered the
- *  catalogue -- which is the better offer, and the reason someone who just
- *  enjoyed a party might stay.
+ *  A LAPSED GUEST cannot browse, so "Home" was a lie -- it walked them into a
+ *  paywall. Joining another party is the only thing they can genuinely do, so
+ *  it becomes their second action rather than a nice extra.
  */
 async function renderEndedActions(
   box: HTMLElement,
@@ -671,13 +669,17 @@ async function renderEndedActions(
 ): Promise<void> {
   if (!box) return;
 
-  // "Join another party" used to be the alternative offered to a lapsed guest,
-  // because exploring was the one thing they could not do. Everyone can explore
-  // now, so there is no branch left: the catalogue is the better offer and it
-  // is available to whoever just finished watching.
+  let entitled = true;
+  try {
+    const { hasActiveAccess } = await import("./db");
+    entitled = await hasActiveAccess();
+  } catch { /* fail open: a browse button that works is better than one hidden */ }
+
   const secondary = opts.host
     ? { id: "peAnother", label: "Start another party" }
-    : { id: "peExplore", label: "Explore veedeeoh" };
+    : entitled
+      ? { id: "peExplore", label: "Explore veedeeoh" }
+      : { id: "peAnother", label: "Join another party" };
 
   box.innerHTML = `
     <button class="prBtn primary" id="peKeep">${opts.host ? "Explore veedeeoh" : "Keep watching this"}</button>
@@ -716,10 +718,9 @@ async function renderEndedActions(
 async function renderEndedUpsell(box: HTMLElement, isHost: boolean): Promise<void> {
   if (!box) return;
   try {
-    const { isSubscribed, trialDaysLeft, getAccount, startCheckout } = await import("./db");
-    const { hostingHoursLeft } = await import("./party");
+    const { hasActiveAccess, trialDaysLeft, getAccount, startCheckout } = await import("./db");
 
-    if (await isSubscribed()) {
+    if (await hasActiveAccess()) {
       // On a trial, and only near the end. Someone on day one does not need
       // reminding, and a subscriber needs nothing at all.
       const days = await trialDaysLeft();
@@ -727,21 +728,12 @@ async function renderEndedUpsell(box: HTMLElement, isHost: boolean): Promise<voi
       if (days === null || days > 3 || !String(acct?.tier || "").startsWith("trial")) return;
       box.innerHTML = `<p class="peUpsell">${days <= 1 ? "Your trial ends tomorrow" : `${days} days left in your trial`}.
         <button class="peLink" id="peSub">Keep your profiles and lists</button></p>`;
-    } else if (isHost) {
-      // A free host who has just spent some of their allowance. This is the one
-      // moment the number means something: they have used the paid feature and
-      // can see what it cost them. Silent while there is plenty left -- a
-      // countdown shown from full is nagging, not information.
-      const hours = await hostingHoursLeft();
-      if (hours === null || hours > 1) return;
-      box.innerHTML = `<p class="peUpsell">${hours <= 0
-        ? "That is your free hosting for the month."
-        : "Under an hour of free hosting left this month."}
-        <button class="peLink" id="peSub">10 hours a month &mdash; $4</button></p>`;
+    } else if (!isHost) {
+      // A lapsed guest: they can follow party links forever but cannot browse.
+      // Say exactly that, because it is true and it is the actual difference.
+      box.innerHTML = `<p class="peUpsell">You can always join a party you are invited to.
+        <button class="peLink" id="peSub">Watch anything, any time &mdash; $4/mo</button></p>`;
     } else {
-      // A guest, on any plan. Nothing to sell: watching is free and always was,
-      // and an upsell over the end of a film someone enjoyed is how you lose
-      // the goodwill the film just earned.
       return;
     }
 
@@ -939,6 +931,42 @@ export function showRemoved(o: { title: string; code: string; text: string; canR
     el.remove();
     const { joinParty } = await import("./party");
     await joinParty(o.code);
+  });
+  el.querySelector("#prmClose")!.addEventListener("click", () => el.remove());
+}
+
+/** A free account that has used its four parties for the month.
+ *
+ *  The same full-screen card as a removal, deliberately, and not a toast. A
+ *  toast is the right size for "link copied" and the wrong size for "you
+ *  cannot come in, and here is the only way to change that" -- it expires on
+ *  its own while the person is still reading it, and it leaves them on a
+ *  veiled player with no idea what happened.
+ *
+ *  It says which party they are missing, because the specific one they were
+ *  invited to tonight is the argument. A generic wall is not. */
+export function showJoinLimit(o: { title: string; used: number; limit: number }): void {
+  document.getElementById("partyRemoved")?.remove();
+  const el = document.createElement("div");
+  el.id = "partyRemoved";
+  el.innerHTML = `
+    <div class="prmCard">
+      <p class="prmKicker">That is ${o.used} of ${o.limit} parties this month</p>
+      <h2>${escapeHtml(o.title || "This party")}</h2>
+      <p class="prmReason">A free account can be in ${o.limit} watch parties a month.
+        Yours resets on the first.</p>
+      <p class="prmHint">Cloud is $4 a month for unlimited parties, three profiles and the
+        whole catalogue to browse on your own. veedeeoh is also free to run yourself.</p>
+      <div class="prmRow">
+        <button class="partyBtn primary" id="prmSub">Subscribe &mdash; $4/mo</button>
+        <button class="partyBtn" id="prmClose">Not now</button>
+      </div>
+    </div>`;
+  document.body.appendChild(el);
+
+  el.querySelector("#prmSub")!.addEventListener("click", async () => {
+    const { startCheckout } = await import("./db");
+    try { await startCheckout(); } catch { showToast("Couldn't start checkout"); }
   });
   el.querySelector("#prmClose")!.addEventListener("click", () => el.remove());
 }

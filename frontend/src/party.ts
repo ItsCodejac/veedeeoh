@@ -202,13 +202,11 @@ export async function canHost(): Promise<boolean> {
   if (getActiveProfile()?.is_kids) return false;
   const { data } = await getSupabase().auth.getUser();
   if (!data.user) return false;
-  // CREDIT, NOT TIER. Hosting is what costs us money, so it is metered rather
-  // than sold: three hours a month free, ten on the plan. A free account is a
-  // host with a smaller allowance, not a non-host.
-  //
-  // Fail CLOSED. A transient error that wrongly lets someone browse costs
-  // nothing; one that lets an account host for free costs Durable Object time.
-  try { return (await hasHostingCredit()).ok; } catch { return false; }
+  const { hasActiveAccess } = await import("./db");
+  // Fail CLOSED here, unlike the browse gate. A transient error that wrongly
+  // lets someone browse is a small mistake; one that lets a lapsed account host
+  // is the hole this exists to close.
+  try { return await hasActiveAccess(); } catch { return false; }
 }
 
 export interface PartyOptions {
@@ -330,6 +328,30 @@ export async function joinParty(joinCode: string): Promise<void> {
 
   const { data: u } = await sb.auth.getUser();
   if (!u.user) { veil(); showToast("Sign in to join the party"); return; }
+
+  // THE MONTHLY LIMIT, checked only for a party this account has not been in.
+  //
+  // Asked in that order on purpose. The allowance counts parties joined this
+  // month, so somebody who has used all four and then reconnects to the fourth
+  // would be refused entry to a party they are already sitting in. The RLS
+  // policy gets this right for free -- an existing row makes the upsert an
+  // UPDATE, which never reaches the insert check -- and the client has to be
+  // told the same thing explicitly or it will be stricter than the database.
+  const { data: already } = await sb.from("party_joins")
+    .select("party_id").eq("party_id", party.id).eq("user_id", u.user.id).maybeSingle();
+
+  if (!already) {
+    const { partyJoinAllowance } = await import("./db");
+    const allow = await partyJoinAllowance();
+    // Null means the check itself failed. Let them through and let the policy
+    // decide: a network blip must not look like a spent allowance.
+    if (allow && !allow.can_join) {
+      veil();
+      const { showJoinLimit } = await import("./party-setup");
+      showJoinLimit({ title: party.title || "", used: allow.used, limit: allow.limit });
+      return;
+    }
+  }
 
   // Two separate records, deliberately. party_joins is the presence log for
   // this party; the referral is a permanent, first-touch claim on the guest's
@@ -727,16 +749,6 @@ export async function hasHostingCredit(): Promise<{ ok: boolean; exempt: boolean
   const c = (await ensurePartyCredits()) ?? (await partyCreditSummary());
   if (!c) return { ok: true, exempt: false, balance: 0 };   // no data: do not block
   return { ok: c.exempt || c.balance > 0, exempt: c.exempt, balance: c.balance };
-}
-
-/** Hours of hosting left this month, or null when it does not apply -- an
- *  exempt account, or a balance we could not read. Credits are 10 minutes each
- *  (METER_MINUTES), which is a detail no piece of copy should have to know. */
-export async function hostingHoursLeft(): Promise<number | null> {
-  const { partyCreditSummary } = await import("./db");
-  const c = await partyCreditSummary();
-  if (!c || c.exempt) return null;
-  return (c.balance * METER_MINUTES) / 60;
 }
 
 function startMetering(joinCode: string): void {
