@@ -15,7 +15,7 @@ import { getStoredProfiles, openProfileEditor, getActiveProfile } from "./profil
 import { card, row } from "./settings-ui";
 import { renderAccount } from "./settings-account";
 
-type SectionId = "account" | "household" | "playback" | "about";
+type SectionId = "account" | "household" | "public" | "refer" | "playback" | "about";
 
 interface Section {
   id: SectionId;
@@ -30,6 +30,8 @@ const ICON = {
   home: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>`,
   play: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>`,
   info: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`,
+  badge: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><path d="M17 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+  share: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/></svg>`,
 };
 
 function renderHousehold(el: HTMLElement): void {
@@ -49,8 +51,7 @@ function renderHousehold(el: HTMLElement): void {
         </div>`).join("")}
     </div>
     <div class="setBtnRow"><button class="setBtn primary" id="setAddProfile">Add a profile</button></div>`)
-    + card("Who can watch what", `<div id="setRatings"></div>`,
-        "Every profile's rating limits, side by side and editable here. A profile with nothing ticked can watch anything.");
+    ;
 
   el.querySelectorAll<HTMLElement>("[data-edit]").forEach((b) => {
     b.addEventListener("click", () => {
@@ -189,6 +190,16 @@ function renderAbout(el: HTMLElement): void {
   void renderCredits(el.querySelector<HTMLElement>("#setCredits"));
 }
 
+function renderReferSection(el: HTMLElement): void {
+  el.innerHTML = "";
+  void import("./settings-referral").then((m) => m.renderReferral(el));
+}
+
+function renderPublicPage(el: HTMLElement): void {
+  el.innerHTML = "";
+  void import("./settings-referral").then((m) => m.renderPublicSection(el));
+}
+
 /** Attribution for the avatar styles.
  *
  *  GENERATED FROM THE STYLE LIST, not written out. About half the styles on
@@ -222,7 +233,13 @@ async function renderCredits(box: HTMLElement | null): Promise<void> {
 
 const SECTIONS: Section[] = [
   { id: "account",   label: "Account",   icon: ICON.user, kidsSafe: false, render: renderAccount },
-  { id: "household", label: "Household", icon: ICON.home, kidsSafe: false, render: renderHousehold },
+  { id: "household", label: "Profiles",  icon: ICON.home, kidsSafe: false, render: renderHousehold },
+  // Its own section rather than buried in Account. Someone on partner terms
+  // opens the app to share a link and check what it earned; making that the
+  // fifth thing down inside another page is the wrong shape for the person
+  // whose entire relationship with the product is this.
+  { id: "public",    label: "Public profile", icon: ICON.badge, kidsSafe: false, render: renderPublicPage },
+  { id: "refer",     label: "Refer and earn", icon: ICON.share, kidsSafe: false, render: renderReferSection },
   { id: "playback",  label: "Playback",  icon: ICON.play, kidsSafe: true,  render: renderPlayback },
   { id: "about",     label: "About",     icon: ICON.info, kidsSafe: true,  render: renderAbout },
 ];
@@ -240,29 +257,87 @@ export function settingsSections(): Section[] {
  *  push history itself -- main.ts owns the route. */
 export async function renderSettings(section?: string): Promise<void> {
   const available = settingsSections();
-  const wanted = available.find((s) => s.id === section) || available[0]!;
-  currentSection = wanted.id;
-
   const nav = document.getElementById("settingsNav");
   const body = document.getElementById("settingsBody");
   if (!nav || !body) return;
 
+  // ONE PAGE, NOT SIX. The old nav swapped the body between sections, which is
+  // why twenty controls sat three and four clicks deep and why several were
+  // reachable on one width and not the other. Everything renders now; the bar
+  // scrolls rather than navigates, so there is no intermediate destination for
+  // anything to hide behind and no second layout to keep correct.
   nav.innerHTML = available.map((s) => `
-    <button class="setNavBtn${s.id === currentSection ? " active" : ""}" data-sec="${s.id}">
+    <button class="setNavBtn" data-jump="${s.id}">
       ${s.icon}<span>${escapeHtml(s.label)}</span>
     </button>`).join("");
 
-  nav.querySelectorAll<HTMLElement>("[data-sec]").forEach((b) => {
+  body.innerHTML = available.map((s) => `
+    <section class="setSection" id="setSec-${s.id}">
+      <h2 class="setSectionHead">${escapeHtml(s.label)}</h2>
+      <div id="setSecBody-${s.id}"></div>
+    </section>`).join("");
+
+  // Rendered in parallel: each section fetches its own data and one slow call
+  // should not hold up the rest of the page.
+  //
+  // AND SEPARATELY, so one failure cannot take the page with it. On a single
+  // page a rejected render inside Promise.all would blank all six sections --
+  // strictly worse than the old behaviour, where a broken section only broke
+  // itself. A section that throws now says so and leaves the rest alone.
+  await Promise.all(available.map(async (sec) => {
+    const host = document.getElementById(`setSecBody-${sec.id}`);
+    if (!host) return;
+    try {
+      await sec.render(host);
+    } catch (e) {
+      console.error(`[settings] ${sec.id} failed to render`, e);
+      host.innerHTML = `<p class="setHint">This section could not load. `
+        + `<a href="#settings/${sec.id}" onclick="location.reload()">Reload</a></p>`;
+    }
+  }));
+
+  const scroller = document.getElementById("scrollableArea");
+  nav.querySelectorAll<HTMLElement>("[data-jump]").forEach((b) => {
     b.addEventListener("click", () => {
-      const id = b.dataset.sec!;
-      if (id === currentSection) return;
-      location.hash = `#settings/${id}`;   // router re-enters renderSettings
+      const target = document.getElementById(`setSec-${b.dataset.jump}`);
+      if (!target) return;
+      currentSection = b.dataset.jump as SectionId;
+      // Written to the hash so Back returns to where they were reading, which
+      // is the one thing a jump bar loses over real navigation.
+      history.replaceState({}, "", `#settings/${b.dataset.jump}`);
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      paintActive();
     });
   });
 
-  body.innerHTML = "";
-  await wanted.render(body);
-  document.getElementById("scrollableArea")?.scrollTo({ top: 0 });
+  /** Highlight whichever section is actually on screen. A jump bar that never
+   *  updates is a row of buttons; one that tracks position is a map. */
+  const paintActive = () => {
+    nav.querySelectorAll<HTMLElement>("[data-jump]").forEach((b) =>
+      b.classList.toggle("active", b.dataset.jump === currentSection));
+  };
+
+  if ("IntersectionObserver" in window) {
+    const seen = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        currentSection = e.target.id.replace("setSec-", "") as SectionId;
+      }
+      paintActive();
+    }, { root: scroller || null, rootMargin: "-10% 0px -80% 0px" });
+    body.querySelectorAll(".setSection").forEach((el) => seen.observe(el));
+  }
+
+  // Deep links still work: #settings/refer scrolls there instead of opening a
+  // different page.
+  const wanted = available.find((s) => s.id === section);
+  currentSection = (wanted?.id || available[0]!.id) as SectionId;
+  paintActive();
+  if (wanted && wanted.id !== available[0]!.id) {
+    document.getElementById(`setSec-${wanted.id}`)?.scrollIntoView({ block: "start" });
+  } else {
+    scroller?.scrollTo({ top: 0 });
+  }
 }
 
 /** Navigate to settings. The hash is the source of truth, same as every other

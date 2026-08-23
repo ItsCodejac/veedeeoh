@@ -17,7 +17,20 @@ export async function renderReferral(el: HTMLElement): Promise<void> {
   const [code, sum, terms, sources] = await Promise.all([
     db.myReferralCode(), db.referralSummary(), db.myReferralTerms(), db.referralsBySource(),
   ]);
-  if (!code) { el.innerHTML = ""; return; }
+  // A BLANK PANE IS NOT AN ANSWER, and it was the wrong diagnosis too.
+  // myReferralCode() calls ensure_referral_code, which MINTS one -- so a null
+  // here does not mean "no code yet", it means the call failed: signed out, or
+  // the network. Offering "get my link" would have been a button for a problem
+  // nobody has. Say what happened and let them try again.
+  if (!code) {
+    el.innerHTML = card("Refer and earn", `
+      <p class="setHint" style="margin:0 0 14px">
+        Could not load your referral details just now.
+      </p>
+      <button class="setBtn" id="setRefRetry">Try again</button>`);
+    el.querySelector("#setRefRetry")?.addEventListener("click", () => { void renderReferral(el); });
+    return;
+  }
 
   const link = db.referralLink(code);
   const money = (c: number) => `$${(c / 100).toFixed(2)}`;
@@ -42,7 +55,8 @@ export async function renderReferral(el: HTMLElement): Promise<void> {
     ${row("Your terms", `<span class="setBadge${isPartner ? " gold" : ""}">${escapeHtml(rate)}% for ${months === 0 ? "the life of the account" : `${months} months`}</span>`)}
     <div class="setBtnRow">
       <input class="setInput" id="setRefLink" readonly value="${escapeHtml(link)}" />
-      <button class="setBtn primary" id="setRefCopy">Copy</button>
+      <button class="setBtn primary" id="setRefShare" hidden>Share</button>
+      <button class="setBtn" id="setRefCopy">Copy</button>
     </div>
     <div class="setStats">
       <div><b>${sum?.referred ?? 0}</b><span>Signed up</span></div>
@@ -57,14 +71,36 @@ export async function renderReferral(el: HTMLElement): Promise<void> {
         + "A referral is yours for 90 days; once they subscribe it is yours for good. "
         + "Payouts are made by hand while the programme is in beta.");
 
-  void renderPublicProfile(el);
-  void renderPicks(el);
-  void renderSuggestionsInbox(el);
-  void renderHostChannel(el);
+
+  // WHAT GETS SHARED IS A SENTENCE, NOT A URL. Copying a bare link means
+  // writing "hey, try this" yourself every time, which for somebody sharing
+  // twenty times is nineteen more sentences than they should have to write --
+  // and a naked link pasted into a chat is the thing people do not click.
+  const shareText = "I'm watching free movies and TV on veedeeoh. Thousands of "
+    + "titles in one app, and you can watch together in sync. Have a look:";
+
+  // Feature-detected rather than assumed. navigator.share exists on phones and
+  // in Safari, and is missing in most desktop browsers -- offering a button
+  // that throws is worse than not offering one.
+  const shareBtn = el.querySelector<HTMLButtonElement>("#setRefShare");
+  if (shareBtn && typeof navigator.share === "function") {
+    shareBtn.hidden = false;
+    shareBtn.addEventListener("click", async () => {
+      try {
+        await navigator.share({ title: "veedeeoh", text: shareText, url: link });
+      } catch (e: any) {
+        // AbortError is the user closing the sheet, which is not a failure and
+        // must not be reported as one.
+        if (e?.name !== "AbortError") showToast("Could not open the share sheet");
+      }
+    });
+  }
 
   el.querySelector("#setRefCopy")?.addEventListener("click", async () => {
-    try { await navigator.clipboard.writeText(link); showToast("Referral link copied"); }
-    catch { el.querySelector<HTMLInputElement>("#setRefLink")?.select(); }
+    try {
+      await navigator.clipboard.writeText(`${shareText} ${link}`);
+      showToast("Message and link copied");
+    } catch { el.querySelector<HTMLInputElement>("#setRefLink")?.select(); }
   });
 }
 
@@ -296,4 +332,19 @@ async function renderSuggestionsInbox(root: HTMLElement): Promise<void> {
     </div>`,
     "Titles people would like you to host. Who asked stays private.");
   root.appendChild(box);
+}
+
+/** Settings > Public profile.
+ *
+ *  These four were rendered by renderReferral because they happened to live in
+ *  the same file, which put "your recommendations" and "who suggested what to
+ *  you" inside a section called Refer and earn. Filing by module is not filing
+ *  by meaning: one of these is how you get paid, the other is who you are.
+ */
+export async function renderPublicSection(el: HTMLElement): Promise<void> {
+  el.innerHTML = "";
+  await renderPublicProfile(el);
+  await renderHostChannel(el);
+  await renderPicks(el);
+  await renderSuggestionsInbox(el);
 }

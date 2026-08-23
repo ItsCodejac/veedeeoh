@@ -884,7 +884,7 @@ function wireSidebar(): void {
       sheet.classList.remove("open");
       void import("./settingsview").then((m) => m.openSettings());
     });
-    item("Switch profile", ICON.user, forward("#sidebarUser"));
+    item("Account and profiles", ICON.user, forward("#sidebarUser"));
     if (document.getElementById("fbEntry")) item("Report something", ICON.chat, forward("#fbEntry"));
     if (document.getElementById("pwaInstallEntry")) item("Install app", ICON.down, forward("#pwaInstallEntry .sidebar-install-main"));
     item("Sign out", ICON.out, forward("#logoutBtn"), true);
@@ -1032,10 +1032,14 @@ function wireHeader(): void {
               <button id="menuSwitchProfileBtn" style="padding:12px;border-radius:10px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);color:#fff;font-weight:700;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
                 ${activeP.is_kids
                   ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg><span>Exit kids mode</span>'
-                  : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg><span>Switch profile</span>'}
+                  : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg><span>Who&rsquo;s watching</span>'}
               </button>
 
               ${activeP.is_kids ? '' : `
+              <button id="menuEditProfileBtn" style="padding:12px;border-radius:10px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);color:#fff;font-weight:700;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>
+                <span>Edit this profile</span>
+              </button>
               <button id="menuOpenSettingsBtn" style="padding:12px;border-radius:10px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);color:#fff;font-weight:700;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                 <span>Settings</span>
@@ -1065,6 +1069,15 @@ function wireHeader(): void {
             p.openProfileSwitcher((newP) => { void enterAsProfile(newP); });
           });
         }
+
+        // EDITING A PROFILE WAS FOUR CLICKS AND NEVER CALLED EDIT: You >
+        // Switch profile > Manage Profiles > tap an avatar. Nothing in that
+        // chain said what it led to, and "Manage Profiles" renames itself to
+        // "Done" the moment you are in it. Two clicks now, by its own name.
+        modal.querySelector("#menuEditProfileBtn")?.addEventListener("click", () => {
+          modal.remove();
+          p.openProfileEditor(p.getActiveProfile());
+        });
 
         const setBtn = modal.querySelector("#menuOpenSettingsBtn");
         if (setBtn) {

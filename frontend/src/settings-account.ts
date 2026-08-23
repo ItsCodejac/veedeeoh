@@ -60,8 +60,16 @@ export async function renderAccount(el: HTMLElement): Promise<void> {
 
   void renderPasskeys(el.querySelector<HTMLElement>("#setPasskeys")!);
   void renderBilling(el.querySelector<HTMLElement>("#setBilling")!);
-  const { renderReferral } = await import("./settings-referral");
-  void renderReferral(el.querySelector<HTMLElement>("#setReferral")!);
+  // Referrals moved to their own Settings section. A pointer stays here
+  // because this is where anyone who already knew it lived will look first.
+  const referBox = el.querySelector<HTMLElement>("#setReferral");
+  if (referBox) {
+    referBox.innerHTML = card("Refer and earn", `
+      <p class="setHint" style="margin:0">
+        Your link, your terms and what they have earned now live in
+        <a href="#settings/refer">Refer and earn</a>.
+      </p>`);
+  }
 }
 
 // ---------------------------------------------------------------- billing ---

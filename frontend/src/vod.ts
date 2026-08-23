@@ -605,7 +605,7 @@ export async function renderFavorites(): Promise<void> {
       </div>
       <div style="display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 520px; text-align: center">
         <div style="font-size: 30px; font-weight: 800; letter-spacing: -0.03em; color: #fff">Nothing on your list yet</div>
-        <div style="font-size: 16px; font-weight: 500; line-height: 1.55; color: #7C828C; text-wrap: pretty">Hit + on anything you want to get to later. It lands here, on every device you watch on.</div>
+        <div style="font-size: 16px; font-weight: 500; line-height: 1.55; color: #7C828C; text-wrap: pretty">Tap the heart on anything you want to keep. It lands here, on every device you watch on.</div>
       </div>
     `;
     container.append(empty);

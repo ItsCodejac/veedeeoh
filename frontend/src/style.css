@@ -5053,3 +5053,35 @@ body.can-host .vodQuickBtn.partyAct { display: flex; }
   .sidebar-logout { display: none; }
   .sidebar-legal { display: none; }
 }
+
+/* ---- settings: one page ---------------------------------------------------
+   The nav used to swap the body between six sections, which is why twenty
+   controls sat three and four clicks deep. It scrolls now. Same layout at
+   every width, because every item that went missing went missing on mobile --
+   the version with a second layout is the version nobody tests. */
+.setSection { scroll-margin-top: 12px; }
+.setSection + .setSection { margin-top: 34px; }
+.setSectionHead {
+  margin: 0 0 14px; font-family: var(--display);
+  font-size: 12px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase;
+  color: rgba(255,255,255,.42);
+  padding-bottom: 9px; border-bottom: 1px solid rgba(255,255,255,.08);
+}
+
+/* The jump bar sticks, so the map is available from anywhere on a long page. */
+#settingsNav {
+  position: sticky; top: 0; z-index: 5;
+  background: linear-gradient(#06070a 70%, rgba(6,7,10,0));
+  padding-bottom: 10px;
+}
+@media (max-width: 768px) {
+  /* Horizontal and swipeable rather than stacked: six items down the side of a
+     phone is most of the first screen. */
+  #settingsNav {
+    display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  #settingsNav::-webkit-scrollbar { display: none; }
+  #settingsNav .setNavBtn { flex: 0 0 auto; }
+  #settingsNav .setNavBtn svg { display: none; }
+}
