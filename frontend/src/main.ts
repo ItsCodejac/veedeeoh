@@ -42,41 +42,13 @@ function applyWordmark(isKids: boolean): void {
 // Branded ident, played on profile SELECTION (a user gesture, so audio is
 // allowed -- cold-boot autoplay cannot have sound).
 //
-// The normal variant is drawn, not played: src/ident.ts is a port of the design
-// the video was rendered from, at 96 KB of audio instead of 1.57 MB of H.264.
-//
-// KIDS IS STILL THE VIDEO. It is not a recolour of the same animation -- the
-// design has an entirely separate scene set for it (a ball drops, bounces, hops
-// to the v, rolls the name out, and ".kids" pops in) and porting it is its own
-// job. Its sting is different too, and kids-bump.mp4 carries both until that
-// port lands. Branching here rather than pretending one animation covers both.
+// Both variants are drawn now: src/ident.ts ports the design the two videos
+// were rendered from. Normal ignites a dot and writes with it; kids drops a
+// ball, bounces it, hops it onto the v and pops ".kids" in. They are separate
+// animations with separate stings, which is why the port is two scene tables
+// and not one with a colour swapped.
 function playIdent(isKids: boolean, done: () => void): void {
-  if (!isKids) {
-    void import("./ident").then((m) => m.playIdent(done)).catch(done);
-    return;
-  }
-
-  const o = document.createElement("div");
-  o.id = "bootIdent";
-  o.style.cssText = "position:fixed;inset:0;z-index:99999;background:#06070a;display:flex;align-items:center;justify-content:center;transition:opacity .5s ease;";
-  const v = document.createElement("video");
-  v.src = "/kids-bump.mp4";
-  v.autoplay = true; v.setAttribute("playsinline", "");
-  v.style.cssText = "width:100%;height:100%;object-fit:contain;";
-  let finished = false;
-  const finish = () => {
-    if (finished) return;
-    finished = true;
-    try { sessionStorage.setItem("veedeeoh_ident_at", String(Date.now())); } catch {}
-    o.style.opacity = "0";
-    setTimeout(() => o.remove(), 500);
-    done();
-  };
-  v.onended = finish; v.onerror = finish; o.onclick = finish;
-  o.appendChild(v);
-  document.body.appendChild(o);
-  setTimeout(finish, 6000); // never trap the user behind a stalled video
-  v.play().catch(() => { v.muted = true; v.play().catch(finish); }); // sound; fall back muted
+  void import("./ident").then((m) => m.playIdent(done, { kids: isKids })).catch(done);
 }
 
 // Region switch splash. Non-US catalogs are built live rather than served from

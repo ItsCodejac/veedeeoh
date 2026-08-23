@@ -626,41 +626,13 @@ class VodPlayer {
 
     const isKids = !!getActiveProfile()?.is_kids;
 
-    // The normal ident is drawn. Silent here on purpose: this plays over a film
-    // somebody just chose, and a sting on top of the opening seconds of their
-    // own content is the wrong instinct -- the one at profile entry already had
-    // the moment.
-    if (!isKids) {
-      const root = this.root;
-      if (!root) return;
-      void import("./ident").then((m) => m.playIdent(() => {}, { parent: root, sound: false }));
-      return;
-    }
-
-    const wrap = document.createElement("div");
-    wrap.dataset.role = "bump";
-    wrap.style.cssText = "position:absolute;inset:0;z-index:50;background:#06070a;display:flex;align-items:center;justify-content:center;transition:opacity .45s ease;";
-    const v = document.createElement("video");
-    v.src = isKids ? "/kids-bump.mp4" : "/bump.mp4";
-    v.autoplay = true;
-    v.setAttribute("playsinline", "");
-    v.style.cssText = "width:100%;height:100%;object-fit:contain;";
-    wrap.appendChild(v);
-    this.root?.appendChild(wrap);
-
-    let done = false;
-    const finish = () => {
-      if (done) return;
-      done = true;
-      wrap.style.opacity = "0";
-      setTimeout(() => wrap.remove(), 450);
-    };
-    v.onended = finish;
-    v.onerror = finish;
-    wrap.addEventListener("click", (e) => { e.stopPropagation(); finish(); }, { signal: this.ac.signal });
-    setTimeout(finish, 6000);                                  // never trap the viewer
-    // Sound where the browser allows it; this follows a click, so it usually does.
-    v.play().catch(() => { v.muted = true; v.play().catch(finish); });
+    // Drawn, and silent here on purpose: this plays over a film somebody just
+    // chose, and a sting on top of the opening seconds of their own content is
+    // the wrong instinct. The ident at profile entry already had that moment.
+    const root = this.root;
+    if (!root) return;
+    void import("./ident").then((m) =>
+      m.playIdent(() => {}, { parent: root, sound: false, kids: isKids }));
   }
 
   private hideLoader = (): void => {
