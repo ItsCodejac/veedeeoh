@@ -122,6 +122,13 @@ begin
 end;
 $$;
 
+-- Revoked like every other definer function here. Calling a trigger function
+-- directly raises "can only be called as a trigger", so this is hygiene rather
+-- than a hole -- but a SECURITY DEFINER function that anyone may execute is
+-- exactly the shape of the bug this project already had once, and leaving one
+-- around teaches the wrong default.
+revoke execute on function public.handle_new_user() from public, anon, authenticated;
+
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
