@@ -632,7 +632,7 @@ class VodPlayer {
     const root = this.root;
     if (!root) return;
     void import("./ident").then((m) =>
-      m.playIdent(() => {}, { parent: root, sound: false, kids: isKids }));
+      m.playIdent(() => {}, { parent: root, sound: false, variant: isKids ? "kids" : "main" }));
   }
 
   private hideLoader = (): void => {

@@ -155,3 +155,21 @@ party already joined, or it ends up stricter than the database.
 
 Numbers live in `20260823030000_free_party_join_limit.sql` (4/month) and
 `grant_monthly_credits` (60 credits = 10h hosting, inside the subscription).
+
+---
+
+## Noted 2026-08-23: a host can open unlimited parties
+
+Nothing enforces one open party per host. `parties` has a unique `join_code`
+and an index on `(host_user_id, created_at)`, but no constraint on how many
+rows a host may have with `ended_at is null`. Both the client and the RLS
+insert policy check entitlement and say nothing about count.
+
+The database fix is one partial unique index:
+
+    create unique index parties_one_open_per_host
+      on public.parties (host_user_id) where ended_at is null;
+
+Deferred on purpose: the party UI is being rebuilt, and the index will fail to
+create if any host already has two open rows, so it needs a pass closing the
+stale ones first. Both belong with that work rather than ahead of it.

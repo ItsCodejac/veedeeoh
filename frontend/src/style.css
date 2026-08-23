@@ -5372,3 +5372,10 @@ body.no-element-fullscreen .vds-fullscreen-button { display: none !important; }
 .kwI   { color: #ffc93a; }
 .kwD   { color: #3ac9f5; }
 .kwS   { color: var(--accent); }
+
+/* The party ident, filling the joining curtain. The wordmark and track bar
+   underneath stay in the flow and become visible if the work outlasts the
+   animation -- a curtain that lifts before the stage is ready is the thing
+   this replaces. */
+#partyJoining .pjIdent { position: absolute; inset: 0; z-index: 2; }
+#partyJoining .pjInner { position: relative; z-index: 1; }

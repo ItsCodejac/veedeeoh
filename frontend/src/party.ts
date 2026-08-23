@@ -10,7 +10,7 @@
 import { getSupabase } from "./auth";
 import { getActiveProfile } from "./profiles";
 import { allowedRatingsFor } from "./db";
-import { showToast } from "./util";
+import { showToast, escapeHtml } from "./util";
 import { openVodPlayer, setPartyEmitter, applyPartyState, setPartyViewerMode, setPartyPlayback, resyncToHost, stopPartySync, type PartyPlaybackState } from "./vodplayer";
 
 const WORKER_URL = (import.meta.env.VITE_PARTY_WORKER_URL as string) || "";
@@ -300,7 +300,7 @@ export async function joinParty(joinCode: string): Promise<void> {
   // screen explaining any of it -- so the invite looked like it had failed
   // right up until the film appeared. Covered, and torn down on every exit
   // path below.
-  const veil = showJoining(joinCode);
+  const veil = partyCurtain(`Joining ${joinCode.toUpperCase()}`);
 
   const sb = getSupabase();
   // Through the definer function, not a table select. The select policy no
@@ -309,7 +309,7 @@ export async function joinParty(joinCode: string): Promise<void> {
   // "private" party. Knowing the code is now the credential.
   const { data: rows, error } = await sb.rpc("party_by_code", { code: joinCode });
   const party = Array.isArray(rows) ? rows[0] : rows;
-  if (error || !party) { veil(); showToast("That party has ended or the link is wrong"); return; }
+  if (error || !party) { void veil(true); showToast("That party has ended or the link is wrong"); return; }
 
   // THE KIDS TRAP. A party link handed to a kids profile would otherwise play
   // whatever the host is playing. Refuse outright rather than filtering -- a
@@ -320,14 +320,14 @@ export async function joinParty(joinCode: string): Promise<void> {
     const item = await lookupCatalogItem(party.content_id);
     const rating = (item?.rating || "").toUpperCase();
     if (!rating || !allowed.has(rating)) {
-      veil();
+      void veil(true);
       showToast(`This party is playing something outside ${profile.name}'s rating limits`);
       return;
     }
   }
 
   const { data: u } = await sb.auth.getUser();
-  if (!u.user) { veil(); showToast("Sign in to join the party"); return; }
+  if (!u.user) { void veil(true); showToast("Sign in to join the party"); return; }
 
   // THE MONTHLY LIMIT, checked only for a party this account has not been in.
   //
@@ -346,7 +346,7 @@ export async function joinParty(joinCode: string): Promise<void> {
     // Null means the check itself failed. Let them through and let the policy
     // decide: a network blip must not look like a spent allowance.
     if (allow && !allow.can_join) {
-      veil();
+      void veil(true);
       const { showJoinLimit } = await import("./party-setup");
       showJoinLimit({ title: party.title || "", used: allow.used, limit: allow.limit });
       return;
@@ -366,7 +366,7 @@ export async function joinParty(joinCode: string): Promise<void> {
     .then(({ error: e }) => { if (e) console.warn("[party] referral not recorded", e); });
 
   const item = await lookupCatalogItem(party.content_id);
-  if (!item) { veil(); showToast("That title isn't in the catalog any more"); return; }
+  if (!item) { void veil(true); showToast("That title isn't in the catalog any more"); return; }
 
   // Each viewer resolves their OWN url -- a Pluto JWT is per-session and
   // expires, so the host's cannot be shared. asPartyChannel used to read
@@ -376,7 +376,7 @@ export async function joinParty(joinCode: string): Promise<void> {
   const vod = await import("./vod");
 
   const resolved = await viewerStreamsFor(item, vod);
-  if (!resolved) { veil(); showToast("That title can't be streamed right now"); return; }
+  if (!resolved) { void veil(true); showToast("That title can't be streamed right now"); return; }
   const { streams, url } = resolved;
 
   // Do NOT open the player yet. A guest was dropped straight into the film the
@@ -950,30 +950,60 @@ function asPartyChannel(item: any, url: string | null, streams?: any[] | null): 
 }
 
 
-/** Full-screen "joining" cover. Returns its own dismiss function so every exit
- *  path from joinParty -- including the failures -- can drop it, rather than
- *  relying on one happy-path removal that a `return` above it would skip. */
-function showJoining(code: string): () => void {
+/** The curtain over a party transition.
+ *
+ *  WHY IT EXISTS. Starting a party is three round trips -- resolve the streams,
+ *  create the party, open the socket -- and joining one is two. None of that
+ *  was covered on the host side at all, so pressing "start a watch party"
+ *  flashed the home screen and then jumped to a lobby. The joiner had a
+ *  wordmark and a track bar, which said something was happening without making
+ *  it feel like part of the product.
+ *
+ *  The party ident covers it now, and the work runs behind it. Dismiss waits
+ *  for the animation to finish, so the curtain never cuts mid-frame: the wait
+ *  is max(ident, work) rather than their sum, and the ident is 2.4s against
+ *  network calls that usually take longer.
+ *
+ *  If the work outlasts the ident, the old wordmark and track bar are still
+ *  underneath and simply become visible. A curtain that lifts before the stage
+ *  is ready is the thing this replaces.
+ */
+function partyCurtain(sub: string): (now?: boolean) => Promise<void> {
   const el = document.createElement("div");
   el.id = "partyJoining";
   el.innerHTML = `
+    <div class="pjIdent"></div>
     <div class="pjInner">
       <div class="pjMark">veedeeoh<span class="dot">.</span><span class="sfx">party</span></div>
-      <div class="pjSub">Joining ${code.toUpperCase()}</div>
+      <div class="pjSub">${escapeHtml(sub)}</div>
       <div class="vdTrackBar"><span></span></div>
     </div>`;
   document.body.appendChild(el);
   requestAnimationFrame(() => el.classList.add("in"));
 
+  // Resolves when the ident has played out, or immediately if it could not be
+  // loaded at all -- a missing brand animation must not hold up a party.
+  const identDone = new Promise<void>((resolve) => {
+    void import("./ident")
+      .then((m) => m.playIdent(() => resolve(), {
+        parent: el.querySelector<HTMLElement>(".pjIdent")!,
+        variant: "party",
+      }))
+      .catch(() => resolve());
+  });
+
   let gone = false;
-  return () => {
+  // `now` for the failure paths. Holding a curtain up for 2.4s of brand
+  // animation before revealing "that party has ended" is the animation getting
+  // in the way of the message, which is the opposite of the job.
+  return async (now = false) => {
     if (gone) return;
     gone = true;
+    if (!now) await identDone;
     el.classList.remove("in");
     setTimeout(() => el.remove(), 380);
   };
 }
-
 
 // ------------------------------------------------------- viewer resync ---
 

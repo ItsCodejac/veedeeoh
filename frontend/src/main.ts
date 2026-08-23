@@ -44,13 +44,13 @@ function applyWordmark(isKids: boolean): void {
 // Branded ident, played on profile SELECTION (a user gesture, so audio is
 // allowed -- cold-boot autoplay cannot have sound).
 //
-// Both variants are drawn now: src/ident.ts ports the design the two videos
-// were rendered from. Normal ignites a dot and writes with it; kids drops a
-// ball, bounces it, hops it onto the v and pops ".kids" in. They are separate
-// animations with separate stings, which is why the port is two scene tables
-// and not one with a colour swapped.
+// Both variants come from the design's own standalone component now. The hand
+// port that used to live here matched the source numbers and still looked
+// wrong, so none of it survived.
 function playIdent(isKids: boolean, done: () => void): void {
-  void import("./ident").then((m) => m.playIdent(done, { kids: isKids })).catch(done);
+  void import("./ident")
+    .then((m) => m.playIdent(done, { variant: isKids ? "kids" : "main" }))
+    .catch(done);
 }
 
 // Region switch splash. Non-US catalogs are built live rather than served from
