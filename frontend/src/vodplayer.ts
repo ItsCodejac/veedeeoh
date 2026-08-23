@@ -148,6 +148,19 @@ class VodPlayer {
         src: toSource(first.url),
         autoplay: true,
         currentTime: this.startTime,
+        // THE ROOT OF "REACTIONS DO NOT WORK ON MOBILE". Vidstack defaults
+        // playsInline to FALSE, so the video element never got the attribute,
+        // and iOS takes a video without playsinline into its own full-screen
+        // player the instant it starts playing. Not on a button press -- on
+        // the first frame. So every watch party on an iPhone was running
+        // inside the system player from the moment it began, where no reaction
+        // bar, no knock and no removal card can be drawn, and where rotating
+        // the phone moves the video and nothing else because there is nothing
+        // else there.
+        //
+        // Everything above this was aimed at the fullscreen BUTTON, which was
+        // never the thing doing it.
+        playsInline: true,
         layout: new VidstackPlayerLayout(),
       });
     } catch (e: any) {
