@@ -359,81 +359,8 @@ async function decidedIds() {
 
 const TV_RATINGS = new Set(["TV-Y", "TV-Y7", "TV-Y7-FV", "TV-G", "TV-PG", "TV-14", "TV-MA"]);
 
-/** The queue is the OPT-IN pool: titles a restricted profile cannot see on its
- *  own. TV-rated content within a tier's ceiling is already admitted
- *  automatically, so approving it would be busywork -- Bluey is in whether or
- *  not anyone clicks. What needs a human is everything the rating system cannot
- *  vouch for: MPAA letters, whose meaning moved when PG-13 arrived in 1984, and
- *  unrated titles.
- *
- *  Narrowed to titles that could plausibly be for children, by rating or genre,
- *  so the queue is a few hundred rather than two thousand. */
-async function curateQueue() {
-  const j = await (await fetch(`${SITE}/api/vod`)).json();
-  const seen = new Set(), pool = [];
-  for (const rail of j.rails || []) {
-    for (const it of rail.items || []) {
-      if (seen.has(it.id)) continue;
-      seen.add(it.id);
-      const rating = (it.rating || "").toUpperCase();
-      if (TV_RATINGS.has(rating)) continue;                    // already auto-admitted or auto-excluded
-      // Only ratings a child might plausibly be allowed to watch: PG-13 and R are
-      // not judgement calls. Every G is worth a look, since G is the strongest
-      // signal we have and also the one that drifted (The Ten Commandments is G).
-      // PG and unrated need a genre hint as well, or the queue fills with 371
-      // adult dramas that happen to predate PG-13.
-      if (!["G", "PG", "NOT RATED", ""].includes(rating)) continue;
-      const kidGenre = /kids|famil|animation|anime|cartoon/i.test(it.genre || "");
-      if (rating !== "G" && !kidGenre) continue;
-      pool.push(it);
-    }
-  }
-  const order = { G: 0, PG: 1 };
-  pool.sort((a, b) => (order[(a.rating || "").toUpperCase()] ?? 2) - (order[(b.rating || "").toUpperCase()] ?? 2));
-  const decided = await decidedIds();
-  const showUnsure = false;
-  const link = (it) => {
-    const id = String(it.id || "");
-    if (id.startsWith("tubi:")) return `https://tubitv.com/${it.series_id ? "series" : "movies"}/${id.replace("tubi:", "")}`;
-    if (id.startsWith("archive:")) return `https://archive.org/details/${id.replace("archive:", "")}`;
-    return "https://pluto.tv/en/on-demand";
-  };
-  return {
-    counts: Object.entries(TIERS).reduce((a, [k]) => ({ ...a, [k]: Object.values(decided).filter((v) => v === k).length }), {}),
-    total: pool.length,
-    unsure: pool.filter((it) => decided[it.id] === "no").map((it) => ({
-      id: it.id, title: it.title, poster: it.poster, rating: it.rating,
-      provider: it.provider || (String(it.id).startsWith("tubi:") ? "Tubi" : "Pluto TV"),
-      summary: (it.summary || "").slice(0, 220),
-      kind: it.series_id ? "series" : "title",
-      watchUrl: link(it),
-    })),
-    queue: pool.filter((it) => !decided[it.id]).map((it) => ({
-      id: it.id, title: it.title, poster: it.poster, rating: it.rating,
-      maturity: it.maturity, provider: it.provider || (String(it.id).startsWith("tubi:") ? "Tubi" : String(it.id).startsWith("archive:") ? "Internet Archive" : "Pluto TV"),
-      summary: (it.summary || "").slice(0, 220),
-      kind: it.series_id ? "series" : "title",
-      watchUrl: link(it),
-    })),
-  };
-}
 
-async function curateDecide({ contentId, decision, kind = "title" }) {
-  if (!TIERS[decision]) return { ok: false, error: "unknown decision" };
-  const collection_id = await ensureCollection(decision);
-  const r = await sb("collection_items", {
-    method: "POST", headers: { Prefer: "resolution=merge-duplicates" },
-    body: JSON.stringify({ collection_id, content_id: contentId, kind }),
-  });
-  if (!r.ok) return { ok: false, error: (await r.json().catch(() => ({}))).message || `HTTP ${r.status}` };
-  return { ok: true };
-}
 
-async function curateUndo({ contentId }) {
-  const ids = await Promise.all(Object.keys(TIERS).map((k) => ensureCollection(k)));
-  const r = await sb(`collection_items?content_id=eq.${encodeURIComponent(contentId)}&collection_id=in.(${ids.join(",")})`, { method: "DELETE" });
-  return { ok: r.ok };
-}
 
 // ------------------------------------------------------------------ users ---
 const PAID = ["founder_vip", "giveaway", "cloud_paid", "trial_7day", "trial_dollar_month"];
@@ -641,6 +568,208 @@ async function accountSnapshot(email) {
   return { ...u, referral: codes[0] || null };
 }
 
+// ------------------------------------------------------------------ overview ---
+
+/** The numbers that answer "how is it going" without opening four sections.
+ *
+ *  Every count is exact rather than sampled: PostgREST returns one through the
+ *  content-range header when asked, so an accurate figure costs the same as a
+ *  wrong one. */
+async function overview() {
+  // select=* rather than a named column: referrals and party_joins have no `id`
+  // -- their keys are composite -- so asking for one is a 400.
+  //
+  // AND A FAILED COUNT RETURNS NULL, NOT ZERO. The first version fell back to 0
+  // when the header was missing, so a rejected query rendered as a confident
+  // "0 referrals" on a dashboard whose whole job is to be believed. A number
+  // that cannot be produced should look unavailable, not empty.
+  const count = async (table, query = "") => {
+    const r = await sb(`${table}?select=*${query ? "&" + query : ""}`, {
+      headers: { Prefer: "count=exact", Range: "0-0" },
+    });
+    if (!r.ok) { console.error(`  count(${table}) failed:`, await r.text()); return null; }
+    const n = Number((r.headers.get("content-range") || "").split("/")[1]);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const dayAgo = new Date(Date.now() - 864e5).toISOString();
+  const weekAgo = new Date(Date.now() - 7 * 864e5).toISOString();
+  const nowIso = new Date().toISOString();
+
+  const [users, newWeek, paid, trialing, partiesDay, joinsDay, refs, refsPaid, reports, waitlist] =
+    await Promise.all([
+      count("profiles"),
+      count("profiles", `created_at=gte.${weekAgo}`),
+      // Access means a paid tier that has not lapsed. Counting tier alone
+      // reports expired founders as customers, which is how a dashboard tells
+      // you business is better than it is.
+      count("profiles", `tier=in.(founder_vip,cloud_paid,giveaway)&or=(tier_expires.is.null,tier_expires.gte.${nowIso})`),
+      count("profiles", `tier=eq.trial_7day&tier_expires=gte.${nowIso}`),
+      count("parties", `created_at=gte.${dayAgo}`),
+      count("party_joins", `joined_at=gte.${dayAgo}`),
+      count("referrals"),
+      count("referrals", "first_paid_at=not.is.null"),
+      count("profile_reports", "handled_at=is.null"),
+      count("waitlist"),
+    ]);
+
+  return {
+    users, newWeek, paid, trialing,
+    partiesDay, joinsDay,
+    referrals: refs, referralsConverted: refsPaid,
+    openReports: reports, waitlist,
+  };
+}
+
+// ------------------------------------------------------------------- reports ---
+
+/** Profiles people have flagged.
+ *
+ *  NOTHING READ THIS TABLE. Reporting shipped with the public profiles, the
+ *  rows have been accumulating with nowhere to go, and a report nobody can see
+ *  is worse than no report button at all -- it tells someone their complaint
+ *  was received when it was only stored. */
+async function reportQueue(status = "open") {
+  const filter = status === "open" ? "&handled_at=is.null"
+    : status === "handled" ? "&handled_at=not.is.null" : "";
+  const r = await sb(
+    `profile_reports?select=id,subject_user_id,reason,created_at,handled_at${filter}` +
+    `&order=created_at.desc&limit=100`);
+  if (!r.ok) return { ok: false, error: await r.text() };
+  const rows = await r.json();
+  if (!rows.length) return { ok: true, groups: [] };
+
+  // Grouped by subject: five reports about one person is one decision, not
+  // five, and a list of individual rows hides how bad something is.
+  const ids = [...new Set(rows.map((x) => x.subject_user_id))];
+  const pr = await sb(
+    `profiles?select=id,email,public_handle,display_name,public_parties_banned&id=in.(${ids.join(",")})`);
+  const people = pr.ok ? await pr.json() : [];
+  const byId = Object.fromEntries(people.map((p) => [p.id, p]));
+
+  const groups = ids.map((id) => {
+    const mine = rows.filter((x) => x.subject_user_id === id);
+    const reasons = {};
+    for (const m of mine) reasons[m.reason] = (reasons[m.reason] || 0) + 1;
+    const p = byId[id] || {};
+    return {
+      userId: id,
+      email: p.email || null,
+      handle: p.public_handle || null,
+      name: p.display_name || null,
+      banned: !!p.public_parties_banned,
+      count: mine.length,
+      open: mine.filter((m) => !m.handled_at).length,
+      reasons,
+      latest: mine[0]?.created_at,
+    };
+  }).sort((a, b) => b.open - a.open || b.count - a.count);
+
+  return { ok: true, groups };
+}
+
+/** Ban or unban a profile from being listed publicly, and close its reports.
+ *
+ *  Banning hides the profile and its public parties; it does not touch the
+ *  account, which can still watch. Marking handled is separate from banning so
+ *  a report can be dismissed without punishing anyone -- most will be. */
+async function resolveReport({ userId, ban, dismiss }) {
+  if (!userId) return { ok: false, error: "userId required" };
+
+  if (ban !== undefined) {
+    const r = await sb(`profiles?id=eq.${userId}`, {
+      method: "PATCH", headers: { Prefer: "return=representation" },
+      body: JSON.stringify({ public_parties_banned: !!ban }),
+    });
+    if (!r.ok) return { ok: false, error: await r.text() };
+  }
+
+  if (dismiss || ban !== undefined) {
+    await sb(`profile_reports?subject_user_id=eq.${userId}&handled_at=is.null`, {
+      method: "PATCH", body: JSON.stringify({ handled_at: new Date().toISOString() }),
+    });
+  }
+  return { ok: true, ...(await reportQueue("open")) };
+}
+
+// ------------------------------------------------------------------- parties ---
+
+/** What is running now, and what ran recently.
+ *
+ *  Twelve parties have happened and there has been no way to see any of them --
+ *  not who hosted, not whether anyone joined, not whether a public one is live
+ *  right now. */
+async function partyActivity() {
+  const sixHours = new Date(Date.now() - 6 * 3600e3).toISOString();
+  const r = await sb(
+    "parties?select=id,join_code,title,host_user_id,is_public,seat_limit,created_at,ended_at" +
+    "&order=created_at.desc&limit=40");
+  if (!r.ok) return { ok: false, error: await r.text() };
+  const rows = await r.json();
+  if (!rows.length) return { ok: true, live: [], recent: [] };
+
+  const hostIds = [...new Set(rows.map((p) => p.host_user_id).filter(Boolean))];
+  const hr = hostIds.length
+    ? await sb(`profiles?select=id,email,public_handle&id=in.(${hostIds.join(",")})`) : null;
+  const hosts = hr && hr.ok ? await hr.json() : [];
+  const hostBy = Object.fromEntries(hosts.map((h) => [h.id, h]));
+
+  const jr = await sb(`party_joins?select=party_id`);
+  const joins = jr.ok ? await jr.json() : [];
+  const joinCount = {};
+  for (const j of joins) joinCount[j.party_id] = (joinCount[j.party_id] || 0) + 1;
+
+  const shape = (p) => ({
+    code: p.join_code, title: p.title || "Untitled",
+    host: hostBy[p.host_user_id]?.public_handle || hostBy[p.host_user_id]?.email || "unknown",
+    isPublic: !!p.is_public, joins: joinCount[p.id] || 0,
+    started: p.created_at, ended: p.ended_at,
+  });
+
+  // "Live" is not ended AND started within the idle window the worker uses --
+  // a row whose host vanished without ending it is not a live party, and
+  // counting it as one makes the number a lie that never goes down.
+  const live = rows.filter((p) => !p.ended_at && p.created_at > sixHours).map(shape);
+  const recent = rows.filter((p) => p.ended_at || p.created_at <= sixHours).slice(0, 20).map(shape);
+  return { ok: true, live, recent };
+}
+
+// ----------------------------------------------------------------- referrals ---
+
+/** Who introduced whom, and whether it has converted yet.
+ *
+ *  referral_earnings shows money owed; this shows the pipeline behind it,
+ *  including claims that have not converted -- which is the half that tells you
+ *  whether the programme is working at all. */
+async function referralLedger() {
+  const r = await sb(
+    "referrals?select=referrer_user_id,referred_user_id,code,source,first_paid_at,created_at,expires_at" +
+    "&order=created_at.desc&limit=100");
+  if (!r.ok) return { ok: false, error: await r.text() };
+  const rows = await r.json();
+  if (!rows.length) return { ok: true, rows: [] };
+
+  const ids = [...new Set(rows.flatMap((x) => [x.referrer_user_id, x.referred_user_id]).filter(Boolean))];
+  const pr = await sb(`profiles?select=id,email,public_handle&id=in.(${ids.join(",")})`);
+  const people = pr.ok ? await pr.json() : [];
+  const by = Object.fromEntries(people.map((p) => [p.id, p.public_handle || p.email]));
+
+  const now = Date.now();
+  return {
+    ok: true,
+    rows: rows.map((x) => ({
+      referrer: by[x.referrer_user_id] || "unknown",
+      referred: by[x.referred_user_id] || "unknown",
+      code: x.code, source: x.source,
+      converted: !!x.first_paid_at,
+      // A claim that has lapsed is still on the books and still looks like a
+      // pending conversion unless it is called what it is.
+      lapsed: !x.first_paid_at && !!x.expires_at && new Date(x.expires_at).getTime() < now,
+      created: x.created_at,
+    })),
+  };
+}
+
 const routes = {
   "GET /api/status": () => catalogStatus(),
   "POST /api/warm": () => rebuildCatalog(),
@@ -655,9 +784,11 @@ const routes = {
   "POST /api/invite": (u, b) => createInvite(b),
   "POST /api/invite/revoke": (u, b) => revokeInvite(b.code),
   "GET /api/feedback": (u) => listFeedback(u.searchParams.get("status") || "all"),
-  "GET /api/curate": () => curateQueue(),
-  "POST /api/curate/decide": (u, b) => curateDecide(b),
-  "POST /api/curate/undo": (u, b) => curateUndo(b),
+  "GET /api/overview": () => overview(),
+  "GET /api/reports": (u) => reportQueue(u.searchParams.get("status") || "open"),
+  "POST /api/reports/resolve": (u, b) => resolveReport(b),
+  "GET /api/parties": () => partyActivity(),
+  "GET /api/referral-ledger": () => referralLedger(),
   "POST /api/feedback/update": (u, b) => updateFeedback(b),
   "GET /api/credits": (u) => creditsFor(u.searchParams.get("email") || ""),
   "POST /api/credits/exempt": (u, b) => setCreditExempt(b),

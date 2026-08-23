@@ -37,6 +37,11 @@
 <header><h1>veedeeoh<span>.</span> control</h1><small id="target"></small></header>
 
 <div class="grid">
+  <div class="card" style="grid-column:1/-1">
+    <h2>Overview</h2>
+    <div id="ov" class="dim">loading&hellip;</div>
+  </div>
+
   <div class="card">
     <h2>Catalog health</h2>
     <div id="cat" class="dim">checking…</div>
@@ -104,36 +109,6 @@
     <div id="invList" class="muted">loading…</div>
   </div>
 
-  <div class="card" style="grid-column:1/-1">
-    <h2>Kids curation</h2>
-    <div class="muted" style="margin-top:0">
-      TV-rated content gates itself, so it is not here. What is left are the <b>G, PG and unrated
-      films</b> &mdash; the ones whose rating cannot be trusted, because PG-13 did not exist until 1984
-      and pre-1984 PG absorbed what would now be PG-13. <i>The War of the Worlds</i> (1953) is rated G.
-      <div style="margin-top:10px;display:flex;gap:26px;flex-wrap:wrap">
-        <span><b style="color:var(--accent)">Little</b> &mdash; the <b>TV-Y</b> bar, which the
-          guidelines define as <i>ages 2&ndash;6, not expected to frighten younger children</i>.
-          That age range is the rating's own wording.</span>
-        <span><b style="color:var(--accent)">Older</b> &mdash; the <b>TV-Y7</b> bar:
-          <i>age 7 and above, may include mild fantasy or comedic violence, may frighten children
-          under 7</i>. The guideline sets no upper age. This tier also admits <b>TV-G</b>, which
-          means <i>suitable for all ages</i> and explicitly <i>not designed specifically for
-          children</i> &mdash; so general-audience material belongs here too, not only kids' shows.</span>
-        <span><b>Not sure</b> &mdash; park it. Nothing is approved, so a child never sees it, and you
-          can come back to the parked list whenever you like.</span>
-      </div>
-      <div style="margin-top:8px">Watch anything you are unsure about. Judging by title is how a
-      denylist once certified racist wartime cartoons as TV-Y7.</div>
-    </div>
-    <div id="curStats" class="muted"></div>
-    <div id="curGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;margin-top:14px"></div>
-    <div class="actions">
-      <button class="ghost" id="curMore">Load more</button>
-      <button class="ghost" id="curUnsure">Review parked</button>
-    </div>
-    <div id="curUnsureGrid" style="display:none;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;margin-top:14px"></div>
-  </div>
-
   <div class="card">
     <h2>Watch party credits</h2>
     <div class="actions" style="margin-top:0">
@@ -141,6 +116,31 @@
       <button id="crLoad">Look up</button>
     </div>
     <div id="crOut" class="muted">No account loaded.</div>
+  </div>
+
+  <div class="card" style="grid-column:1/-1">
+    <h2>Reported profiles</h2>
+    <div class="muted" style="margin-top:0">
+      Grouped by person, because five reports about one profile is one decision.
+      Banning hides their public profile and stops them being listed; it does not
+      close the account or stop them watching. Dismissing clears the reports and
+      punishes nobody, which is what most of these will need.
+    </div>
+    <div id="rep" class="muted">loading&hellip;</div>
+  </div>
+
+  <div class="card" style="grid-column:1/-1">
+    <h2>Watch parties</h2>
+    <div id="pty" class="muted">loading&hellip;</div>
+  </div>
+
+  <div class="card" style="grid-column:1/-1">
+    <h2>Referral pipeline</h2>
+    <div class="muted" style="margin-top:0">
+      Every attribution, converted or not. Payouts below are the money side; this
+      is whether the programme is producing anything to pay out on.
+    </div>
+    <div id="refLedger" class="muted">loading&hellip;</div>
   </div>
 
   <div class="card" style="grid-column:1/-1">
@@ -418,86 +418,99 @@ window.setFb = async (id, status) => { await j('/api/feedback/update', { method:
 $('fbFilter').onchange = loadFeedback;
 $('fbRefresh').onclick = loadFeedback;
 
-// ---- kids curation ----
-let curAll = [], curShown = 0;
-const CUR_PAGE = 12;
-
-async function loadCurate(reset = true) {
-  const r = await j('/api/curate');
-  if (r.error) { $('curStats').innerHTML = '<span class="bad">' + r.error + '</span>'; return; }
-  curAll = r.queue;
-  if (reset) { curShown = 0; $('curGrid').innerHTML = ''; }
-  const done = r.counts.little + r.counts.older + r.counts.no;
-  $('curStats').innerHTML =
-    `<b>${r.queue.length}</b> awaiting review · approved <span class="ok">${r.counts.little} little</span>,
-     <span class="ok">${r.counts.older} older</span> · <span class="dim">${r.counts.no} not for kids</span>
-     · ${done}/${r.total} decided`;
-  renderCurate();
+loadCatalog(); loadInvites(); loadFeedback();
+// ---- overview ----
+async function loadOverview() {
+  const o = await j('/api/overview').catch(() => null);
+  if (!o) { $('ov').textContent = 'unavailable'; return; }
+  const stat = (label, value, tone) =>
+    `<div style="min-width:120px">
+       <div style="font-size:23px;font-weight:800;color:${tone || '#fff'};line-height:1.1">${value}</div>
+       <div class="dim" style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin-top:3px">${label}</div>
+     </div>`;
+  $('ov').innerHTML =
+    `<div style="display:flex;flex-wrap:wrap;gap:26px 34px">
+      ${stat('Accounts', o.users)}
+      ${stat('New this week', o.newWeek, o.newWeek ? 'var(--accent)' : null)}
+      ${stat('Paying', o.paid, o.paid ? 'var(--ok)' : null)}
+      ${stat('On trial', o.trialing)}
+      ${stat('Parties 24h', o.partiesDay)}
+      ${stat('Joins 24h', o.joinsDay)}
+      ${stat('Referrals', `${o.referralsConverted}/${o.referrals}`)}
+      ${stat('Open reports', o.openReports, o.openReports ? 'var(--bad)' : null)}
+      ${stat('Waitlist', o.waitlist)}
+     </div>
+     <div class="dim" style="font-size:11.5px;margin-top:14px">
+       Paying counts a live tier that has not lapsed, not merely a tier &mdash; an
+       expired founder is not a customer. Referrals read converted / total.
+     </div>`;
 }
 
-function renderCurate() {
-  const slice = curAll.slice(curShown, curShown + CUR_PAGE);
-  curShown += slice.length;
-  $('curGrid').insertAdjacentHTML('beforeend', slice.map(c => `
-    <div class="curCard" data-id="${escapeHtml(c.id)}" style="background:#080a10;border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column">
-      ${c.poster ? `<img src="${escapeHtml(c.poster)}" alt="" style="width:100%;aspect-ratio:347/500;object-fit:cover;background:#111">`
-                 : `<div style="width:100%;aspect-ratio:347/500;display:flex;align-items:center;justify-content:center;color:#555;font-size:12px">no poster</div>`}
-      <div style="padding:11px;display:flex;flex-direction:column;gap:6px;flex:1">
-        <div style="font-weight:800;font-size:13.5px;line-height:1.3">${escapeHtml(c.title)}</div>
-        <div class="dim" style="font-size:11.5px">${escapeHtml(c.rating || '?')} · ${escapeHtml(c.provider)}${c.kind === 'series' ? ' · series' : ''}</div>
-        ${c.summary ? `<div class="dim" style="font-size:11.5px;line-height:1.45">${escapeHtml(c.summary).slice(0,150)}</div>` : ''}
-        <a href="${escapeHtml(c.watchUrl)}" target="_blank" rel="noreferrer"
-           style="font-size:11.5px;color:var(--accent);text-decoration:none">Watch before deciding &rarr;</a>
-        <div style="display:flex;gap:5px;margin-top:auto;padding-top:8px">
-          <button onclick="decide('${escapeHtml(c.id)}','little','${c.kind}')" style="flex:1;padding:6px 4px;font-size:11px;border-radius:7px">Little<div style="font-weight:500;font-size:9.5px;opacity:.7">2&ndash;6</div></button>
-          <button onclick="decide('${escapeHtml(c.id)}','older','${c.kind}')" style="flex:1;padding:6px 4px;font-size:11px;border-radius:7px">Older<div style="font-weight:500;font-size:9.5px;opacity:.7">7+</div></button>
-          <button class="ghost" onclick="decide('${escapeHtml(c.id)}','no','${c.kind}')" style="flex:1;padding:6px 4px;font-size:11px;border-radius:7px">Not sure</button>
-        </div>
-      </div>
-    </div>`).join(''));
-  $('curMore').style.display = curShown >= curAll.length ? 'none' : 'inline-flex';
+// ---- reported profiles ----
+async function loadReports() {
+  const r = await j('/api/reports').catch(() => null);
+  if (!r || !r.ok) { $('rep').textContent = 'unavailable'; return; }
+  if (!r.groups.length) { $('rep').innerHTML = '<span class="dim">Nothing reported.</span>'; return; }
+  $('rep').innerHTML = r.groups.map(g => {
+    const who = g.handle ? '@' + escapeHtml(g.handle) : escapeHtml(g.email || g.userId);
+    const why = Object.entries(g.reasons).map(([k, n]) => `${k}${n > 1 ? ' ×' + n : ''}`).join(', ');
+    return `<div class="row">
+      <span>${who}${g.name ? ` <span class="dim">(${escapeHtml(g.name)})</span>` : ''}
+        <br><span class="dim" style="font-size:11.5px">${why} · ${g.open} open of ${g.count}</span></span>
+      <span style="text-align:right;white-space:nowrap">
+        ${g.banned ? '<span class="bad">banned</span> ' : ''}
+        <button class="ghost" style="padding:3px 8px;font-size:11px" onclick="resolveRep('${g.userId}', 'dismiss')">dismiss</button>
+        <button class="ghost" style="padding:3px 8px;font-size:11px" onclick="resolveRep('${g.userId}', ${g.banned ? 'false' : 'true'})">${g.banned ? 'unban' : 'ban'}</button>
+      </span>
+    </div>`;
+  }).join('');
+}
+window.resolveRep = async (userId, action) => {
+  const body = action === 'dismiss' ? { userId, dismiss: true } : { userId, ban: action };
+  await j('/api/reports/resolve', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body) });
+  loadReports(); loadOverview();
+};
+
+// ---- watch parties ----
+async function loadParties() {
+  const r = await j('/api/parties').catch(() => null);
+  if (!r || !r.ok) { $('pty').textContent = 'unavailable'; return; }
+  const line = (p, live) => `<div class="row">
+      <span>${live ? '<span class="ok">●</span> ' : ''}${escapeHtml(p.title)}
+        <br><span class="dim" style="font-size:11.5px">${escapeHtml(p.host)} · ${p.code}
+        · ${p.isPublic ? 'public' : 'private'}</span></span>
+      <span style="text-align:right"><b>${p.joins}</b> <span class="dim">joined</span>
+        <br><span class="dim" style="font-size:11.5px">${new Date(p.started).toLocaleString()}</span></span>
+    </div>`;
+  $('pty').innerHTML =
+    (r.live.length
+      ? `<div class="lbl" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#61666F;margin-bottom:6px">Live now</div>`
+        + r.live.map(p => line(p, true)).join('')
+      : '<span class="dim">Nothing live.</span>')
+    + (r.recent.length
+      ? `<div class="lbl" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#61666F;margin:16px 0 6px">Recent</div>`
+        + r.recent.map(p => line(p, false)).join('')
+      : '');
 }
 
-window.decide = async (id, decision, kind) => {
-  const card = document.querySelector(`.curCard[data-id="${CSS.escape(id)}"]`);
-  if (card) { card.style.opacity = '.35'; card.style.pointerEvents = 'none'; }
-  await j('/api/curate/decide', { method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ contentId: id, decision, kind }) });
-  if (card) card.remove();
-  const r = await j('/api/curate');
-  const done = r.counts.little + r.counts.older + r.counts.no;
-  $('curStats').innerHTML =
-    `<b>${r.queue.length}</b> awaiting review · approved <span class="ok">${r.counts.little} little</span>,
-     <span class="ok">${r.counts.older} older</span> · <span class="dim">${r.counts.no} not for kids</span>
-     · ${done}/${r.total} decided`;
-};
-$('curMore').onclick = renderCurate;
+// ---- referral pipeline ----
+async function loadRefLedger() {
+  const r = await j('/api/referral-ledger').catch(() => null);
+  if (!r || !r.ok) { $('refLedger').textContent = 'unavailable'; return; }
+  if (!r.rows.length) { $('refLedger').innerHTML = '<span class="dim">No attributions yet.</span>'; return; }
+  $('refLedger').innerHTML = r.rows.map(x => `<div class="row">
+      <span>${escapeHtml(x.referrer)} <span class="dim">→</span> ${escapeHtml(x.referred)}
+        <br><span class="dim" style="font-size:11.5px">${escapeHtml(x.source || 'link')}${
+          x.code ? ' · ' + escapeHtml(x.code) : ''} · ${new Date(x.created).toLocaleDateString()}</span></span>
+      <span style="text-align:right">${
+        x.converted ? '<span class="ok">converted</span>'
+        : x.lapsed ? '<span class="dim">lapsed</span>'
+        : '<span class="warn">pending</span>'}</span>
+    </div>`).join('');
+}
 
-let unsureOpen = false;
-$('curUnsure').onclick = async () => {
-  unsureOpen = !unsureOpen;
-  const grid = $('curUnsureGrid');
-  grid.style.display = unsureOpen ? 'grid' : 'none';
-  $('curUnsure').textContent = unsureOpen ? 'Hide parked' : 'Review parked';
-  if (!unsureOpen) return;
-  const r = await j('/api/curate');
-  const list = r.unsure || [];
-  grid.innerHTML = list.length ? list.map(c => `
-    <div class="curCard" data-id="${escapeHtml(c.id)}" style="background:#080a10;border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;opacity:.85">
-      ${c.poster ? `<img src="${escapeHtml(c.poster)}" alt="" style="width:100%;aspect-ratio:347/500;object-fit:cover;background:#111">` : ''}
-      <div style="padding:11px;display:flex;flex-direction:column;gap:6px;flex:1">
-        <div style="font-weight:800;font-size:13.5px;line-height:1.3">${escapeHtml(c.title)}</div>
-        <div class="dim" style="font-size:11.5px">${escapeHtml(c.rating || '?')} · ${escapeHtml(c.provider)}</div>
-        <a href="${escapeHtml(c.watchUrl)}" target="_blank" rel="noreferrer" style="font-size:11.5px;color:var(--accent);text-decoration:none">Watch &rarr;</a>
-        <div style="display:flex;gap:5px;margin-top:auto;padding-top:8px">
-          <button onclick="decide('${escapeHtml(c.id)}','little','${c.kind}')" style="flex:1;padding:6px 4px;font-size:11px;border-radius:7px">Little</button>
-          <button onclick="decide('${escapeHtml(c.id)}','older','${c.kind}')" style="flex:1;padding:6px 4px;font-size:11px;border-radius:7px">Older</button>
-        </div>
-      </div>
-    </div>`).join('') : '<div class="muted">Nothing parked.</div>';
-};
-
-loadCatalog(); loadInvites(); loadFeedback(); loadCurate();
+loadOverview(); loadReports(); loadParties(); loadRefLedger();
 
 // ---- referral payouts ----
 const cents = (n) => '$' + ((n || 0) / 100).toFixed(2);
