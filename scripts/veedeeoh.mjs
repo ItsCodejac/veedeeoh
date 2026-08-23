@@ -596,14 +596,24 @@ async function overview() {
   const weekAgo = new Date(Date.now() - 7 * 864e5).toISOString();
   const nowIso = new Date().toISOString();
 
-  const [users, newWeek, paid, trialing, partiesDay, joinsDay, refs, refsPaid, reports, waitlist] =
+  const [users, newWeek, access, subscribed, trialing, partiesDay, joinsDay, refs, refsPaid, reports, waitlist] =
     await Promise.all([
       count("profiles"),
       count("profiles", `created_at=gte.${weekAgo}`),
-      // Access means a paid tier that has not lapsed. Counting tier alone
-      // reports expired founders as customers, which is how a dashboard tells
-      // you business is better than it is.
+
+      // ACCESS AND REVENUE ARE DIFFERENT NUMBERS AND MUST NOT SHARE A LABEL.
+      // This first one counts everyone who can watch: a live paid-equivalent
+      // tier, comps included. It was labelled "paying", which meant four
+      // comped founder accounts -- three of them created while testing the
+      // grant tooling -- were being reported as customers on a product with no
+      // customers. Overstating revenue to yourself is the one direction a
+      // dashboard must never be wrong in.
       count("profiles", `tier=in.(founder_vip,cloud_paid,giveaway)&or=(tier_expires.is.null,tier_expires.gte.${nowIso})`),
+
+      // And this is revenue: a Stripe subscription exists. Nothing about a
+      // tier column can establish that somebody paid.
+      count("profiles", "stripe_subscription_id=not.is.null"),
+
       count("profiles", `tier=eq.trial_7day&tier_expires=gte.${nowIso}`),
       count("parties", `created_at=gte.${dayAgo}`),
       count("party_joins", `joined_at=gte.${dayAgo}`),
@@ -614,7 +624,7 @@ async function overview() {
     ]);
 
   return {
-    users, newWeek, paid, trialing,
+    users, newWeek, access, subscribed, comped: (access ?? 0) - (subscribed ?? 0), trialing,
     partiesDay, joinsDay,
     referrals: refs, referralsConverted: refsPaid,
     openReports: reports, waitlist,
@@ -770,6 +780,81 @@ async function referralLedger() {
   };
 }
 
+// --------------------------------------------------------------------- users ---
+
+/** Everyone, browsable.
+ *
+ *  EVERY EXISTING PATH ASSUMED YOU ALREADY KNEW THE EMAIL. Look-up by exact
+ *  address is fine when someone writes to you and useless for "who has signed
+ *  up", "who is on a trial that lapses this week", or "who are my partners" --
+ *  which is most of what an operator actually wants to ask. The tooling was
+ *  built for people who had not joined yet.
+ *
+ *  @param q    substring of email, handle or display name.
+ *  @param filt paying | trial | expired | partner | banned | all
+ */
+async function listUsers({ q = "", filt = "all", limit = 200 } = {}) {
+  const cols = "id,email,created_at,tier,tier_expires,seats,party_credits," +
+               "party_credits_exempt,public_handle,display_name,public_parties_banned";
+  const parts = [`select=${cols}`, "order=created_at.desc", `limit=${Math.min(Number(limit) || 200, 500)}`];
+
+  const term = String(q || "").trim();
+  if (term) {
+    const esc = term.replace(/[(),*]/g, "");
+    parts.push(`or=(email.ilike.*${esc}*,public_handle.ilike.*${esc}*,display_name.ilike.*${esc}*)`);
+  }
+
+  const nowIso = new Date().toISOString();
+  const PAID_TIERS = "founder_vip,cloud_paid,giveaway";
+  if (filt === "access") {
+    parts.push(`tier=in.(${PAID_TIERS})`, `or=(tier_expires.is.null,tier_expires.gte.${nowIso})`);
+  } else if (filt === "subscribed") {
+    parts.push("stripe_subscription_id=not.is.null");
+  } else if (filt === "trial") {
+    parts.push("tier=eq.trial_7day", `tier_expires=gte.${nowIso}`);
+  } else if (filt === "expired") {
+    // Had something, and it ran out. Not the same as never having had one.
+    parts.push(`tier_expires=lt.${nowIso}`);
+  } else if (filt === "banned") {
+    parts.push("public_parties_banned=is.true");
+  }
+
+  const r = await sb(`profiles?${parts.join("&")}`);
+  if (!r.ok) return { ok: false, error: await r.text() };
+  let rows = await r.json();
+
+  // Referral terms come from a second table, so they are joined here rather
+  // than left out -- "who are my partners" is exactly the question the list
+  // exists to answer, and it cannot be answered from profiles alone.
+  const ids = rows.map((u) => u.id);
+  let codes = [];
+  if (ids.length) {
+    const cr = await sb(`referral_codes?select=user_id,code,kind,rate_bps,duration_months&user_id=in.(${ids.join(",")})`);
+    codes = cr.ok ? await cr.json() : [];
+  }
+  const codeBy = Object.fromEntries(codes.map((c) => [c.user_id, c]));
+
+  const now = Date.now();
+  rows = rows.map((u) => {
+    const exp = u.tier_expires ? new Date(u.tier_expires).getTime() : null;
+    const expired = exp != null && exp < now;
+    return {
+      ...u,
+      referral: codeBy[u.id] || null,
+      expired,
+      // One word for the state, computed once here so the panel cannot render
+      // it differently from the filters that selected it.
+      status: u.public_parties_banned ? "banned"
+        : (["founder_vip", "cloud_paid", "giveaway"].includes(u.tier) && !expired) ? "access"
+        : (u.tier === "trial_7day" && !expired) ? "trial"
+        : expired ? "expired" : "none",
+    };
+  });
+
+  if (filt === "partner") rows = rows.filter((u) => u.referral && u.referral.kind === "partner");
+  return { ok: true, count: rows.length, rows };
+}
+
 const routes = {
   "GET /api/status": () => catalogStatus(),
   "POST /api/warm": () => rebuildCatalog(),
@@ -778,6 +863,10 @@ const routes = {
   "POST /api/tier": (u, b) => setTier(b.email, b.tier),
   "POST /api/grant": (u, b) => applyEdition(b),
   "GET /api/account": (u) => accountSnapshot((u.searchParams.get("email") || "").toLowerCase()),
+  "GET /api/users": (u) => listUsers({
+    q: u.searchParams.get("q") || "",
+    filt: u.searchParams.get("filter") || "all",
+  }),
   "GET /api/editions": () => Object.entries(EDITIONS).map(([id, e]) =>
     ({ id, label: e.label, subject: e.subject, grants: e.grants })),
   "GET /api/invites": () => listInvites(),

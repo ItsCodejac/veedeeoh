@@ -60,13 +60,31 @@
     <div class="muted">Sends a real CORS preflight, not just a GET. A GET-only check passes while the browser path is dead.</div>
   </div>
 
-  <div class="card">
-    <h2>Users and tiers</h2>
+  <div class="card" style="grid-column:1/-1">
+    <h2>Accounts</h2>
+    <div class="actions" style="margin-top:0">
+      <input id="uq" type="text" placeholder="search email, handle or name" />
+      <select id="ufilt">
+        <option value="all">Everyone</option>
+        <option value="subscribed">Subscribed (paying)</option>
+        <option value="access">Has access (incl. comps)</option>
+        <option value="trial">On trial</option>
+        <option value="expired">Lapsed</option>
+        <option value="partner">Affiliate partners</option>
+        <option value="banned">Banned</option>
+      </select>
+      <button class="ghost" id="ureload">Refresh</button>
+    </div>
+    <div id="ulist" class="muted">loading&hellip;</div>
+  </div>
+
+  <div class="card" style="grid-column:1/-1">
+    <h2>Account detail</h2>
     <div class="actions" style="margin-top:0">
       <input id="email" type="email" placeholder="email@example.com" />
       <button id="lookup">Look up</button>
     </div>
-    <div id="user" class="muted">No account loaded.</div>
+    <div id="user" class="muted">Pick an account above, or look one up.</div>
   </div>
   <div class="card">
     <h2>Beta invites</h2>
@@ -277,8 +295,42 @@ $('lookup').onclick = async () => {
      <div class="actions" style="margin-top:0">
        <select id="grantSel"></select>
        <button id="applyGrant">Apply</button>
+       <button class="ghost" id="grantTune">Custom</button>
      </div>
-     <div id="grantNote" class="dim" style="font-size:11.5px;margin-top:6px"></div>`;
+     <div id="grantNote" class="dim" style="font-size:11.5px;margin-top:6px"></div>
+
+     <div id="grantCustom" hidden style="background:#0d0f14;border:1px solid rgba(255,255,255,.1);border-radius:11px;padding:14px;margin-top:10px">
+       <div class="lbl" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#61666F;margin-bottom:10px">Custom access</div>
+       <div class="gRow"><span>Tier</span>
+         <select id="cTier">
+           <option value="">leave alone</option>
+           <option value="founder_vip">founder_vip</option>
+           <option value="giveaway">giveaway</option>
+           <option value="cloud_paid">cloud_paid</option>
+           <option value="trial_7day">trial_7day</option>
+         </select></div>
+       <div class="gRow"><span>Expires after (days)</span>
+         <input id="cDays" type="number" min="1" placeholder="blank = never" /></div>
+       <div class="gRow"><span>Add watch party hours</span>
+         <input id="cCredits" type="number" min="0" placeholder="blank = none" /></div>
+       <div class="gRow"><span>Never metered</span>
+         <select id="cExempt">
+           <option value="">leave alone</option>
+           <option value="true">yes</option>
+           <option value="false">no</option>
+         </select></div>
+       <div class="gRow"><span>Referral rate %</span>
+         <input id="cRate" type="number" min="0" max="100" placeholder="leave alone" /></div>
+       <div class="gRow"><span>Commission months</span>
+         <input id="cMonths" type="number" min="0" placeholder="0 = for life" /></div>
+       <div class="gRow"><span>Note</span>
+         <input id="cNote" type="text" placeholder="why" /></div>
+       <div class="dim" style="font-size:11px;margin:8px 0 12px">
+         Blank leaves a setting exactly as it is. Nothing here can silently
+         revoke something &mdash; only the fields you fill in are touched.
+       </div>
+       <button id="applyCustom">Apply custom</button>
+     </div>`;
 
   $('setTier').onclick = async () => {
     const btn = $('setTier'); btn.disabled = true; btn.textContent = 'Saving…';
@@ -308,6 +360,38 @@ $('lookup').onclick = async () => {
   sel.onchange = describe;
   describe();
 
+  $('grantTune').onclick = () => {
+    const box = $('grantCustom');
+    box.hidden = !box.hidden;
+    $('grantTune').textContent = box.hidden ? 'Custom' : 'Hide';
+  };
+
+  // Straight to admin_apply_grants with an explicit grants object, so custom
+  // terms and the presets travel the same path and mean the same thing.
+  $('applyCustom').onclick = async () => {
+    const num = (id) => { const v = $(id).value.trim(); return v === '' ? null : Number(v); };
+    const g = {};
+    if ($('cTier').value) g.tier = $('cTier').value;
+    const days = num('cDays');
+    if (days != null || $('cTier').value) g.tier_days = days;   // null = no expiry
+    const cr = num('cCredits'); if (cr != null) g.party_credits = cr;
+    if ($('cExempt').value) g.party_credits_exempt = $('cExempt').value === 'true';
+    const rate = num('cRate'); if (rate != null) g.referral_rate_bps = Math.round(rate * 100);
+    const mo = num('cMonths'); if (mo != null) g.referral_duration_months = mo;
+    if (!Object.keys(g).length) { $('grantNote').innerHTML = '<span class="bad">Nothing filled in.</span>'; return; }
+
+    const btn = $('applyCustom'); btn.disabled = true; btn.textContent = 'Applying…';
+    const res = await j('/api/grant', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email, grants: g, note: $('cNote').value || 'custom grant' }) });
+    btn.disabled = false; btn.textContent = 'Apply custom';
+    if (!res || res.ok === false) {
+      $('grantNote').innerHTML = `<span class="bad">${(res && res.error) || 'failed'}</span>`;
+      return;
+    }
+    $('lookup').click();
+    loadUsers();
+  };
+
   $('applyGrant').onclick = async () => {
     const btn = $('applyGrant'); btn.disabled = true; btn.textContent = 'Applying…';
     const res = await j('/api/grant', { method:'POST', headers:{'Content-Type':'application/json'},
@@ -320,6 +404,7 @@ $('lookup').onclick = async () => {
     // Re-read, so what is on screen is the account as it now is rather than
     // what was requested.
     $('lookup').click();
+    loadUsers();
   };
 };
 
@@ -432,7 +517,8 @@ async function loadOverview() {
     `<div style="display:flex;flex-wrap:wrap;gap:26px 34px">
       ${stat('Accounts', o.users)}
       ${stat('New this week', o.newWeek, o.newWeek ? 'var(--accent)' : null)}
-      ${stat('Paying', o.paid, o.paid ? 'var(--ok)' : null)}
+      ${stat('Subscribed', o.subscribed, o.subscribed ? 'var(--ok)' : null)}
+      ${stat('Comped', o.comped)}
       ${stat('On trial', o.trialing)}
       ${stat('Parties 24h', o.partiesDay)}
       ${stat('Joins 24h', o.joinsDay)}
@@ -441,8 +527,10 @@ async function loadOverview() {
       ${stat('Waitlist', o.waitlist)}
      </div>
      <div class="dim" style="font-size:11.5px;margin-top:14px">
-       Paying counts a live tier that has not lapsed, not merely a tier &mdash; an
-       expired founder is not a customer. Referrals read converted / total.
+       <b>Subscribed</b> means a Stripe subscription exists &mdash; actual revenue.
+       <b>Comped</b> is everyone else with live access: founders, giveaways,
+       friends and family. They are deliberately not customers, so they are
+       counted apart rather than added in. Referrals read converted / total.
      </div>`;
 }
 
@@ -511,6 +599,49 @@ async function loadRefLedger() {
 }
 
 loadOverview(); loadReports(); loadParties(); loadRefLedger();
+// ---- accounts ----
+const STATUS_TONE = { subscribed:'ok', access:'accent', trial:'warn', expired:'dim', banned:'bad', none:'dim' };
+
+async function loadUsers() {
+  const q = encodeURIComponent($('uq').value.trim());
+  const f = $('ufilt').value;
+  const r = await j(`/api/users?q=${q}&filter=${f}`).catch(() => null);
+  if (!r || !r.ok) { $('ulist').innerHTML = '<span class="bad">unavailable</span>'; return; }
+  if (!r.rows.length) { $('ulist').innerHTML = '<span class="dim">Nobody matches.</span>'; return; }
+
+  $('ulist').innerHTML =
+    `<div class="dim" style="font-size:11.5px;margin-bottom:8px">${r.count} account${r.count === 1 ? '' : 's'}</div>` +
+    r.rows.map(u => {
+      const ref = u.referral;
+      const tone = STATUS_TONE[u.status] || 'dim';
+      const bits = [];
+      if (u.tier) bits.push(u.tier);
+      if (u.tier_expires) bits.push((u.expired ? 'expired ' : 'until ') + u.tier_expires.slice(0, 10));
+      else if (u.tier) bits.push('no expiry');
+      if (u.party_credits_exempt) bits.push('unmetered');
+      else if (u.party_credits) bits.push(u.party_credits + ' credits');
+      if (ref) bits.push(`${(ref.rate_bps / 100).toFixed(0)}%${ref.kind === 'partner' ? ' partner' : ''}`);
+      return `<div class="row">
+        <span>${escapeHtml(u.email || u.id)}${u.public_handle ? ` <span class="dim">@${escapeHtml(u.public_handle)}</span>` : ''}
+          <br><span class="dim" style="font-size:11.5px">${bits.join(' · ') || 'no tier'}</span></span>
+        <span style="text-align:right;white-space:nowrap">
+          <span class="${tone === 'accent' ? '' : tone}" ${tone === 'accent' ? 'style="color:var(--accent)"' : ''}>${u.status}</span>
+          <br><button class="ghost" style="padding:3px 8px;font-size:11px;margin-top:4px"
+                      onclick="openUser('${escapeHtml(u.email || '')}')">manage</button>
+        </span>
+      </div>`;
+    }).join('');
+}
+window.openUser = (email) => {
+  $('email').value = email;
+  $('lookup').click();
+  $('user').scrollIntoView({ behavior: 'smooth', block: 'center' });
+};
+$('ureload').onclick = loadUsers;
+$('ufilt').onchange = loadUsers;
+let uqTimer;
+$('uq').oninput = () => { clearTimeout(uqTimer); uqTimer = setTimeout(loadUsers, 220); };
+loadUsers();
 
 // ---- referral payouts ----
 const cents = (n) => '$' + ((n || 0) / 100).toFixed(2);
