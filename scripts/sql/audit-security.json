@@ -1,0 +1,2660 @@
+[
+    {
+        "section": "1 rls",
+        "item": "beta_invites",
+        "detail": "RLS on, 0 policies, anon: select/INSERT/UPDATE/DELETE",
+        "flag": "ANON CAN WRITE"
+    },
+    {
+        "section": "1 rls",
+        "item": "catalog_cache",
+        "detail": "RLS on, 1 policies, anon: select/INSERT/UPDATE/DELETE",
+        "flag": "ANON CAN WRITE"
+    },
+    {
+        "section": "1 rls",
+        "item": "collection_items",
+        "detail": "RLS on, 2 policies, anon: select/INSERT/UPDATE/DELETE",
+        "flag": "ANON CAN WRITE"
+    },
+    {
+        "section": "1 rls",
+        "item": "collections",
+        "detail": "RLS on, 2 policies, anon: select/INSERT/UPDATE/DELETE",
+        "flag": "ANON CAN WRITE"
+    },
+    {
+        "section": "1 rls",
+        "item": "favorites",
+        "detail": "RLS on, 1 policies, anon: select/INSERT/UPDATE/DELETE",
+        "flag": "ANON CAN WRITE"
+    },
+    {
+        "section": "1 rls",
+        "item": "feedback",
+        "detail": "RLS on, 2 policies, anon: select/INSERT/UPDATE/DELETE",
+        "flag": "ANON CAN WRITE"
+    },
+    {
+        "section": "1 rls",
+        "item": "free_month_grants",
+        "detail": "RLS on, 1 policies, anon: select/INSERT/UPDATE/DELETE",
+        "flag": "ANON CAN WRITE"
+    },
+    {
+        "section": "1 rls",
+        "item": "host_follows",
+        "detail": "RLS on, 1 policies, anon: select/INSERT/UPDATE/DELETE",
+        "flag": "ANON CAN WRITE"
+    },
+    {
+        "section": "1 rls",
+        "item": "host_suggestions",
+        "detail": "RLS on, 1 policies, anon: select/INSERT/UPDATE/DELETE",
+        "flag": "ANON CAN WRITE"
+    },
+    {
+        "section": "1 rls",
+        "item": "household_invites",
+        "detail": "RLS on, 1 policies, anon: select/INSERT/UPDATE/DELETE",
+        "flag": "ANON CAN WRITE"
+    },
+    {
+        "section": "1 rls",
+        "item": "household_members",
+        "detail": "RLS on, 1 policies, anon: select/INSERT/UPDATE/DELETE",
+        "flag": "ANON CAN WRITE"
+    },
+    {
+        "section": "1 rls",
+        "item": "household_profiles",
+        "detail": "RLS on, 2 policies, anon: select/INSERT/UPDATE/DELETE",
+        "flag": "ANON CAN WRITE"
+    },
+    {
+        "section": "1 rls",
+        "item": "parties",
+        "detail": "RLS on, 5 policies, anon: select/INSERT/UPDATE/DELETE",
+        "flag": "ANON CAN WRITE"
+    },
+    {
+        "section": "1 rls",
+        "item": "party_credit_ledger",
+        "detail": "RLS on, 1 policies, anon: select/INSERT/UPDATE/DELETE",
+        "flag": "ANON CAN WRITE"
+    },
+    {
+        "section": "1 rls",
+        "item": "party_joins",
+        "detail": "RLS on, 2 policies, anon: select/INSERT/UPDATE/DELETE",
+        "flag": "ANON CAN WRITE"
+    },
+    {
+        "section": "1 rls",
+        "item": "profile_exclusions",
+        "detail": "RLS on, 1 policies, anon: select/INSERT/UPDATE/DELETE",
+        "flag": "ANON CAN WRITE"
+    },
+    {
+        "section": "1 rls",
+        "item": "profile_reports",
+        "detail": "RLS on, 1 policies, anon: select/INSERT/UPDATE/DELETE",
+        "flag": "ANON CAN WRITE"
+    },
+    {
+        "section": "1 rls",
+        "item": "profiles",
+        "detail": "RLS on, 2 policies, anon: select/UPDATE",
+        "flag": "ANON CAN WRITE"
+    },
+    {
+        "section": "1 rls",
+        "item": "public_picks",
+        "detail": "RLS on, 1 policies, anon: select/INSERT/UPDATE/DELETE",
+        "flag": "ANON CAN WRITE"
+    },
+    {
+        "section": "1 rls",
+        "item": "referral_codes",
+        "detail": "RLS on, 1 policies, anon: select/INSERT/UPDATE/DELETE",
+        "flag": "ANON CAN WRITE"
+    },
+    {
+        "section": "1 rls",
+        "item": "referral_earnings",
+        "detail": "RLS on, 1 policies, anon: select/INSERT/UPDATE/DELETE",
+        "flag": "ANON CAN WRITE"
+    },
+    {
+        "section": "1 rls",
+        "item": "referrals",
+        "detail": "RLS on, 1 policies, anon: select/INSERT/UPDATE/DELETE",
+        "flag": "ANON CAN WRITE"
+    },
+    {
+        "section": "1 rls",
+        "item": "reserved_handles",
+        "detail": "RLS on, 0 policies, anon: select/INSERT/UPDATE/DELETE",
+        "flag": "ANON CAN WRITE"
+    },
+    {
+        "section": "1 rls",
+        "item": "waitlist",
+        "detail": "RLS on, 1 policies, anon: select/INSERT/UPDATE/DELETE",
+        "flag": "ANON CAN WRITE"
+    },
+    {
+        "section": "1 rls",
+        "item": "watch_progress",
+        "detail": "RLS on, 1 policies, anon: select/INSERT/UPDATE/DELETE",
+        "flag": "ANON CAN WRITE"
+    },
+    {
+        "section": "2 policy",
+        "item": "household_invites / Owners can manage household invites",
+        "detail": "ALL to PUBLIC | using: (auth.uid() = owner_id) | check: (auth.uid() = owner_id)",
+        "flag": "applies to PUBLIC, not a named role"
+    },
+    {
+        "section": "2 policy",
+        "item": "household_members / Members can view household membership",
+        "detail": "SELECT to PUBLIC | using: ((auth.uid() = owner_id) OR (auth.uid() = member_user_id)) | check: -",
+        "flag": "applies to PUBLIC, not a named role"
+    },
+    {
+        "section": "2 policy",
+        "item": "household_profiles / Users can manage own household profiles",
+        "detail": "ALL to PUBLIC | using: (auth.uid() = user_id) | check: (auth.uid() = user_id)",
+        "flag": "applies to PUBLIC, not a named role"
+    },
+    {
+        "section": "2 policy",
+        "item": "waitlist / waitlist_public_insert",
+        "detail": "INSERT to authenticated,anon | using: - | check: ((email IS NOT NULL) AND (POSITION(('@'::text) IN (email)) > 1) AND (length(email) <= 320))",
+        "flag": "grants anon"
+    },
+    {
+        "section": "3 definer",
+        "item": "popular_content(max_rows integer)",
+        "detail": "callable by anon+authenticated, search_path set",
+        "flag": "callable by anon"
+    },
+    {
+        "section": "4 columns",
+        "item": "beta_invites.tier",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "SENSITIVE COLUMN IS CLIENT-WRITABLE"
+    },
+    {
+        "section": "4 columns",
+        "item": "beta_invites.tier",
+        "detail": "UPDATE granted to anon",
+        "flag": "SENSITIVE COLUMN IS CLIENT-WRITABLE"
+    },
+    {
+        "section": "4 columns",
+        "item": "beta_invites.tier_expires",
+        "detail": "UPDATE granted to anon",
+        "flag": "SENSITIVE COLUMN IS CLIENT-WRITABLE"
+    },
+    {
+        "section": "4 columns",
+        "item": "beta_invites.tier_expires",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "SENSITIVE COLUMN IS CLIENT-WRITABLE"
+    },
+    {
+        "section": "4 columns",
+        "item": "free_month_grants.stripe_ref",
+        "detail": "UPDATE granted to anon",
+        "flag": "SENSITIVE COLUMN IS CLIENT-WRITABLE"
+    },
+    {
+        "section": "4 columns",
+        "item": "free_month_grants.stripe_ref",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "SENSITIVE COLUMN IS CLIENT-WRITABLE"
+    },
+    {
+        "section": "4 columns",
+        "item": "parties.seat_limit",
+        "detail": "UPDATE granted to anon",
+        "flag": "SENSITIVE COLUMN IS CLIENT-WRITABLE"
+    },
+    {
+        "section": "4 columns",
+        "item": "parties.seat_limit",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "SENSITIVE COLUMN IS CLIENT-WRITABLE"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.credits_granted_for",
+        "detail": "UPDATE granted to anon",
+        "flag": "SENSITIVE COLUMN IS CLIENT-WRITABLE"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.party_credits",
+        "detail": "UPDATE granted to anon",
+        "flag": "SENSITIVE COLUMN IS CLIENT-WRITABLE"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.party_credits_accrued",
+        "detail": "UPDATE granted to anon",
+        "flag": "SENSITIVE COLUMN IS CLIENT-WRITABLE"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.party_credits_exempt",
+        "detail": "UPDATE granted to anon",
+        "flag": "SENSITIVE COLUMN IS CLIENT-WRITABLE"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.party_credits_spent",
+        "detail": "UPDATE granted to anon",
+        "flag": "SENSITIVE COLUMN IS CLIENT-WRITABLE"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.public_parties_banned",
+        "detail": "UPDATE granted to anon",
+        "flag": "SENSITIVE COLUMN IS CLIENT-WRITABLE"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.seats",
+        "detail": "UPDATE granted to anon",
+        "flag": "SENSITIVE COLUMN IS CLIENT-WRITABLE"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.stripe_customer_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "SENSITIVE COLUMN IS CLIENT-WRITABLE"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.stripe_subscription_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "SENSITIVE COLUMN IS CLIENT-WRITABLE"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.tier",
+        "detail": "UPDATE granted to anon",
+        "flag": "SENSITIVE COLUMN IS CLIENT-WRITABLE"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.tier_expires",
+        "detail": "UPDATE granted to anon",
+        "flag": "SENSITIVE COLUMN IS CLIENT-WRITABLE"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_earnings.stripe_invoice_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "SENSITIVE COLUMN IS CLIENT-WRITABLE"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_earnings.stripe_invoice_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "SENSITIVE COLUMN IS CLIENT-WRITABLE"
+    },
+    {
+        "section": "2 policy",
+        "item": "catalog_cache / catalog_cache_read",
+        "detail": "SELECT to authenticated | using: has_active_access() | check: -",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policy",
+        "item": "collection_items / read items of visible collections",
+        "detail": "SELECT to authenticated | using: (EXISTS ( SELECT 1\n   FROM collections c\n  WHERE ((c.id = collection_items.collection_id) AND ((c.scope = 'platform'::text) OR (c.owner_id = auth.uid()))))) | check: -",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policy",
+        "item": "collection_items / write items of own collections",
+        "detail": "ALL to authenticated | using: (EXISTS ( SELECT 1\n   FROM collections c\n  WHERE ((c.id = collection_items.collection_id) AND (c.scope = 'household'::text) AND (c.owner_id = auth.uid())))) | check: (EXISTS ( SELECT 1\n   FROM collections c\n  WHERE ((c.id = collection_items.collection_id) AND (c.scope = 'household'::text) AND (c.owner_id = auth.uid()))))",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policy",
+        "item": "collections / read platform or own collections",
+        "detail": "SELECT to authenticated | using: ((scope = 'platform'::text) OR (owner_id = auth.uid())) | check: -",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policy",
+        "item": "collections / write own collections",
+        "detail": "ALL to authenticated | using: ((scope = 'household'::text) AND (owner_id = auth.uid())) | check: ((scope = 'household'::text) AND (owner_id = auth.uid()))",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policy",
+        "item": "favorites / favorites_by_profile",
+        "detail": "ALL to authenticated | using: can_use_profile(profile_id) | check: can_use_profile(profile_id)",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policy",
+        "item": "feedback / insert own feedback",
+        "detail": "INSERT to authenticated | using: - | check: (reporter_user_id = auth.uid())",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policy",
+        "item": "feedback / read own feedback",
+        "detail": "SELECT to authenticated | using: (reporter_user_id = auth.uid()) | check: -",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policy",
+        "item": "free_month_grants / read own free months",
+        "detail": "SELECT to authenticated | using: (user_id = auth.uid()) | check: -",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policy",
+        "item": "host_follows / own follows",
+        "detail": "ALL to authenticated | using: (follower_user_id = auth.uid()) | check: (follower_user_id = auth.uid())",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policy",
+        "item": "host_suggestions / own suggestions",
+        "detail": "ALL to authenticated | using: (from_user_id = auth.uid()) | check: (from_user_id = auth.uid())",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policy",
+        "item": "household_profiles / household_profiles_member_read",
+        "detail": "SELECT to authenticated | using: ((auth.uid() = user_id) OR (EXISTS ( SELECT 1\n   FROM household_members m\n  WHERE ((m.owner_id = household_profiles.user_id) AND (m.member_user_id = auth.uid()))))) | check: -",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policy",
+        "item": "parties / entitled host creates parties",
+        "detail": "INSERT to authenticated | using: - | check: ((host_user_id = auth.uid()) AND can_host_party())",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policy",
+        "item": "parties / host deletes own parties",
+        "detail": "DELETE to authenticated | using: (host_user_id = auth.uid()) | check: -",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policy",
+        "item": "parties / host reads own parties",
+        "detail": "SELECT to authenticated | using: (host_user_id = auth.uid()) | check: -",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policy",
+        "item": "parties / host updates own parties",
+        "detail": "UPDATE to authenticated | using: (host_user_id = auth.uid()) | check: (host_user_id = auth.uid())",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policy",
+        "item": "parties / read public or own parties",
+        "detail": "SELECT to authenticated | using: ((host_user_id = auth.uid()) OR (is_public AND (ended_at IS NULL))) | check: -",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policy",
+        "item": "party_credit_ledger / read own credit ledger",
+        "detail": "SELECT to authenticated | using: (user_id = auth.uid()) | check: -",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policy",
+        "item": "party_joins / record own join",
+        "detail": "INSERT to authenticated | using: - | check: (user_id = auth.uid())",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policy",
+        "item": "party_joins / see own joins or joins to my parties",
+        "detail": "SELECT to authenticated | using: ((user_id = auth.uid()) OR (host_user_id = auth.uid())) | check: -",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policy",
+        "item": "profile_exclusions / own exclusions",
+        "detail": "ALL to authenticated | using: (owner_id = auth.uid()) | check: (owner_id = auth.uid())",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policy",
+        "item": "profile_reports / file a report",
+        "detail": "INSERT to authenticated | using: - | check: ((reporter_user_id = auth.uid()) AND (subject_user_id <> auth.uid()))",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policy",
+        "item": "profiles / read own profile",
+        "detail": "SELECT to authenticated | using: (id = auth.uid()) | check: -",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policy",
+        "item": "profiles / update own profile",
+        "detail": "UPDATE to authenticated | using: (id = auth.uid()) | check: (id = auth.uid())",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policy",
+        "item": "public_picks / own picks",
+        "detail": "ALL to authenticated | using: (user_id = auth.uid()) | check: (user_id = auth.uid())",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policy",
+        "item": "referral_codes / read own referral code",
+        "detail": "SELECT to authenticated | using: (user_id = auth.uid()) | check: -",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policy",
+        "item": "referral_earnings / read own earnings",
+        "detail": "SELECT to authenticated | using: (referrer_user_id = auth.uid()) | check: -",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policy",
+        "item": "referrals / read referrals i am part of",
+        "detail": "SELECT to authenticated | using: ((referrer_user_id = auth.uid()) OR (referred_user_id = auth.uid())) | check: -",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policy",
+        "item": "watch_progress / watch_by_profile",
+        "detail": "ALL to authenticated | using: can_use_profile(profile_id) | check: can_use_profile(profile_id)",
+        "flag": "ok"
+    },
+    {
+        "section": "3 definer",
+        "item": "accept_household_invite(invite_token text)",
+        "detail": "callable by authenticated, search_path set",
+        "flag": "ok"
+    },
+    {
+        "section": "3 definer",
+        "item": "attribute_party_join(party uuid)",
+        "detail": "callable by authenticated, search_path set",
+        "flag": "ok"
+    },
+    {
+        "section": "3 definer",
+        "item": "attribute_referral(ref_code text, src text, party uuid)",
+        "detail": "callable by authenticated, search_path set",
+        "flag": "ok"
+    },
+    {
+        "section": "3 definer",
+        "item": "can_host_party()",
+        "detail": "callable by authenticated, search_path set",
+        "flag": "ok"
+    },
+    {
+        "section": "3 definer",
+        "item": "can_list_public_party()",
+        "detail": "callable by authenticated, search_path set",
+        "flag": "ok"
+    },
+    {
+        "section": "3 definer",
+        "item": "can_use_profile(pid uuid)",
+        "detail": "callable by authenticated, search_path set",
+        "flag": "ok"
+    },
+    {
+        "section": "3 definer",
+        "item": "claim_handle(want text, name text, about text)",
+        "detail": "callable by authenticated, search_path set",
+        "flag": "ok"
+    },
+    {
+        "section": "3 definer",
+        "item": "ensure_party_credits()",
+        "detail": "callable by authenticated, search_path set",
+        "flag": "ok"
+    },
+    {
+        "section": "3 definer",
+        "item": "ensure_referral_code()",
+        "detail": "callable by authenticated, search_path set",
+        "flag": "ok"
+    },
+    {
+        "section": "3 definer",
+        "item": "followed_live_parties()",
+        "detail": "callable by authenticated, search_path set",
+        "flag": "ok"
+    },
+    {
+        "section": "3 definer",
+        "item": "has_active_access()",
+        "detail": "callable by authenticated, search_path set",
+        "flag": "ok"
+    },
+    {
+        "section": "3 definer",
+        "item": "host_page(want text)",
+        "detail": "callable by authenticated, search_path set",
+        "flag": "ok"
+    },
+    {
+        "section": "3 definer",
+        "item": "my_suggestions()",
+        "detail": "callable by authenticated, search_path set",
+        "flag": "ok"
+    },
+    {
+        "section": "3 definer",
+        "item": "party_by_code(code text)",
+        "detail": "callable by authenticated, search_path set",
+        "flag": "ok"
+    },
+    {
+        "section": "3 definer",
+        "item": "party_credit_summary()",
+        "detail": "callable by authenticated, search_path set",
+        "flag": "ok"
+    },
+    {
+        "section": "3 definer",
+        "item": "party_signups(party uuid)",
+        "detail": "callable by authenticated, search_path set",
+        "flag": "ok"
+    },
+    {
+        "section": "3 definer",
+        "item": "public_parties(max_rows integer)",
+        "detail": "callable by authenticated, search_path set",
+        "flag": "ok"
+    },
+    {
+        "section": "3 definer",
+        "item": "public_profile(want text)",
+        "detail": "callable by authenticated, search_path set",
+        "flag": "ok"
+    },
+    {
+        "section": "3 definer",
+        "item": "redeem_beta_invite(invite_code text)",
+        "detail": "callable by authenticated, search_path set",
+        "flag": "ok"
+    },
+    {
+        "section": "3 definer",
+        "item": "referral_summary()",
+        "detail": "callable by authenticated, search_path set",
+        "flag": "ok"
+    },
+    {
+        "section": "3 definer",
+        "item": "report_profile(handle text, why text)",
+        "detail": "callable by authenticated, search_path set",
+        "flag": "ok"
+    },
+    {
+        "section": "3 definer",
+        "item": "spend_party_credits(minutes integer, party uuid)",
+        "detail": "callable by authenticated, search_path set",
+        "flag": "ok"
+    },
+    {
+        "section": "3 definer",
+        "item": "suggest_to_host(handle text, content text, name text)",
+        "detail": "callable by authenticated, search_path set",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "beta_invites.code",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "beta_invites.code",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "beta_invites.created_at",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "beta_invites.created_at",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "beta_invites.email",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "beta_invites.email",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "beta_invites.grants",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "beta_invites.grants",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "beta_invites.id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "beta_invites.id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "beta_invites.note",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "beta_invites.note",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "beta_invites.redeemed_at",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "beta_invites.redeemed_at",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "beta_invites.redeemed_by",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "beta_invites.redeemed_by",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "beta_invites.revoked_at",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "beta_invites.revoked_at",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "beta_invites.sent_at",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "beta_invites.sent_at",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "catalog_cache.payload",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "catalog_cache.payload",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "catalog_cache.region",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "catalog_cache.region",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "catalog_cache.updated_at",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "catalog_cache.updated_at",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "collection_items.added_at",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "collection_items.added_at",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "collection_items.collection_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "collection_items.collection_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "collection_items.content_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "collection_items.content_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "collection_items.kind",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "collection_items.kind",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "collections.created_at",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "collections.created_at",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "collections.id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "collections.id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "collections.min_age",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "collections.min_age",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "collections.name",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "collections.name",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "collections.owner_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "collections.owner_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "collections.scope",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "collections.scope",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "collections.show_as_tab",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "collections.show_as_tab",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "favorites.content_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "favorites.content_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "favorites.created_at",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "favorites.created_at",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "favorites.poster",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "favorites.poster",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "favorites.profile_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "favorites.profile_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "favorites.title",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "favorites.title",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.app_version",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.app_version",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.body",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.body",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.console_tail",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.console_tail",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.created_at",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.created_at",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.kind",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.kind",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.notes",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.notes",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.profile_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.profile_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.profile_is_kids",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.profile_is_kids",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.reporter_email",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.reporter_email",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.reporter_user_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.reporter_user_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.status",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.status",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.title",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.title",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.url",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.url",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.user_agent",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.user_agent",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.view",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.view",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.viewport",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "feedback.viewport",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "free_month_grants.applied_at",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "free_month_grants.applied_at",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "free_month_grants.created_at",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "free_month_grants.created_at",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "free_month_grants.id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "free_month_grants.id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "free_month_grants.milestone",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "free_month_grants.milestone",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "free_month_grants.trigger",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "free_month_grants.trigger",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "free_month_grants.user_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "free_month_grants.user_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "free_month_grants.year",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "free_month_grants.year",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "host_follows.created_at",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "host_follows.created_at",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "host_follows.follower_user_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "host_follows.follower_user_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "host_follows.host_user_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "host_follows.host_user_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "host_suggestions.content_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "host_suggestions.content_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "host_suggestions.created_at",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "host_suggestions.created_at",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "host_suggestions.from_user_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "host_suggestions.from_user_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "host_suggestions.host_user_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "host_suggestions.host_user_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "host_suggestions.title",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "host_suggestions.title",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_invites.created_at",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_invites.created_at",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_invites.id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_invites.id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_invites.invited_email",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_invites.invited_email",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_invites.owner_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_invites.owner_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_invites.profile_name",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_invites.profile_name",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_invites.status",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_invites.status",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_invites.token",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_invites.token",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_members.id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_members.id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_members.joined_at",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_members.joined_at",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_members.member_user_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_members.member_user_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_members.owner_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_members.owner_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_members.profile_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_members.profile_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_profiles.allowed_ratings",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_profiles.allowed_ratings",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_profiles.avatar_color",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_profiles.avatar_color",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_profiles.avatar_recipe",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_profiles.avatar_recipe",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_profiles.avatar_url",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_profiles.avatar_url",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_profiles.created_at",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_profiles.created_at",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_profiles.id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_profiles.id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_profiles.is_kids",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_profiles.is_kids",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_profiles.max_rating",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_profiles.max_rating",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_profiles.name",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_profiles.name",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_profiles.pin",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_profiles.pin",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_profiles.user_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "household_profiles.user_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "parties.blurb",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "parties.blurb",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "parties.content_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "parties.content_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "parties.created_at",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "parties.created_at",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "parties.ended_at",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "parties.ended_at",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "parties.host_name",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "parties.host_name",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "parties.host_user_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "parties.host_user_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "parties.id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "parties.id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "parties.is_public",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "parties.is_public",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "parties.join_code",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "parties.join_code",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "parties.stream_idx",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "parties.stream_idx",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "parties.title",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "parties.title",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "party_credit_ledger.created_at",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "party_credit_ledger.created_at",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "party_credit_ledger.delta",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "party_credit_ledger.delta",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "party_credit_ledger.id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "party_credit_ledger.id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "party_credit_ledger.note",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "party_credit_ledger.note",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "party_credit_ledger.party_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "party_credit_ledger.party_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "party_credit_ledger.reason",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "party_credit_ledger.reason",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "party_credit_ledger.user_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "party_credit_ledger.user_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "party_joins.host_user_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "party_joins.host_user_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "party_joins.joined_at",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "party_joins.joined_at",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "party_joins.party_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "party_joins.party_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "party_joins.user_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "party_joins.user_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profile_exclusions.content_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profile_exclusions.content_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profile_exclusions.owner_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profile_exclusions.owner_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profile_exclusions.profile_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profile_exclusions.profile_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profile_reports.created_at",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profile_reports.created_at",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profile_reports.handled_at",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profile_reports.handled_at",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profile_reports.id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profile_reports.id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profile_reports.reason",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profile_reports.reason",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profile_reports.reporter_user_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profile_reports.reporter_user_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profile_reports.subject_user_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profile_reports.subject_user_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.bio",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.bio",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.created_at",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.display_name",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.display_name",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.email",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.hosts_hour",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.hosts_hour",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.hosts_tz",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.hosts_tz",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.hosts_weekday",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.hosts_weekday",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.must_change_password",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.public_handle",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.region",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.region",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.social_handle",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.social_handle",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.social_platform",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.social_platform",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "profiles.trial_email_sent",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "public_picks.content_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "public_picks.content_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "public_picks.created_at",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "public_picks.created_at",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "public_picks.poster",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "public_picks.poster",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "public_picks.title",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "public_picks.title",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "public_picks.user_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "public_picks.user_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_codes.active",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_codes.active",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_codes.code",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_codes.code",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_codes.created_at",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_codes.created_at",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_codes.duration_months",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_codes.duration_months",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_codes.kind",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_codes.kind",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_codes.rate_bps",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_codes.rate_bps",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_codes.user_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_codes.user_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_earnings.commission_cents",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_earnings.commission_cents",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_earnings.currency",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_earnings.currency",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_earnings.gross_cents",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_earnings.gross_cents",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_earnings.id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_earnings.id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_earnings.occurred_at",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_earnings.occurred_at",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_earnings.paid_out_at",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_earnings.paid_out_at",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_earnings.payout_ref",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_earnings.payout_ref",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_earnings.rate_bps",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_earnings.rate_bps",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_earnings.referred_user_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_earnings.referred_user_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_earnings.referrer_user_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referral_earnings.referrer_user_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referrals.code",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referrals.code",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referrals.created_at",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referrals.created_at",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referrals.duration_months",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referrals.duration_months",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referrals.expires_at",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referrals.expires_at",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referrals.first_paid_at",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referrals.first_paid_at",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referrals.party_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referrals.party_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referrals.rate_bps",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referrals.rate_bps",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referrals.referred_user_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referrals.referred_user_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referrals.referrer_user_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referrals.referrer_user_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referrals.source",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "referrals.source",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "reserved_handles.handle",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "reserved_handles.handle",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "waitlist.created_at",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "waitlist.created_at",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "waitlist.email",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "waitlist.email",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "waitlist.id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "waitlist.id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "waitlist.status",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "waitlist.status",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "watch_progress.completed",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "watch_progress.completed",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "watch_progress.content_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "watch_progress.content_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "watch_progress.duration_secs",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "watch_progress.duration_secs",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "watch_progress.position_secs",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "watch_progress.position_secs",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "watch_progress.profile_id",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "watch_progress.profile_id",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "watch_progress.title",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "watch_progress.title",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "watch_progress.updated_at",
+        "detail": "UPDATE granted to authenticated",
+        "flag": "ok"
+    },
+    {
+        "section": "4 columns",
+        "item": "watch_progress.updated_at",
+        "detail": "UPDATE granted to anon",
+        "flag": "ok"
+    }
+]

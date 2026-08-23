@@ -128,19 +128,17 @@ const PAID_TIERS = new Set(["founder_vip", "giveaway", "cloud_paid", "trial_7day
 
 /** Client-side access gate: an active, non-expired paid/trial tier.
  *
- *  THIS IS THE ONLY GATE ON BROWSING. The comment here used to say server RLS
- *  (has_active_access) was the real enforcement and this merely drove the UI.
- *  No such function exists in any migration -- it was never written -- so
- *  anyone willing to edit the client can browse the catalogue while lapsed.
+ *  Server RLS is the real enforcement; this drives the UI. That was the
+ *  original comment, I "corrected" it to say has_active_access() had never been
+ *  written, and the correction was wrong: the function exists, it is SECURITY
+ *  DEFINER with search_path set, and the RLS policy on catalog_cache is
+ *  `for select to authenticated using (has_active_access())`.
  *
- *  Left alone deliberately, and written down rather than quietly patched: what
- *  is behind this gate is Pluto, Tubi and Internet Archive listings, which are
- *  public and free to reach directly. The account's own data -- household
- *  profiles, favorites, watch_progress -- is RLS'd by user_id and genuinely
- *  protected. Hosting and joining parties are enforced in the database, because
- *  those cost us money. This one is a conversion boundary, not a security one,
- *  and saying so is worth more than a claim that fails the first time somebody
- *  relies on it. */
+ *  It is not in any migration, which is why reading the repo said otherwise.
+ *  A third of this schema was made in the dashboard, so the migrations are not
+ *  evidence of absence -- scripts/sql/audit-security.sql against the live
+ *  database is.
+ */
 export async function hasActiveAccess(): Promise<boolean> {
   const acct = await getAccount();
 

@@ -27,10 +27,18 @@ rls as (
                 nullif(case when has_table_privilege('anon', c.oid, 'UPDATE') then 'UPDATE' end, ''),
                 nullif(case when has_table_privilege('anon', c.oid, 'DELETE') then 'DELETE' end, '')), ''), 'none')
            as detail,
-         -- Worst first. A CASE reports only its first match, and "anon can
-         -- write" is a bigger fact than "no RLS" -- the fixture caught this
-         -- calling a writable anon table merely unprotected-and-readable.
+         -- Worst first, and "worst" is not simply "has a grant".
+         --
+         -- RLS ON WITH ZERO POLICIES DENIES EVERYTHING, whatever the grants
+         -- say, so those tables are the safest in the database and must not be
+         -- reported as writable. Running this against production called
+         -- beta_invites and reserved_handles "ANON CAN WRITE" when both are
+         -- deny-all by design -- the loudest flag on the two tables that
+         -- needed no attention at all.
          case
+           when c.relrowsecurity
+                and (select count(*) from pg_policy p where p.polrelid = c.oid) = 0
+             then 'RLS on, no policies: denies everything (safe)'
            when has_table_privilege('anon', c.oid, 'INSERT')
              or has_table_privilege('anon', c.oid, 'UPDATE')
              or has_table_privilege('anon', c.oid, 'DELETE')
@@ -40,9 +48,6 @@ rls as (
                   or has_table_privilege('authenticated', c.oid, 'SELECT'))
              then 'NO RLS and readable by a client role'
            when not c.relrowsecurity then 'no RLS (service-role only?)'
-           when (select count(*) from pg_policy p where p.polrelid = c.oid) = 0
-                and has_table_privilege('authenticated', c.oid, 'SELECT')
-             then 'RLS on with no policies: denies everything'
            else 'ok'
          end as flag
     from pg_class c join pg_namespace n on n.oid = c.relnamespace

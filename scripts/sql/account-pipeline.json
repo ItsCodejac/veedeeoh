@@ -1,0 +1,290 @@
+[
+    {
+        "section": "1 functions",
+        "item": "has_active_access",
+        "detail": "present, definer, tiers via OWN COPY",
+        "flag": "unexpected: this was never written"
+    },
+    {
+        "section": "1 functions",
+        "item": "can_host_party",
+        "detail": "present, definer",
+        "flag": "stale: 030000 did not run"
+    },
+    {
+        "section": "1 functions",
+        "item": "apply_grants",
+        "detail": "present, definer",
+        "flag": "ok"
+    },
+    {
+        "section": "1 functions",
+        "item": "ensure_party_credits",
+        "detail": "present, definer",
+        "flag": "ok"
+    },
+    {
+        "section": "1 functions",
+        "item": "grant_monthly_credits",
+        "detail": "present, definer, tiers via OWN COPY",
+        "flag": "ok"
+    },
+    {
+        "section": "1 functions",
+        "item": "party_credit_summary",
+        "detail": "present, definer",
+        "flag": "ok"
+    },
+    {
+        "section": "1 functions",
+        "item": "redeem_beta_invite",
+        "detail": "present, definer",
+        "flag": "ok"
+    },
+    {
+        "section": "1 functions",
+        "item": "spend_party_credits",
+        "detail": "present, definer",
+        "flag": "ok"
+    },
+    {
+        "section": "1 functions",
+        "item": "can_join_party",
+        "detail": "ABSENT",
+        "flag": "MISSING - run the migrations"
+    },
+    {
+        "section": "1 functions",
+        "item": "is_entitled",
+        "detail": "ABSENT",
+        "flag": "MISSING - run the migrations"
+    },
+    {
+        "section": "1 functions",
+        "item": "party_join_allowance",
+        "detail": "ABSENT",
+        "flag": "MISSING - run the migrations"
+    },
+    {
+        "section": "1 functions",
+        "item": "party_joins_this_month",
+        "detail": "ABSENT",
+        "flag": "MISSING - run the migrations"
+    },
+    {
+        "section": "2 policies",
+        "item": "parties / entitled host creates parties",
+        "detail": "INSERT: ((host_user_id = auth.uid()) AND can_host_party())",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policies",
+        "item": "parties / host deletes own parties",
+        "detail": "d: (host_user_id = auth.uid())",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policies",
+        "item": "parties / host reads own parties",
+        "detail": "SELECT: (host_user_id = auth.uid())",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policies",
+        "item": "parties / host updates own parties",
+        "detail": "UPDATE: (host_user_id = auth.uid())",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policies",
+        "item": "parties / read public or own parties",
+        "detail": "SELECT: ((host_user_id = auth.uid()) OR (is_public AND (ended_at IS NULL)))",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policies",
+        "item": "party_joins / see own joins or joins to my parties",
+        "detail": "SELECT: ((user_id = auth.uid()) OR (host_user_id = auth.uid()))",
+        "flag": "ok"
+    },
+    {
+        "section": "2 policies",
+        "item": "party_joins / record own join",
+        "detail": "INSERT: (user_id = auth.uid())",
+        "flag": "join cap NOT enforced - run 030000"
+    },
+    {
+        "section": "3 signup",
+        "item": "users / on_auth_user_created",
+        "detail": "CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION handle_new_user()",
+        "flag": "ok"
+    },
+    {
+        "section": "4 profiles",
+        "item": "credits_granted_for",
+        "detail": "date (no default), nullable",
+        "flag": "ok"
+    },
+    {
+        "section": "4 profiles",
+        "item": "party_credits",
+        "detail": "integer default 0, not null",
+        "flag": "ok"
+    },
+    {
+        "section": "4 profiles",
+        "item": "party_credits_exempt",
+        "detail": "boolean default false, not null",
+        "flag": "ok"
+    },
+    {
+        "section": "4 profiles",
+        "item": "seats",
+        "detail": "integer default 3, not null",
+        "flag": "ok"
+    },
+    {
+        "section": "4 profiles",
+        "item": "stripe_customer_id",
+        "detail": "text (no default), nullable",
+        "flag": "ok"
+    },
+    {
+        "section": "4 profiles",
+        "item": "stripe_subscription_id",
+        "detail": "text (no default), nullable",
+        "flag": "ok"
+    },
+    {
+        "section": "4 profiles",
+        "item": "tier",
+        "detail": "text default 'cloud_paid'::text, nullable",
+        "flag": "ok"
+    },
+    {
+        "section": "4 profiles",
+        "item": "tier_expires",
+        "detail": "timestamp with time zone (no default), nullable",
+        "flag": "ok"
+    },
+    {
+        "section": "5 accounts",
+        "item": "founder_vip",
+        "detail": "5 accounts, 4 no expiry, 1 unexpired, 0 expired, 4 exempt",
+        "flag": "ok"
+    },
+    {
+        "section": "5 accounts",
+        "item": "giveaway",
+        "detail": "1 accounts, 0 no expiry, 1 unexpired, 0 expired, 0 exempt",
+        "flag": "ok"
+    },
+    {
+        "section": "5 accounts",
+        "item": "trial_7day",
+        "detail": "8 accounts, 0 no expiry, 3 unexpired, 5 expired, 0 exempt",
+        "flag": "ok"
+    },
+    {
+        "section": "7 joins",
+        "item": "dannywsalama1@gmail.com",
+        "detail": "1 parties this month, tier=founder_vip",
+        "flag": "ok"
+    },
+    {
+        "section": "7 joins",
+        "item": "lmnlloud@gmail.com",
+        "detail": "7 parties this month, tier=trial_7day",
+        "flag": "ok"
+    },
+    {
+        "section": "7 joins",
+        "item": "tiredreese@atomicmail.com",
+        "detail": "4 parties this month, tier=trial_7day",
+        "flag": "ok"
+    },
+    {
+        "section": "8 seats",
+        "item": "itsdegenlife@gmail.com",
+        "detail": "4 of 3 seats used",
+        "flag": "OVER SEAT CAP"
+    },
+    {
+        "section": "8 seats",
+        "item": "bosslevel8@gmail.com",
+        "detail": "2 of 3 seats used",
+        "flag": "ok"
+    },
+    {
+        "section": "8 seats",
+        "item": "bubbleskullco@gmail.com",
+        "detail": "3 of 3 seats used",
+        "flag": "ok"
+    },
+    {
+        "section": "8 seats",
+        "item": "cojacplays+vtest1@gmail.com",
+        "detail": "1 of 3 seats used",
+        "flag": "ok"
+    },
+    {
+        "section": "8 seats",
+        "item": "cojacplays+vtest2@gmail.com",
+        "detail": "1 of 3 seats used",
+        "flag": "ok"
+    },
+    {
+        "section": "8 seats",
+        "item": "cojacplays+vtest3@gmail.com",
+        "detail": "1 of 3 seats used",
+        "flag": "ok"
+    },
+    {
+        "section": "8 seats",
+        "item": "cojacplays+vtest5@gmail.com",
+        "detail": "1 of 3 seats used",
+        "flag": "ok"
+    },
+    {
+        "section": "8 seats",
+        "item": "cojacplays@gmail.com",
+        "detail": "1 of 3 seats used",
+        "flag": "ok"
+    },
+    {
+        "section": "8 seats",
+        "item": "cojacproduction@gmail.com",
+        "detail": "1 of 3 seats used",
+        "flag": "ok"
+    },
+    {
+        "section": "8 seats",
+        "item": "dannywsalama1@gmail.com",
+        "detail": "1 of 3 seats used",
+        "flag": "ok"
+    },
+    {
+        "section": "8 seats",
+        "item": "dj.cojac@gmail.com",
+        "detail": "1 of 3 seats used",
+        "flag": "ok"
+    },
+    {
+        "section": "8 seats",
+        "item": "itscojac@gmail.com",
+        "detail": "1 of 3 seats used",
+        "flag": "ok"
+    },
+    {
+        "section": "8 seats",
+        "item": "lmnlloud@gmail.com",
+        "detail": "1 of 3 seats used",
+        "flag": "ok"
+    },
+    {
+        "section": "8 seats",
+        "item": "tiredreese@atomicmail.com",
+        "detail": "1 of 3 seats used",
+        "flag": "ok"
+    }
+]

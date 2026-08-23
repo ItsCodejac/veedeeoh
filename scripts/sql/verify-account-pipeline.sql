@@ -24,8 +24,12 @@ with expected as (
     ('spend_party_credits',    true),
     ('apply_grants',           true),
     ('redeem_beta_invite',     true),
-    -- never written; the browse gate is client-side only, by decision
-    ('has_active_access',      false)
+    -- EXISTS, and is not in any migration. Written in the dashboard, and the
+    -- RLS policy on catalog_cache calls it, so the browse gate is enforced
+    -- server-side after all. An earlier pass here asserted the opposite from
+    -- reading the migrations, which is exactly the mistake this file exists to
+    -- stop somebody making.
+    ('has_active_access',      true)
   ) as t(name, should_exist)
 ),
 fns as (
