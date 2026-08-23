@@ -35,8 +35,13 @@ export async function renderReferral(el: HTMLElement): Promise<void> {
   const link = db.referralLink(code);
   const money = (c: number) => `$${(c / 100).toFixed(2)}`;
   const isPartner = terms?.kind === "partner";
-  const rate = terms ? (terms.rate_bps / 100).toFixed(terms.rate_bps % 100 ? 1 : 0) : "20";
-  const months = terms?.duration_months ?? 12;
+  // Number(), not a truthiness check on `terms`. A terms row that exists but
+  // has no rate on it -- which is what a partner looks like before anyone sets
+  // their terms -- divided undefined by 100 and printed "NaN% for 12 months"
+  // on the referral card.
+  const bps = Number(terms?.rate_bps);
+  const rate = Number.isFinite(bps) ? (bps / 100).toFixed(bps % 100 ? 1 : 0) : "20";
+  const months = Number.isFinite(Number(terms?.duration_months)) ? Number(terms!.duration_months) : 12;
 
   // Attribution by source is the honest answer to "is hosting parties worth
   // it?". Without it a host cannot tell whether their parties earned anything

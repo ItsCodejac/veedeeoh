@@ -11,7 +11,7 @@
 // and nothing else.
 
 import { escapeHtml, showToast } from "./util";
-import { getStoredProfiles, openProfileEditor, getActiveProfile } from "./profiles";
+import { getStoredProfiles, openProfileEditor, getActiveProfile, profileFace } from "./profiles";
 import { card, row } from "./settings-ui";
 import { renderAccount } from "./settings-account";
 
@@ -42,7 +42,7 @@ function renderHousehold(el: HTMLElement): void {
     <div class="setProfiles">
       ${profiles.map((p) => `
         <div class="setProfile">
-          <span class="setAvatar" style="background:${escapeHtml(p.avatar_color || "#c5f04e")}">${escapeHtml(p.name.charAt(0).toUpperCase())}</span>
+          <span class="setAvatar" style="background:${profileFace(p).background}">${escapeHtml(profileFace(p).letter)}</span>
           <span class="setProfileMeta">
             <b>${escapeHtml(p.name)}${p.id === active.id ? ` <span class="setDim">(active)</span>` : ""}</b>
             <span>${p.is_kids ? "Kids profile" : p.role === "owner" ? "Account owner" : "Standard profile"}${p.pin ? " · PIN set" : ""}</span>
@@ -61,86 +61,19 @@ function renderHousehold(el: HTMLElement): void {
   });
   el.querySelector("#setAddProfile")?.addEventListener("click", () =>
     openProfileEditor(undefined, () => openSettings("household")));
-
-  void renderRatingMatrix(el.querySelector<HTMLElement>("#setRatings")!);
 }
 
-/** The comparison matrix, editable in place.
- *
- *  This is the section that justified the whole rebuild. Limits used to live
- *  only inside each child's own editor, so "is her sister allowed this?" was a
- *  memory exercise across two modals. One grid, every profile, every rating.
- *
- *  Saves per toggle rather than behind a Save button: there is no coherent
- *  half-finished state to protect, and a parent who ticks a box and navigates
- *  away should not silently lose the change. */
-async function renderRatingMatrix(box: HTMLElement): Promise<void> {
-  const { RATING_GROUPS } = await import("./db");
-  const { updateProfileEverywhere } = await import("./profiles");
-  const profiles = getStoredProfiles();
+// THE RATING MATRIX IS GONE. It was a grid of every profile against every
+// rating, and it was the section that justified the settings rebuild -- until
+// the rebuild concluded the opposite: a limit applies to one person, so it is
+// set where that person is edited, beside their name, avatar and PIN. Two
+// controls writing one field is how they drift.
+//
+// What was left behind was a call to it against `#setRatings`, an element the
+// new markup no longer emits, with a `!` asserting it was there. It threw on
+// every single render of Settings. Nothing visible broke, which is why it
+// survived: the exception landed after the section had already painted.
 
-  // Owners are not rating-gated, and showing a row that cannot restrain anyone
-  // implies a control that does not exist.
-  const gated = profiles.filter((p) => p.role !== "owner");
-  if (!gated.length) {
-    box.innerHTML = `<p class="setHint">Only the account owner exists so far. Add a profile to set limits for it.</p>`;
-    return;
-  }
-
-  const codes = RATING_GROUPS.flatMap((g) => g.ratings.map((r) => r.code));
-
-  box.innerHTML = `
-    <div class="setMatrixScroll">
-      <table class="setMatrix">
-        <thead><tr><th></th>${codes.map((c) => `<th>${escapeHtml(c)}</th>`).join("")}</tr></thead>
-        <tbody>
-          ${gated.map((p) => {
-            const allowed = new Set((p.allowed_ratings ?? []).map((r) => r.toUpperCase()));
-            return `<tr data-pid="${escapeHtml(p.id)}">
-              <th scope="row">${escapeHtml(p.name)}
-                ${allowed.size ? "" : `<span class="setDim"> · everything</span>`}</th>
-              ${codes.map((c) => `<td>
-                <input type="checkbox" data-code="${escapeHtml(c)}"${allowed.has(c) ? " checked" : ""}
-                  aria-label="${escapeHtml(p.name)} may watch ${escapeHtml(c)}" />
-              </td>`).join("")}
-            </tr>`;
-          }).join("")}
-        </tbody>
-      </table>
-    </div>`;
-
-  box.querySelectorAll<HTMLInputElement>("input[type=checkbox]").forEach((cb) => {
-    cb.addEventListener("change", async () => {
-      const tr = cb.closest("tr")!;
-      const pid = tr.dataset.pid!;
-      const target = getStoredProfiles().find((p) => p.id === pid);
-      if (!target) return;
-
-      const picked = Array.from(tr.querySelectorAll<HTMLInputElement>("input:checked"))
-        .map((i) => i.dataset.code!);
-
-      // Empty means unrestricted, which is what allowedRatingsFor already
-      // treats a null list as -- so store null rather than an empty array and
-      // keep one meaning for one state.
-      try {
-        await updateProfileEverywhere(pid, {
-          name: target.name,
-          avatar_color: target.avatar_color,
-          allowed_ratings: picked.length ? picked : null,
-        });
-        const note = tr.querySelector("th .setDim");
-        if (picked.length && note) note.remove();
-        if (!picked.length && !note) {
-          tr.querySelector("th")!.insertAdjacentHTML("beforeend", `<span class="setDim"> · everything</span>`);
-        }
-        showToast(`${target.name}: limits saved`);
-      } catch {
-        cb.checked = !cb.checked;
-        showToast("Couldn't save that. Try again.");
-      }
-    });
-  });
-}
 
 function renderPlayback(el: HTMLElement): void {
   const QK = "veedeeoh_pref_quality", CK = "veedeeoh_pref_cc";

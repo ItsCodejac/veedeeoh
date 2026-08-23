@@ -57,7 +57,7 @@ export function promptForPin(profile: HouseholdProfile): Promise<boolean> {
     modal.style.cssText = "position:fixed;inset:0;z-index:10001;background:rgba(6,7,10,0.94);backdrop-filter:blur(20px);display:flex;align-items:center;justify-content:center;padding:20px;color:#fff;font-family:'Space Grotesk',sans-serif;";
     modal.innerHTML = `
       <div style="background:#10141e;border:1px solid rgba(255,255,255,0.15);border-radius:20px;max-width:340px;width:100%;padding:28px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,0.9);">
-        <div style="width:56px;height:56px;border-radius:14px;background:${profile.avatar_color};display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#06070a;margin:0 auto 14px;">${escapeHtml(profile.name.charAt(0).toUpperCase())}</div>
+        <div style="width:56px;height:56px;border-radius:14px;background:${profileFace(profile).background};display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#06070a;margin:0 auto 14px;">${escapeHtml(profileFace(profile).letter)}</div>
         <h3 style="margin:0 0 6px;font-size:18px;font-weight:800;">Enter PIN for ${escapeHtml(profile.name)}</h3>
         <p style="margin:0 0 18px;font-size:13px;color:#9aa5b5;">This profile is protected.</p>
         <input id="pinEntry" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" style="width:170px;text-align:center;letter-spacing:14px;font-size:26px;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,0.2);background:#080a10;color:#fff;outline:none;" />
@@ -359,6 +359,37 @@ function localAvatar(url?: string | null): string {
   return v && !/^https?:\/\//i.test(v) ? v : '';
 }
 
+/** A profile's face: the CSS background to draw, and the letter to draw only
+ *  when there is no picture.
+ *
+ *  ONE COPY. There were five, each re-deciding what an avatar is, and three of
+ *  them had never been told avatars existed -- the PIN prompt, the household-
+ *  full upsell and the Profiles list in Settings all drew a coloured square
+ *  with an initial regardless of what the profile had chosen. The sidebar, six
+ *  inches away, drew the real thing. A picture that appears in some places and
+ *  not others reads as a save that half worked.
+ *
+ *  A remote value counts as no picture: an api.dicebear.com URL from the old
+ *  picker would make the third-party request that generating locally exists to
+ *  remove. Opening the profile editor regenerates it locally. */
+export function profileFace(p: { name?: string; avatar_color?: string | null; avatar_url?: string | null }):
+  { background: string; letter: string } {
+  const img = localAvatar(p.avatar_url);
+  // SINGLE QUOTES INSIDE THE url(). Every caller drops this into a
+  // style="..." attribute, so a double quote here closes the attribute at the
+  // "u" of url and the browser parses the rest of the data URI as a series of
+  // bogus attributes. The avatar vanished and the initial vanished with it,
+  // which is a more confusing failure than either alone. A data URI from
+  // DiceBear contains no quote of either kind -- base64 has none by
+  // construction and the percent-encoded form escapes them -- and the replace
+  // below keeps that true if it ever stops being.
+  const safe = img.replace(/'/g, "%27");
+  return {
+    background: safe ? `url('${safe}') center/cover` : (p.avatar_color || '#c5f04e'),
+    letter: safe ? '' : (p.name || '?').charAt(0).toUpperCase(),
+  };
+}
+
 export function openProfileSwitcher(onSelectProfile?: (p: HouseholdProfile) => void): void {
   const existing = document.getElementById('profileSwitcherModal');
   if (existing) existing.remove();
@@ -394,9 +425,9 @@ export function openProfileSwitcher(onSelectProfile?: (p: HouseholdProfile) => v
             background: none; border: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 14px; transition: transform 0.2s ease, opacity 0.2s; outline: none; position: relative;
           ">
             <div style="
-              width: 100px; height: 100px; border-radius: 20px; background: ${localAvatar(p.avatar_url) ? `url('${localAvatar(p.avatar_url)}') center/cover` : p.avatar_color}; display: flex; align-items: center; justify-content: center; font-size: 40px; font-weight: 800; color: #06070a; box-shadow: ${p.id === active.id ? '0 0 0 4px #c5f04e, 0 12px 30px rgba(197,240,78,0.4)' : '0 8px 24px rgba(0,0,0,0.5)'}; position: relative;
+              width: 100px; height: 100px; border-radius: 20px; background: ${profileFace(p).background}; display: flex; align-items: center; justify-content: center; font-size: 40px; font-weight: 800; color: #06070a; box-shadow: ${p.id === active.id ? '0 0 0 4px #c5f04e, 0 12px 30px rgba(197,240,78,0.4)' : '0 8px 24px rgba(0,0,0,0.5)'}; position: relative;
             ">
-              ${localAvatar(p.avatar_url) ? '' : p.name.charAt(0).toUpperCase()}
+              ${escapeHtml(profileFace(p).letter)}
               <div class="editOverlay" style="display: none; position: absolute; inset: 0; background: rgba(0,0,0,0.6); border-radius: 20px; align-items: center; justify-content: center;">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
               </div>
@@ -509,7 +540,7 @@ export function openProfileSwitcher(onSelectProfile?: (p: HouseholdProfile) => v
         modal.innerHTML = `
           <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 38px; padding: 0 60px 40px; width: 100%; height: 100%; background: #0A0B0E;">
             <div style="display: flex; align-items: center; gap: 18px">
-              ${profiles.map(p => `<div style="width: 84px; height: 84px; border-radius: 50%; background: ${p.avatar_color || '#C6F53A'}; color: #0A0B0E; font-size: 30px; font-weight: 800; display: flex; align-items: center; justify-content: center">${p.name.charAt(0).toUpperCase()}</div>`).join('')}
+              ${profiles.map(p => `<div style="width: 84px; height: 84px; border-radius: 50%; background: ${profileFace(p).background}; color: #0A0B0E; font-size: 30px; font-weight: 800; display: flex; align-items: center; justify-content: center">${escapeHtml(profileFace(p).letter)}</div>`).join('')}
               <div style="width: 84px; height: 84px; border-radius: 50%; border: 2px dashed #2B303A; display: flex; align-items: center; justify-content: center">
                 <svg viewBox="0 0 24 24" fill="none" stroke="#C6F53A" stroke-width="2" stroke-linecap="round" style="width: 30px; height: 30px"><path d="M12 6v12M6 12h12"></path></svg>
               </div>

@@ -4060,15 +4060,34 @@ body.kids-mode { --brand-accent: #ff9f1c; }
    section list survives on a small screen. */
 .settingsWrap { max-width: 940px; margin: 0 auto; padding: 30px clamp(16px, 4vw, 40px) 80px; }
 .settingsHead h1 { font-family: var(--brand); font-size: 30px; font-weight: 800; margin: 0 0 26px; }
-.settingsCols { display: grid; grid-template-columns: 210px 1fr; gap: 34px; align-items: start; }
+/* ONE LAYOUT, NOT TWO. This was a 210px sidebar beside the content on desktop
+   and a horizontal scroller below 760px, which is two structures to keep
+   correct -- and every control that went missing went missing on the one that
+   gets tested least.
 
-.settingsNav { display: flex; flex-direction: column; gap: 3px; position: sticky; top: 12px; }
+   The first attempt at fixing it added an id rule that set the bar sticky and
+   gave the buttons pill padding, but never overrode `flex-direction: column`
+   here and never touched the 210px grid column. The result on desktop was the
+   worst of both: pill-shaped buttons stacked six high inside a narrow rail. */
+.settingsCols { display: block; }
+
+.settingsNav {
+  position: sticky; top: 0; z-index: 5;
+  display: flex; flex-direction: row; gap: 6px;
+  overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  background: linear-gradient(#06070a 72%, rgba(6,7,10,0));
+  padding-bottom: 12px; margin-bottom: 4px;
+}
+.settingsNav::-webkit-scrollbar { display: none; }
 .setNavBtn {
-  display: flex; align-items: center; gap: 11px;
-  padding: 10px 13px; border-radius: 10px;
+  display: flex; align-items: center; gap: 11px; flex: 0 0 auto; white-space: nowrap;
+  padding: 8px 13px; border-radius: 999px;
   background: none; border: none; color: #9aa5b5;
   font: inherit; font-size: 14px; font-weight: 600;
-  cursor: pointer; text-align: left; width: 100%;
+  /* width:auto, not 100%. It was 100% from the sidebar era, when each entry
+     was a full-width row. In a horizontal bar it makes every chip as wide as
+     the bar, so six chips become a 5,190px scroller showing one word. */
+  cursor: pointer; text-align: left; width: auto;
 }
 .setNavBtn:hover { background: rgba(255,255,255,0.05); color: #fff; }
 .setNavBtn.active { background: rgba(197,240,78,0.12); color: var(--accent); }
@@ -4133,7 +4152,8 @@ body.kids-mode { --brand-accent: #ff9f1c; }
 .setProfile { display: flex; align-items: center; gap: 13px; background: rgba(0,0,0,0.28);
   border: 1px solid rgba(255,255,255,0.07); border-radius: 11px; padding: 11px 14px; }
 .setAvatar { width: 36px; height: 36px; border-radius: 9px; flex: none; display: flex;
-  align-items: center; justify-content: center; font-weight: 800; color: #06070a; }
+  align-items: center; justify-content: center; font-weight: 800; color: #06070a;
+  background-repeat: no-repeat; overflow: hidden; }
 .setProfileMeta { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .setProfileMeta b { font-size: 14.5px; }
 .setProfileMeta > span { font-size: 12px; color: rgba(255,255,255,0.5); }
@@ -4149,13 +4169,6 @@ body.kids-mode { --brand-accent: #ff9f1c; }
 .setCheck input { width: 17px; height: 17px; accent-color: var(--accent); }
 
 @media (max-width: 760px) {
-  .settingsCols { grid-template-columns: 1fr; gap: 18px; }
-  .settingsNav {
-    position: static; flex-direction: row; gap: 6px;
-    overflow-x: auto; scrollbar-width: none; padding-bottom: 4px;
-  }
-  .settingsNav::-webkit-scrollbar { display: none; }
-  .setNavBtn { flex: none; white-space: nowrap; }
 }
 
 /* Parental-controls matrix. Scrolls horizontally on its own rather than letting
@@ -5052,23 +5065,9 @@ body.can-host .vodQuickBtn.partyAct { display: flex; }
   padding-bottom: 9px; border-bottom: 1px solid rgba(255,255,255,.08);
 }
 
-/* HORIZONTAL AT EVERY WIDTH. It kept the old sidebar styling on desktop, so a
-   jump bar with six entries became six stacked rows above the content -- most
-   of the first screen spent on navigation for a page you are meant to scroll.
-   It is a bar now, and it sticks, so the map is available from anywhere. */
-#settingsNav {
-  position: sticky; top: 0; z-index: 5;
-  display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-  background: linear-gradient(#06070a 72%, rgba(6,7,10,0));
-  padding-bottom: 12px; margin-bottom: 4px;
-}
-#settingsNav::-webkit-scrollbar { display: none; }
-#settingsNav .setNavBtn {
-  flex: 0 0 auto; width: auto; margin: 0;
-  padding: 8px 13px; border-radius: 999px; font-size: 13px;
-}
-@media (max-width: 768px) { #settingsNav .setNavBtn svg { display: none; } }
+/* The bar itself is styled on .settingsNav above, at every width. Only the
+   icons are dropped on a phone, where six labels already fill the row. */
+@media (max-width: 768px) { .settingsNav .setNavBtn svg { display: none; } }
 
 
 /* ---- avatar character creator -------------------------------------------
