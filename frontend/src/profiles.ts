@@ -413,6 +413,84 @@ export interface SwitcherOptions {
  *  left no way out but to pick somebody: no close control, no Escape, and Back
  *  left the app. Everywhere it is reachable by choice it can now be left the
  *  same way it was opened. */
+/** The adult gate, at module scope so every caller uses the same one.
+ *
+ *  Entering a kids profile is never gated -- a child must be able to reach
+ *  their own. What needs an adult is doing something FROM one. Returns true
+ *  when the active profile is not a kids profile, or when no adult PIN exists
+ *  to check against, because a gate nobody can open is a lockout rather than a
+ *  control. */
+export async function requireAdultAuth(): Promise<boolean> {
+  const active = getActiveProfile();
+  if (!active?.is_kids) return true;
+  const adults = getStoredProfiles().filter((p) => !p.is_kids && p.pin);
+  if (adults.length === 0) return true;
+  return await promptForPin(adults[0]!);
+}
+
+/** May another profile be added right now, and if not, say why.
+ *
+ *  ONE GUARD, TWO DOORS. The switcher checked the seat cap and asked for the
+ *  adult PIN; the "Add a profile" button in Settings, written later, checked
+ *  nothing at all. That is how an account ended up with four profiles on three
+ *  seats -- not an attack, just the door that had no lock on it. The rule lives
+ *  here now and both doors call it.
+ *
+ *  The database refuses the insert regardless (see the seat cap trigger). This
+ *  exists so somebody is told the rule before they have filled in a name and
+ *  chosen an avatar, rather than after. */
+export async function canAddProfile(): Promise<boolean> {
+  if (!(await requireAdultAuth())) return false;
+
+  let used = getStoredProfiles().length;
+  let cap = 3;
+  try {
+    const usage = await db.seatUsage();
+    if (usage) { used = usage.used; cap = usage.cap; }
+    else { cap = (await db.getAccount())?.seats || 3; }
+  } catch {
+    // Unreadable: let them through and let the trigger decide. Refusing here
+    // on a network blip would look like a full household to someone who has
+    // seats to spare.
+    return true;
+  }
+
+  if (used < cap) return true;
+  showHouseholdFull(used, cap);
+  return false;
+}
+
+/** What "your household is full" looks like from anywhere.
+ *
+ *  It used to be written into the switcher's own innerHTML, which is why
+ *  Settings could not show it and simply skipped the check. Standalone now, on
+ *  the same card the other party-side blocks use. */
+function showHouseholdFull(used: number, cap: number): void {
+  document.getElementById('householdFull')?.remove();
+  const el = document.createElement('div');
+  el.id = 'householdFull';
+  el.className = 'prmHost';
+  el.innerHTML = `
+    <div class="prmCard">
+      <p class="prmKicker calm">${used} of ${cap} seats in use</p>
+      <h2>Your household is full</h2>
+      <p class="prmReason">Every seat has a profile on it. Add a seat for $2 a month,
+        or delete a profile you are not using.</p>
+      <div class="prmRow">
+        <button class="partyBtn primary" id="hfSeats">Add a seat</button>
+        <button class="partyBtn" id="hfClose">Not now</button>
+      </div>
+    </div>`;
+  document.body.appendChild(el);
+  // Settings, where billing actually lives. The old button called
+  // window.location.reload(), which reloaded the page and changed nothing.
+  el.querySelector('#hfSeats')!.addEventListener('click', () => {
+    el.remove();
+    window.location.hash = '#settings/account';
+  });
+  el.querySelector('#hfClose')!.addEventListener('click', () => el.remove());
+}
+
 export function openProfileSwitcher(
   onSelectProfile?: (p: HouseholdProfile) => void,
   opts: SwitcherOptions = {},
@@ -561,43 +639,12 @@ export function openProfileSwitcher(
     });
   }
 
-  const requireAdultAuth = async (): Promise<boolean> => {
-    if (!active.is_kids) return true;
-    const adultProfs = profiles.filter(p => !p.is_kids && p.pin);
-    if (adultProfs.length === 0) return true;
-    return await promptForPin(adultProfs[0]!);
-  };
-
   const addBtn = modal.querySelector('#addProfileBtn');
   if (addBtn) {
     addBtn.addEventListener('click', async () => {
-      if (!(await requireAdultAuth())) return;
-      
-      const acct = await db.getAccount();
-      const maxSeats = acct?.seats || 3;
-      if (profiles.length >= maxSeats) {
-        modal.innerHTML = `
-          <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 38px; padding: 0 60px 40px; width: 100%; height: 100%; background: #0A0B0E;">
-            <div style="display: flex; align-items: center; gap: 18px">
-              ${profiles.map(p => `<div style="width: 84px; height: 84px; border-radius: 50%; background: ${profileFace(p).background}; color: #0A0B0E; font-size: 30px; font-weight: 800; display: flex; align-items: center; justify-content: center">${escapeHtml(profileFace(p).letter)}</div>`).join('')}
-              <div style="width: 84px; height: 84px; border-radius: 50%; border: 2px dashed #2B303A; display: flex; align-items: center; justify-content: center">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#c5f04e" stroke-width="2" stroke-linecap="round" style="width: 30px; height: 30px"><path d="M12 6v12M6 12h12"></path></svg>
-              </div>
-            </div>
-            <div style="display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 540px; text-align: center">
-              <div style="font-size: 30px; font-weight: 800; letter-spacing: -0.03em; color: #fff">Your household is full</div>
-              <div style="font-size: 16px; font-weight: 500; line-height: 1.55; color: #7C828C; text-wrap: pretty">All ${profiles.length} seats are in use. Add an extra seat for $2 a month, or free one up from settings.</div>
-            </div>
-            <div style="display: flex; gap: 14px">
-              <button id="closeFullBtn" style="padding: 15px 26px; border-radius: 10px; background: #c5f04e; color: #0A0B0E; font-size: 15px; font-weight: 800; cursor: pointer; border: none;">Go back</button>
-              <button onclick="window.location.reload()" style="padding: 15px 26px; border-radius: 10px; border: 1px solid #23272F; color: #D6DAE0; font-size: 15px; font-weight: 700; background: transparent; cursor: pointer;">Manage seats</button>
-            </div>
-          </div>
-        `;
-        const closeBtn = modal.querySelector('#closeFullBtn');
-        if (closeBtn) closeBtn.addEventListener('click', () => { leave(); openProfileSwitcher(undefined, { dismissible }); });
-        return;
-      }
+      // The adult gate and the seat cap both live in canAddProfile now, so
+      // this door and the one in Settings cannot disagree about the rules.
+      if (!(await canAddProfile())) return;
 
       leave();
       openProfileEditor(undefined, () => openProfileSwitcher(undefined, { dismissible }));

@@ -207,6 +207,24 @@ export async function canJoinParty(): Promise<boolean> {
   return a ? a.can_join : true;   // unreadable: let RLS decide
 }
 
+export interface SeatUsage { used: number; cap: number; can_add: boolean }
+
+/** Seats used and available, from the database rather than from counting the
+ *  local cache.
+ *
+ *  The cache is per device and can be stale or partial; the seat cap is a paid
+ *  boundary and the trigger that enforces it counts rows. Asking the same
+ *  source both use stops the UI saying "2 of 3" while the insert is refused.
+ *
+ *  Null on failure, and callers let the attempt through -- the trigger will
+ *  refuse it if it truly is full, and a network blip must not look like a full
+ *  household to someone with seats to spare. */
+export async function seatUsage(): Promise<SeatUsage | null> {
+  const { data, error } = await getSupabase().rpc("seat_usage");
+  if (error) { console.warn("[seats] usage", error); return null; }
+  return (data as SeatUsage) ?? null;
+}
+
 /** Days left in the current trial/subscription (null if none or already expired). */
 export async function trialDaysLeft(): Promise<number | null> {
   const acct = await getAccount();

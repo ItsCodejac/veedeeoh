@@ -11,7 +11,7 @@
 // and nothing else.
 
 import { escapeHtml, showToast } from "./util";
-import { getStoredProfiles, openProfileEditor, getActiveProfile, profileFace } from "./profiles";
+import { getStoredProfiles, openProfileEditor, getActiveProfile, profileFace, canAddProfile } from "./profiles";
 import { card, row } from "./settings-ui";
 import { renderAccount } from "./settings-account";
 
@@ -59,8 +59,12 @@ function renderHousehold(el: HTMLElement): void {
       if (target) openProfileEditor(target, () => openSettings("household"));
     });
   });
-  el.querySelector("#setAddProfile")?.addEventListener("click", () =>
-    openProfileEditor(undefined, () => openSettings("household")));
+  // Checks the seat cap and the adult PIN, which this button did neither of.
+  // It is how a household reached four profiles on three seats.
+  el.querySelector("#setAddProfile")?.addEventListener("click", async () => {
+    if (!(await canAddProfile())) return;
+    openProfileEditor(undefined, () => openSettings("household"));
+  });
 }
 
 // THE RATING MATRIX IS GONE. It was a grid of every profile against every

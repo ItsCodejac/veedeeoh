@@ -4798,7 +4798,10 @@ body.can-host .vodQuickBtn.partyAct { display: flex; }
    was saying: a browser confirm(), a three-second toast, and a toast that
    needed an answer. */
 
-#partyKickSheet, #partyRemoved {
+/* .prmHost is the reusable form. It was two ids, so a third card -- the
+   household-full notice -- rendered with no positioning at all and sat in the
+   document flow. Anything wanting this treatment adds the class. */
+#partyKickSheet, #partyRemoved, .prmHost {
   position: fixed; inset: 0; z-index: 10060;
   display: flex; align-items: center; justify-content: center;
   background: rgba(4,5,8,.8); backdrop-filter: blur(6px); padding: 20px;
@@ -4826,6 +4829,10 @@ body.can-host .vodQuickBtn.partyAct { display: flex; }
   margin: 0 0 6px; font-family: var(--display); font-size: 11px; font-weight: 800;
   letter-spacing: .18em; text-transform: uppercase; color: #ff8a7a;
 }
+/* The red kicker belongs to being removed from a party. Reused on the
+   household-full card it turns "3 of 3 seats in use" -- a fact, and a prompt to
+   spend money -- into something that reads as a failure. */
+.prmKicker.calm { color: rgba(255,255,255,.5); }
 .prmCard h2 { margin: 0 0 12px; font-family: var(--display); font-size: 22px; font-weight: 800; color: #fff; }
 .prmReason {
   margin: 0 0 10px; display: inline-block;
