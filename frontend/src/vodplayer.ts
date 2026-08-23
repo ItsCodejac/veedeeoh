@@ -1029,9 +1029,35 @@ export function closeVodPlayer(): void {
   }
 }
 
+/** Set by the party code while a viewer is following someone else's playback.
+ *
+ *  A free account may watch inside a party -- that is the whole of what the
+ *  free tier is -- so the entitlement check below has to know the difference
+ *  between pressing play and being shown something. Party paths open the same
+ *  player, so without this flag joining a party would be refused by the gate
+ *  that exists to sell the party. */
+let partyPlayback = false;
+export function setPartyPlayback(on: boolean): void { partyPlayback = on; }
+
 export async function openVodPlayer(ch: any, streamIdx: number, startTime = 0): Promise<void> {
   const overlay = document.getElementById("vodPlayerOverlay");
   if (!overlay) return;
+
+  // THE ONE ENFORCEMENT POINT. Fifteen call sites reach this function -- cards,
+  // the detail view, resume, search, episode lists, deep links -- and checking
+  // at any of them would mean checking at all of them, forever, including the
+  // ones added next year. The card overlay explains the block; this is the
+  // block.
+  if (!partyPlayback) {
+    try {
+      const { hasActiveAccess } = await import("./db");
+      if (!(await hasActiveAccess())) {
+        const { showPlaybackLocked } = await import("./party-setup");
+        showPlaybackLocked(ch?.title || ch?.name || "");
+        return;
+      }
+    } catch { /* the check itself failing must not stop a paying customer */ }
+  }
 
   const token = ++openToken;
 

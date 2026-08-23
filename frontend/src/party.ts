@@ -11,7 +11,7 @@ import { getSupabase } from "./auth";
 import { getActiveProfile } from "./profiles";
 import { allowedRatingsFor } from "./db";
 import { showToast } from "./util";
-import { openVodPlayer, setPartyEmitter, applyPartyState, setPartyViewerMode, resyncToHost, stopPartySync, type PartyPlaybackState } from "./vodplayer";
+import { openVodPlayer, setPartyEmitter, applyPartyState, setPartyViewerMode, setPartyPlayback, resyncToHost, stopPartySync, type PartyPlaybackState } from "./vodplayer";
 
 const WORKER_URL = (import.meta.env.VITE_PARTY_WORKER_URL as string) || "";
 
@@ -410,6 +410,7 @@ export async function joinParty(joinCode: string): Promise<void> {
     // makes the host's streamIdx resolvable. An earlier edit to pass it did not
     // apply -- the argument is optional, so nothing failed to compile and the
     // guest silently kept a one-episode list.
+    setPartyPlayback(true);
     void openVodPlayer(asPartyChannel(item, url, streams), party.stream_idx || 0, 0)
       .then(async () => {
         setPartyViewerMode(true);
@@ -702,6 +703,10 @@ export function disconnect(): void {
   void import("./party-setup").then((m) => { m.dismissWrap(); m.dismissKnock(); }).catch(() => {});
   clearResync();
   setPartyViewerMode(false);
+  // Cleared HERE, with everything else, rather than after each play. Left on,
+  // it is a free account's permanent bypass of the playback gate: join one
+  // party, leave, watch anything.
+  setPartyPlayback(false);
   lastHostState = null;
   setPartyEmitter(null);
   try { socket?.close(); } catch {}
@@ -847,6 +852,7 @@ export async function switchPartyTo(item: any, streamIdx = 0): Promise<boolean> 
   } catch { showToast("Couldn't tell the party"); return false; }
 
   const { openVodPlayer } = await import("./vodplayer");
+  setPartyPlayback(true);
   await openVodPlayer(vod.asChannel(item, streams as any), idx);
   setPartyViewerMode(false);
   (await import("./party-setup")).dismissWrap();
@@ -912,6 +918,7 @@ async function doFollowSwitch(contentId: string, streamIdx: number, title: strin
 
   const { openVodPlayer } = await import("./vodplayer");
   setPartyViewerMode(true);
+  setPartyPlayback(true);
   await openVodPlayer(asPartyChannel(item, resolved.url, resolved.streams), streamIdx, 0);
   setPartyViewerMode(true);
   (await import("./party-reactions")).mountReactions();
@@ -1063,6 +1070,7 @@ export async function resumeHosting(joinCode: string): Promise<boolean> {
   const url = await resolveItemStream(item);
   if (!url) { showToast("That title can't be streamed right now"); return false; }
 
+  setPartyPlayback(true);
   await openVodPlayer(asPartyChannel(item, url, null), party.stream_idx || 0, 0);
   await hostExisting(joinCode);
 

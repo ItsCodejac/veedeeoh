@@ -935,6 +935,40 @@ export function showRemoved(o: { title: string; code: string; text: string; canR
   el.querySelector("#prmClose")!.addEventListener("click", () => el.remove());
 }
 
+/** Pressing play on a free account.
+ *
+ *  Reached from openVodPlayer, so it covers every route into the player rather
+ *  than only the card that has a hover state. On a card the hover has already
+ *  said this; arriving here from the detail view, a search result or a resume
+ *  tile, it is the first time.
+ *
+ *  Two ways out and they are equally real. Self-hosting is not a consolation
+ *  prize we are obliged to mention -- it is the free version of this product,
+ *  and someone who takes it is a user rather than a lost sale. */
+export function showPlaybackLocked(title: string): void {
+  document.getElementById("partyRemoved")?.remove();
+  const el = document.createElement("div");
+  el.id = "partyRemoved";
+  el.innerHTML = `
+    <div class="prmCard">
+      <p class="prmKicker">Your free account is limited to watch parties</p>
+      <h2>${escapeHtml(title || "This title")}</h2>
+      <p class="prmReason">You can join any watch party you are invited to. Watching on
+        your own is part of Cloud.</p>
+      <div class="prmRow">
+        <button class="partyBtn primary" id="prmSub">Subscribe, $4/mo</button>
+        <a class="partyBtn" href="/self-hosting.html">Self-host it free</a>
+      </div>
+      <button class="prmDismiss" id="prmClose">Back to browsing</button>
+    </div>`;
+  document.body.appendChild(el);
+  el.querySelector("#prmSub")!.addEventListener("click", async () => {
+    const { startCheckout } = await import("./db");
+    try { await startCheckout(); } catch { showToast("Couldn't start checkout"); }
+  });
+  el.querySelector("#prmClose")!.addEventListener("click", () => el.remove());
+}
+
 /** A free account that has used its four parties for the month.
  *
  *  The same full-screen card as a removal, deliberately, and not a toast. A
@@ -958,7 +992,7 @@ export function showJoinLimit(o: { title: string; used: number; limit: number })
       <p class="prmHint">Cloud is $4 a month for unlimited parties, three profiles and the
         whole catalogue to browse on your own. veedeeoh is also free to run yourself.</p>
       <div class="prmRow">
-        <button class="partyBtn primary" id="prmSub">Subscribe &mdash; $4/mo</button>
+        <button class="partyBtn primary" id="prmSub">Subscribe, $4/mo</button>
         <button class="partyBtn" id="prmClose">Not now</button>
       </div>
     </div>`;

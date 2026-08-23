@@ -4192,28 +4192,6 @@ body.kids-mode { --brand-accent: #ff9f1c; }
 /* ---- Party guest ------------------------------------------------------
    A lapsed account following a party link. The shell never mounts, so this
    hides whatever chrome exists and leaves the player plus one CTA. */
-body.party-guest aside,
-body.party-guest header,
-body.party-guest #scrollableArea { display: none !important; }
-body.party-guest { background: #06070a; }
-
-#guestBar {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 9999;
-  display: flex; align-items: center; justify-content: center;
-  flex-wrap: wrap; gap: 14px;
-  padding: 12px 18px;
-  background: rgba(6,7,10,0.94);
-  border-top: 1px solid rgba(197,240,78,0.28);
-  backdrop-filter: blur(10px);
-  font-family: var(--display); font-size: 13.5px; color: #cfd6e0;
-}
-#guestBar button {
-  background: var(--accent); color: #06070a; border: none;
-  padding: 9px 16px; border-radius: 9px;
-  font: inherit; font-weight: 800; cursor: pointer;
-}
-#guestBar button:hover { filter: brightness(1.06); }
-@media (max-width: 520px) { #guestBar { font-size: 12.5px; text-align: center; } }
 
 /* Trial countdown. Sidebar, last five days only. */
 #trialNotice {
@@ -5300,3 +5278,67 @@ body.can-host .vodQuickBtn.partyAct { display: flex; }
 .sidebar-user-caret { flex: none; margin-left: auto; color: rgba(255,255,255,.4); }
 .sidebar-user:hover .sidebar-user-caret { color: #fff; }
 @media (max-width: 768px) { .sidebar-user-caret { display: none; } }
+
+/* ---- the block, on the tile ---------------------------------------------
+   A free cloud account can see the whole catalogue and cannot press play. The
+   block sits on the title being reached for, at the moment of reaching, rather
+   than on a wall in front of everything -- a wall says "subscribe to keep
+   watching" to somebody who has not yet seen what they would be subscribing to.
+
+   Shown by a class on <body>, set once per page from one entitlement read. Per
+   tile it would be forty reads of one answer, and every card would paint
+   unlocked for as long as they took. */
+.vodLock {
+  position: absolute; inset: 0; z-index: 4;
+  display: none; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; padding: 10px 8px; border-radius: 8px; text-align: center;
+  background: linear-gradient(rgba(6,7,10,.82), rgba(6,7,10,.94));
+  backdrop-filter: blur(2px);
+}
+body.locked-free .vodCard:hover .vodLock,
+body.locked-free .vodCard:focus-within .vodLock,
+body.locked-free .vodCard.showLock .vodLock,
+body.locked-free .showcaseCard:hover .vodLock,
+body.locked-free .showcaseCard:focus-within .vodLock { display: flex; }
+
+/* One overlay at a time. The quick actions and the lock occupy the same
+   corner of the same poster, and a heart floating over "you cannot watch this"
+   reads as a bug. */
+body.locked-free .vodCard:hover .vodQuick,
+body.locked-free .vodCard:focus-within .vodQuick,
+body.locked-free .vodCard.showLock .vodQuick { display: none; }
+
+.vodLockIcon { color: var(--accent, #c5f04e); line-height: 0; }
+.vodLockText {
+  font-size: 11.5px; line-height: 1.35; font-weight: 700; color: #fff;
+  max-width: 20ch;
+}
+/* Sized to the POSTER, not to a number I liked. A rail poster is about 132px
+   wide and this sits inside 8px of padding, so a nowrap button at 11px clipped
+   its own label -- "Subscribe, $4/m". The row takes the width it is given and
+   the label is allowed to wrap. */
+.vodLockRow { display: flex; flex-direction: column; gap: 5px; width: 100%; }
+.vodLockCta {
+  display: block; padding: 6px 6px; border-radius: 7px; cursor: pointer;
+  font-size: 10.5px; font-weight: 800; line-height: 1.25;
+  background: rgba(255,255,255,.1); color: #fff;
+}
+.vodLockCta.primary { background: var(--accent, #c5f04e); color: #06070a; }
+.vodLockCta:hover { filter: brightness(1.08); }
+
+/* A poster is small. Below roughly 150px the two buttons and the sentence stop
+   fitting, so the sentence goes and the icon carries it -- the player gate says
+   the whole thing anyway when they press play. */
+@media (max-width: 600px) {
+  .vodLockText { display: none; }
+  .vodLockCta { font-size: 10.5px; padding: 5px 7px; }
+}
+
+/* A second way out of the locked-playback card, since its two main actions
+   both leave the page. */
+.prmDismiss {
+  display: block; margin: 14px auto 0; padding: 6px 10px;
+  background: none; border: none; cursor: pointer;
+  color: rgba(255,255,255,.55); font: inherit; font-size: 12.5px;
+}
+.prmDismiss:hover { color: #fff; }

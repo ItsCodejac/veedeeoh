@@ -983,8 +983,42 @@ const QUICK_ACTIONS = `
     <span class="vodQuickBtn partyAct" data-act="party" title="Start a watch party">${PARTY_ICON}</span>
   </span>`;
 
-/** Set once, from the same check the Watch Party button uses. */
+/** The block, sitting on the tile.
+ *
+ *  Rendered into every card and shown by CSS only when body.locked-free is set,
+ *  so the entitlement is answered once for the page rather than once per tile.
+ *  A rail of forty cards each awaiting getAccount() would be forty reads of one
+ *  answer, and the first paint would show every card unlocked while they
+ *  resolved.
+ *
+ *  Not a button: the card itself is a <button> and nesting one inside another
+ *  is invalid, so these are spans with their own handlers and their own
+ *  stopPropagation. */
+const LOCK_OVERLAY = `
+  <span class="vodLock">
+    <span class="vodLockIcon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    </span>
+    <span class="vodLockText">Your free account is limited to watch parties</span>
+    <span class="vodLockRow">
+      <span class="vodLockCta primary" data-lock="sub">Subscribe, $4/mo</span>
+      <span class="vodLockCta" data-lock="self">Self-host free</span>
+    </span>
+  </span>`;
+
+/** Set once for the page, from the same read the player gate uses.
+ *
+ *  Two classes because they are two different questions with two different
+ *  answers: an account can be entitled to watch and still unable to host (a
+ *  kids profile), and the free tier is the reverse of neither. */
 export async function refreshHostingAffordance(): Promise<void> {
+  try {
+    const { hasActiveAccess } = await import("./db");
+    document.body.classList.toggle("locked-free", !(await hasActiveAccess()));
+  } catch {
+    // A failed read must not lock a paying account out of its own catalogue.
+    document.body.classList.remove("locked-free");
+  }
   try {
     const { canHost } = await import("./party");
     document.body.classList.toggle("can-host", await canHost());
@@ -1012,7 +1046,21 @@ function attachQuickActions(el: HTMLElement, item: VodItem, onPlain: () => void)
   // The actions sit inside the card button, so their clicks must not fall
   // through to the card's own handler.
   el.addEventListener("click", (e) => {
-    const act = (e.target as HTMLElement)?.closest?.("[data-act]")?.getAttribute("data-act");
+    const target = e.target as HTMLElement;
+
+    // The lock's own buttons, before anything else. They sit on top of the
+    // poster and inside the card, so without this the card would try to open
+    // the title the person is being told they cannot open.
+    const lock = target?.closest?.("[data-lock]")?.getAttribute("data-lock");
+    if (lock) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (lock === "self") window.location.href = "/self-hosting.html";
+      else void import("./db").then((db) => db.startCheckout()).catch(() => showToast("Couldn't start checkout"));
+      return;
+    }
+
+    const act = target?.closest?.("[data-act]")?.getAttribute("data-act");
     if (act) {
       e.preventDefault();
       e.stopPropagation();
@@ -1021,6 +1069,18 @@ function attachQuickActions(el: HTMLElement, item: VodItem, onPlain: () => void)
       else { openAddToMenu(item, e as MouseEvent); }
       return;
     }
+
+    // A locked card on a touch screen. There is no hover, so the overlay has
+    // never been seen: pin it open instead of playing. A second tap, now on a
+    // visible control, does what it says. Desktop falls through to onPlain and
+    // meets the same explanation from the player gate.
+    if (document.body.classList.contains("locked-free") && !matchMedia("(hover: hover)").matches) {
+      e.preventDefault();
+      e.stopPropagation();
+      el.classList.toggle("showLock");
+      return;
+    }
+
     onPlain();
   });
 }
@@ -1040,6 +1100,7 @@ export function vodCard(item: VodItem, wide = false): HTMLElement {
   el.innerHTML = `
     <span class="vodPoster">${art ? `<img loading="lazy" alt="" src="${escapeHtml(art)}">` : FILM_ICON}
       ${QUICK_ACTIONS}
+      ${LOCK_OVERLAY}
     </span>
     <span class="vodTitle">${escapeHtml(item.title)}</span>
     <span class="vodMeta">${escapeHtml([item.genre, item.rating].filter(Boolean).join(" · "))}</span>`;
