@@ -580,7 +580,7 @@ export function openProfileSwitcher(
             <div style="display: flex; align-items: center; gap: 18px">
               ${profiles.map(p => `<div style="width: 84px; height: 84px; border-radius: 50%; background: ${profileFace(p).background}; color: #0A0B0E; font-size: 30px; font-weight: 800; display: flex; align-items: center; justify-content: center">${escapeHtml(profileFace(p).letter)}</div>`).join('')}
               <div style="width: 84px; height: 84px; border-radius: 50%; border: 2px dashed #2B303A; display: flex; align-items: center; justify-content: center">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#C6F53A" stroke-width="2" stroke-linecap="round" style="width: 30px; height: 30px"><path d="M12 6v12M6 12h12"></path></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="#c5f04e" stroke-width="2" stroke-linecap="round" style="width: 30px; height: 30px"><path d="M12 6v12M6 12h12"></path></svg>
               </div>
             </div>
             <div style="display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 540px; text-align: center">
@@ -588,7 +588,7 @@ export function openProfileSwitcher(
               <div style="font-size: 16px; font-weight: 500; line-height: 1.55; color: #7C828C; text-wrap: pretty">All ${profiles.length} seats are in use. Add an extra seat for $2 a month, or free one up from settings.</div>
             </div>
             <div style="display: flex; gap: 14px">
-              <button id="closeFullBtn" style="padding: 15px 26px; border-radius: 10px; background: #C6F53A; color: #0A0B0E; font-size: 15px; font-weight: 800; cursor: pointer; border: none;">Go back</button>
+              <button id="closeFullBtn" style="padding: 15px 26px; border-radius: 10px; background: #c5f04e; color: #0A0B0E; font-size: 15px; font-weight: 800; cursor: pointer; border: none;">Go back</button>
               <button onclick="window.location.reload()" style="padding: 15px 26px; border-radius: 10px; border: 1px solid #23272F; color: #D6DAE0; font-size: 15px; font-weight: 700; background: transparent; cursor: pointer;">Manage seats</button>
             </div>
           </div>

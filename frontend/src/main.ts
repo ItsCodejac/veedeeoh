@@ -8,7 +8,9 @@ import { getSession, isCloudMode, restoreSession, signOut, getSupabase } from ".
 import { getActiveProfile } from "./profiles";
 
 // Playful multicolor kids identity, used for the brand + kids theme.
-const KIDS_WORDMARK = `veedeeoh<span style="color:#7ed957;">.</span><span style="color:#ff9f1c;">k</span><span style="color:#4dabf7;">i</span><span style="color:#ff6b6b;">d</span><span style="color:#a9e34b;">s</span>`;
+// Colours live in style.css (.kwDot/.kwK/...), not here. This string and the
+// one in index.html were two copies of the same lockup in two palettes.
+const KIDS_WORDMARK = `veedeeoh<span class="kwDot">.</span><span class="kwK">k</span><span class="kwI">i</span><span class="kwD">d</span><span class="kwS">s</span>`;
 
 // The wordmark carries the current context: veedeeoh.kids on a child profile,
 // veedeeoh.uk when browsing another region's catalog, plain veedeeoh. at home.
@@ -21,7 +23,7 @@ function applyWordmark(isKids: boolean): void {
 
   if (isKids) {
     if (brand) brand.innerHTML = KIDS_WORDMARK;
-    if (mobileBrand) mobileBrand.innerHTML = `v<span style="color:#ff9f1c;">k</span>`;
+    if (mobileBrand) mobileBrand.innerHTML = `v<span class="kwK">k</span>`;
     return;
   }
 

@@ -599,7 +599,7 @@ export async function renderFavorites(): Promise<void> {
       <div style="display: flex; align-items: flex-end; gap: 22px; height: 226px">
         <div style="width: 132px; height: 186px; border-radius: 10px; border: 2px dashed #22262E; transform: rotate(-7deg)"></div>
         <div style="width: 148px; height: 210px; border-radius: 10px; border: 2px dashed #2B303A; position: relative; display: flex; align-items: center; justify-content: center">
-          <div style="width: 13px; height: 13px; border-radius: 50%; background: #C6F53A; box-shadow: 0 0 22px #C6F53A99"></div>
+          <div style="width: 13px; height: 13px; border-radius: 50%; background: #c5f04e; box-shadow: 0 0 22px #c5f04e99"></div>
         </div>
         <div style="width: 132px; height: 186px; border-radius: 10px; border: 2px dashed #22262E; transform: rotate(7deg)"></div>
       </div>

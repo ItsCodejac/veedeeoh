@@ -471,7 +471,7 @@ class VodPlayer {
     loader.style.cssText = "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:40;background:#000;";
     loader.innerHTML = `
       <div style="display:flex;align-items:flex-end;gap:10px;height:40px">
-        <div style="width:14px;height:14px;border-radius:50%;background:#C6F53A;animation:vdBounce .72s ease-in-out infinite"></div>
+        <div style="width:14px;height:14px;border-radius:50%;background:#c5f04e;animation:vdBounce .72s ease-in-out infinite"></div>
         <div style="width:14px;height:14px;border-radius:50%;background:#7E8792;animation:vdBounce .72s ease-in-out infinite;animation-delay:.1s"></div>
         <div style="width:14px;height:14px;border-radius:50%;background:#4A5058;animation:vdBounce .72s ease-in-out infinite;animation-delay:.2s"></div>
       </div>

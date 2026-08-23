@@ -5350,3 +5350,18 @@ body.locked-free .vodCard.showLock .vodQuick { display: none; }
    whole viewport, so there is nothing for it to do either way. */
 body.no-element-fullscreen media-fullscreen-button,
 body.no-element-fullscreen .vds-fullscreen-button { display: none !important; }
+
+/* ---- the kids wordmark, defined once -------------------------------------
+   It was written out twice, inline, in index.html and in main.ts, in a palette
+   that agreed with neither the ident nor itself -- three different greens
+   between the full stop (#7ed957), the final letter (#a9e34b) and --accent.
+
+   These are the ident's colours, which is where the lockup is at its largest
+   and most deliberate, with the last letter on --accent. The ball becoming the
+   full stop and the word ending in the same colour is the point of the
+   animation; the sidebar should not quietly disagree with it. */
+.kwDot { color: var(--accent); }
+.kwK   { color: #ff7a5a; }
+.kwI   { color: #ffc93a; }
+.kwD   { color: #3ac9f5; }
+.kwS   { color: var(--accent); }

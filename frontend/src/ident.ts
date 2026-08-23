@@ -39,7 +39,11 @@
 
 const BG = "#08090B";
 const INK = "#FFFFFF";
-const ACCENT = "#C6F53A";
+// The app's accent, not the design file's #C6F53A. They differ by about one
+// percent of hue -- close enough to be invisible side by side and far enough to
+// be two values drifting apart in a codebase. #c5f04e is --accent and appears
+// 65 times; the design's had already leaked into four other files.
+const ACCENT = "#c5f04e";
 
 // ---------------------------------------------------------------------------
 // The three easings the design uses, and nothing else
@@ -322,8 +326,12 @@ export function playIdent(done: () => void, opts: IdentOptions = {}): void {
 
 const KBG = "#0B0E24";
 const KINK = "#FFFFFF";
-const KIDS_COLORS = ["#FF7A5A", "#FFC93A", "#3AC9F5", "#C6F53A"];
-const KACCENT = "#C6F53A";
+// The design's palette, with its last letter mapped onto the app's accent --
+// which is what it was reaching for. The final letter matching the dot is the
+// point of the sequence: the ball becomes the full stop, and the word it
+// finishes lands in the same colour.
+const KIDS_COLORS = ["#FF7A5A", "#FFC93A", "#3AC9F5", ACCENT];
+const KACCENT = ACCENT;
 
 interface KFrameState {
   cam: number; fade: number; bloom: number; drift: number;
@@ -457,7 +465,7 @@ function playKidsIdent(done: () => void, opts: IdentOptions): void {
         <div class="kBloom" style="position:absolute;inset:0;">
           <div class="kBlob" data-dx="26"  style="${blob("#FF7A5A", 24, 34, 900)}"></div>
           <div class="kBlob" data-dx="-30" style="${blob("#3AC9F5", 76, 62, 1000)}"></div>
-          <div class="kBlob" data-dx="14"  style="${blob("#C6F53A", 52, 48, 1200)}"></div>
+          <div class="kBlob" data-dx="14"  style="${blob(ACCENT, 52, 48, 1200)}"></div>
         </div>
         <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% 50%,
           transparent 40%, rgba(4,6,20,0.6) 80%, rgba(4,6,20,0.92) 100%);"></div>
