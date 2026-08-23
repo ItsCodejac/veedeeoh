@@ -141,6 +141,13 @@ const cache = new Map<string, string>();
  *  whitespace and no excess precision, so stripping and rounding returned
  *  byte-identical output for eleven of twelve styles. */
 function smallestUri(svg: string, percentEncoded: string): string {
+  // DiceBear writes `;utf8,` here, which is not a valid media-type parameter
+  // and which iOS Safari refuses outright. See fixSvgDataUri in util.ts -- the
+  // same repair is applied on display, because avatars saved before this line
+  // existed still carry the bad prefix.
+  percentEncoded = percentEncoded.startsWith("data:image/svg+xml;utf8,")
+    ? `data:image/svg+xml;charset=utf-8,${percentEncoded.slice(24)}`
+    : percentEncoded;
   try {
     const bytes = new TextEncoder().encode(svg);
     let bin = "";

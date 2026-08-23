@@ -2,6 +2,7 @@ import { HouseholdProfile } from './types';
 import * as db from './db';
 import { getSession, signOut } from './auth';
 import { RATING_GROUPS, allowedRatingsFor } from './db';
+import { fixSvgDataUri } from './util';
 import { registerOverlay } from './overlay';
 
 /** How an avatar was generated. Kept beside the finished image so the editor
@@ -384,7 +385,7 @@ function localAvatar(url?: string | null): string {
  *  remove. Opening the profile editor regenerates it locally. */
 export function profileFace(p: { name?: string; avatar_color?: string | null; avatar_url?: string | null }):
   { background: string; letter: string } {
-  const img = localAvatar(p.avatar_url);
+  const img = fixSvgDataUri(localAvatar(p.avatar_url));
   // SINGLE QUOTES INSIDE THE url(). Every caller drops this into a
   // style="..." attribute, so a double quote here closes the attribute at the
   // "u" of url and the browser parses the rest of the data URI as a series of

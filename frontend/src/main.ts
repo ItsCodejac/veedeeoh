@@ -1,7 +1,7 @@
 import "./style.css";
 import { fetchCatalog, fetchWatched, getActiveRegion } from "./api";
 import { state } from "./state";
-import { $, showToast, escapeHtml } from "./util";
+import { $, showToast, escapeHtml, fixSvgDataUri } from "./util";
 import { closeTopOverlay, registerOverlay } from "./overlay";
 import { wireVodDetails, renderShows, renderMovies, wireSearchInputs, renderHome } from "./vod";
 import { getSession, isCloudMode, restoreSession, signOut, getSupabase } from "./auth";
@@ -172,7 +172,7 @@ function applyProfileChrome(profile: { name?: string; avatar_color?: string; is_
 function paintProfileAvatar(el: HTMLElement | null, p: { name: string; avatar_color?: string; avatar_url?: string | null }): void {
   if (!el) return;
   const url = (p.avatar_url || '').trim();
-  const local = url && !/^https?:\/\//i.test(url) ? url : '';
+  const local = url && !/^https?:\/\//i.test(url) ? fixSvgDataUri(url) : '';
   if (local) {
     el.textContent = '';
     el.style.backgroundImage = `url("${local}")`;
