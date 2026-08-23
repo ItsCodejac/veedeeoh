@@ -4905,17 +4905,6 @@ body.can-host .vodQuickBtn.partyAct { display: flex; }
    Generated in the browser, six at a time, with Shuffle instead of a
    character builder: creating a profile is a ten-second job done a handful of
    times, and a builder is a screen of its own for what a button covers. */
-.avStyles { margin-bottom: 10px; }
-.avSelect {
-  width: 100%; padding: 9px 12px; border-radius: 9px;
-  background: #080a10; border: 1px solid rgba(255,255,255,.15);
-  color: #fff; font: inherit; font-size: 13.5px; outline: none;
-}
-.avShuffle {
-  background: none; border: none; cursor: pointer; padding: 0;
-  color: var(--accent, #c5f04e); font: inherit; font-size: 12.5px; font-weight: 800;
-}
-.avShuffle:hover { text-decoration: underline; }
 .avGrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
 .avOpt {
   aspect-ratio: 1; border-radius: 12px; cursor: pointer;
@@ -5013,23 +5002,11 @@ body.can-host .vodQuickBtn.partyAct { display: flex; }
 .avBtn:hover { background: rgba(255,255,255,.13); }
 .avBtn.subtle { color: rgba(255,255,255,.62); font-weight: 600; }
 
-.avCustom { margin-top: 10px; }
-.avCustom > summary {
-  cursor: pointer; list-style: none; padding: 6px 0;
-  font-size: 12px; font-weight: 700; color: var(--accent, #c5f04e);
+.avBtn.wide { flex: none; width: 100%; }
+.avSummary {
+  font-size: 12px; font-weight: 700; color: rgba(255,255,255,.55);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.avCustom > summary::-webkit-details-marker { display: none; }
-.avCustom > summary::before { content: "+ "; }
-.avCustom[open] > summary::before { content: "\2212\00a0"; }
-.avOptions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding-top: 4px; }
-.avOptField { display: flex; flex-direction: column; gap: 3px; }
-.avOptField > span { font-size: 11px; font-weight: 700; color: rgba(255,255,255,.5); }
-.avOptField select {
-  padding: 7px 9px; border-radius: 8px; background: #080a10;
-  border: 1px solid rgba(255,255,255,.14); color: #fff; font: inherit; font-size: 12.5px;
-}
-.avNoOpts { margin: 4px 0 0; font-size: 12px; color: rgba(255,255,255,.45); }
-@media (max-width: 560px) { .avOptions { grid-template-columns: 1fr; } }
 
 /* ---- bottom dock, mobile -------------------------------------------------
    The dock had eight flex children in 64px: six tabs, Sign Out, and the legal
@@ -5092,3 +5069,129 @@ body.can-host .vodQuickBtn.partyAct { display: flex; }
   padding: 8px 13px; border-radius: 999px; font-size: 13px;
 }
 @media (max-width: 768px) { #settingsNav .setNavBtn svg { display: none; } }
+
+
+/* ---- avatar character creator -------------------------------------------
+   A full screen, because the library behind it is a character creator and the
+   old control was a dropdown of identifiers. Every choice is a thumbnail of
+   THIS avatar with one thing changed; generating one costs about 60
+   microseconds locally, so there is no reason to describe a hairstyle in
+   words. */
+.asWrap {
+  position: fixed; inset: 0; z-index: 10001;
+  background: #06070a; color: #fff;
+  font-family: 'Space Grotesk', sans-serif;
+}
+.asShell { height: 100%; display: flex; flex-direction: column; min-height: 0; }
+
+.asHead {
+  flex: none; display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; padding: 14px 22px; border-bottom: 1px solid rgba(255,255,255,.09);
+}
+.asHeadTitle h2 { margin: 0; font-size: 19px; font-weight: 800; }
+.asHeadTitle p { margin: 2px 0 0; font-size: 12.5px; color: rgba(255,255,255,.5); }
+.asHeadActions { display: flex; gap: 10px; }
+.asBtn {
+  padding: 10px 16px; border-radius: 10px; cursor: pointer;
+  background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12);
+  color: #fff; font: inherit; font-size: 13px; font-weight: 700;
+}
+.asBtn:hover { background: rgba(255,255,255,.13); }
+.asBtn.primary { background: var(--accent, #c5f04e); border-color: transparent; color: #06070a; }
+.asBtn.subtle { color: rgba(255,255,255,.6); font-weight: 600; }
+
+.asBody { flex: 1; display: flex; min-height: 0; }
+.asSide {
+  width: 272px; flex: none; padding: 20px; overflow-y: auto;
+  border-right: 1px solid rgba(255,255,255,.09);
+  display: flex; flex-direction: column; gap: 14px;
+}
+.asPreview {
+  width: 100%; aspect-ratio: 1; border-radius: 24px;
+  background: #0d1017 center/cover no-repeat;
+  border: 1px solid rgba(255,255,255,.12);
+}
+.asSideBtns { display: flex; gap: 8px; }
+.asSideBtns .asBtn { flex: 1; text-align: center; }
+.asTabs { display: flex; flex-direction: column; gap: 4px; }
+.asTab {
+  text-align: left; padding: 10px 12px; border-radius: 10px; cursor: pointer;
+  background: none; border: none; color: rgba(255,255,255,.72);
+  font: inherit; font-size: 13.5px; font-weight: 700;
+}
+.asTab:hover { background: rgba(255,255,255,.06); color: #fff; }
+.asTab.on { background: rgba(197,240,78,.14); color: var(--accent, #c5f04e); }
+
+.asPanel { flex: 1; min-width: 0; overflow-y: auto; padding: 20px 22px 60px; }
+.asEmpty { font-size: 13.5px; color: rgba(255,255,255,.5); max-width: 46ch; line-height: 1.6; }
+
+.asRow { margin-bottom: 22px; }
+.asRowHead {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  margin-bottom: 8px; font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em; color: rgba(255,255,255,.5);
+}
+.asRowVal { text-transform: none; letter-spacing: 0; color: var(--accent, #c5f04e); }
+
+/* Horizontal and scrollable rather than wrapped. A row of 34 hairstyles read
+   as a wall when it wrapped; as a strip it reads as one feature you scrub. */
+.asStrip { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: thin; }
+.asStrip::-webkit-scrollbar { height: 5px; }
+.asStrip::-webkit-scrollbar-thumb { background: rgba(255,255,255,.14); border-radius: 3px; }
+.asStrip::-webkit-scrollbar-track { background: rgba(255,255,255,.04); border-radius: 3px; }
+
+.asCell { flex: none; width: 72px; display: flex; flex-direction: column; align-items: center; gap: 5px; position: relative; }
+.asTile {
+  width: 72px; height: 72px; flex: none; padding: 0; cursor: pointer;
+  border-radius: 15px; background: #0d1017 center/cover no-repeat;
+  border: 1px solid rgba(255,255,255,.12);
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color .12s, transform .1s;
+}
+.asTile:hover { transform: translateY(-1px); border-color: rgba(255,255,255,.4); }
+.asTile.on { border: 2px solid var(--accent, #c5f04e); }
+.asRandom { color: rgba(255,255,255,.62); font: inherit; font-size: 12px; font-weight: 700; }
+.asCap {
+  font-size: 10.5px; color: rgba(255,255,255,.5); text-align: center;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* The custom colour cell is a real <input type="color"> laid invisibly over a
+   swatch, so the browser's own picker opens and no colour space has to be
+   reimplemented. */
+.asCustomColor { cursor: pointer; }
+.asCustomColor input[type="color"] {
+  position: absolute; top: 0; left: 0; width: 100%; height: 72px;
+  opacity: 0; cursor: pointer; border: none; padding: 0;
+}
+.asAny { background: conic-gradient(#ff5e7e, #ffd166, #c5f04e, #06d6a0, #118ab2, #a78bfa, #ff5e7e); }
+
+.asGroup { margin-bottom: 26px; }
+.asGroup h3 {
+  margin: 0 0 10px; font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em; color: rgba(255,255,255,.5);
+}
+.asGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 12px; }
+.asGrid .asCell, .asGrid .asTile { width: 100%; }
+.asGrid .asTile { aspect-ratio: 1; height: auto; }
+
+.asSlider { width: 100%; max-width: 420px; accent-color: var(--accent, #c5f04e); }
+
+@media (max-width: 860px) {
+  .asBody { flex-direction: column; }
+  .asSide {
+    width: auto; flex-direction: row; flex-wrap: wrap; align-items: center;
+    gap: 12px; padding: 12px 16px; overflow: visible;
+    border-right: none; border-bottom: 1px solid rgba(255,255,255,.09);
+  }
+  .asPreview { width: 84px; height: 84px; aspect-ratio: auto; border-radius: 18px; }
+  .asSideBtns { flex: 1; min-width: 150px; }
+  .asTabs { flex-direction: row; width: 100%; overflow-x: auto; gap: 6px; }
+  .asTab { flex: none; padding: 8px 14px; border-radius: 999px; background: rgba(255,255,255,.06); }
+  .asPanel { padding: 16px 16px 48px; }
+  .asHead { padding: 12px 16px; }
+  .asHeadTitle h2 { font-size: 17px; }
+  .asCell, .asTile { width: 64px; }
+  .asTile { height: 64px; }
+  .asCustomColor input[type="color"] { height: 64px; }
+}

@@ -4,9 +4,16 @@ import { getSession, signOut } from './auth';
 import { RATING_GROUPS, allowedRatingsFor } from './db';
 
 /** How an avatar was generated. Kept beside the finished image so the editor
- *  can reopen on the same style, seed and feature choices instead of resetting
- *  every control to Random. Never used to render. */
-export interface AvatarRecipe { style: string; seed: string; choices: Record<string, string> }
+ *  can reopen on the same style, seed, features, colours and framing instead
+ *  of resetting every control to Random. Never used to render.
+ *
+ *  Re-exported rather than redeclared. It was declared here when a recipe was
+ *  three fields; the creator added colours, toggles and framing, and two
+ *  declarations of the same jsonb column is how one of them ends up silently
+ *  dropping what the other saved. `import type` is erased at build time, so
+ *  this costs nothing at runtime and the collection stays lazily loaded. */
+export type { AvatarRecipe } from './avatars';
+import type { AvatarRecipe } from './avatars';
 
 const ACTIVE_PROFILE_KEY = 'veedeeoh_active_profile';
 
@@ -602,7 +609,8 @@ export function openProfileEditor(editingProfile?: HouseholdProfile, onClose?: (
         <div class="avTop">
           <div class="avPreview" id="avatarPreview"><span id="avatarPreviewLetter"></span></div>
           <div class="avTopRight">
-            <div class="avStyles" id="avatarStyleRow"></div>
+            <div class="avSummary" id="avatarSummary"></div>
+            <button type="button" id="avatarCustomise" class="avBtn wide">Customise this avatar</button>
             <div class="avActions">
               <button type="button" id="avatarShuffle" class="avBtn">Shuffle</button>
               <button type="button" id="avatarNone" class="avBtn subtle">Use initial</button>
@@ -610,10 +618,6 @@ export function openProfileEditor(editingProfile?: HouseholdProfile, onClose?: (
           </div>
         </div>
         <div class="avGrid" id="avatarPickerRow"></div>
-        <details class="avCustom">
-          <summary>Customise</summary>
-          <div class="avOptions" id="avatarOptions"></div>
-        </details>
       </div>
 
       </div><div class="peCol">
@@ -651,21 +655,30 @@ export function openProfileEditor(editingProfile?: HouseholdProfile, onClose?: (
   document.body.appendChild(modal);
 
   let selectedColor = pColor;
+  // Told to the avatar picker once it has loaded. AVATAR COLOR was a dead
+  // control: it moved a white ring between six swatches and changed nothing
+  // else, because the colour is the avatar's BACKGROUND and the background is
+  // baked into the stored image at generation time. Nothing regenerated, so
+  // unless the profile had no picture at all -- the one case where the colour
+  // showed, behind the initial -- picking a colour did nothing visible and
+  // nothing on save either.
+  let recolorAvatar: (() => void) | null = null;
   const colorBtns = modal.querySelectorAll('.colorChoiceBtn');
   colorBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       colorBtns.forEach(b => (b as HTMLElement).style.border = 'none');
       (btn as HTMLElement).style.border = '3px solid #fff';
       selectedColor = (btn as HTMLElement).dataset.color || '#c5f04e';
+      recolorAvatar?.();
     });
   });
 
   // ---- avatar -------------------------------------------------------------
   //
-  // Generated in the browser rather than fetched. Six options plus Shuffle
-  // instead of a character builder: creating a profile is a ten-second job
-  // done a handful of times, and ten dropdowns is a screen of its own for
-  // something a randomise button covers.
+  // Generated in the browser rather than fetched. Six options and Shuffle for
+  // the ten-second case, and a button through to the full creator for the
+  // people who want to build a character. The creator used to be eight
+  // dropdowns behind a disclosure triangle, which was neither.
   let selectedAvatarUrl = pAvatarUrl;
   let selectedRecipe: AvatarRecipe | null = (editingProfile as any)?.avatar_recipe ?? null;
   void wireAvatarPicker(modal, {
@@ -674,6 +687,7 @@ export function openProfileEditor(editingProfile?: HouseholdProfile, onClose?: (
     recipe: selectedRecipe,
     color: () => selectedColor,
     onPick: (dataUri, recipe) => { selectedAvatarUrl = dataUri; selectedRecipe = recipe; },
+    register: (fn) => { recolorAvatar = fn; },
   });
 
   const ratingGroups = modal.querySelector('#ratingGroups') as HTMLElement | null;
@@ -909,12 +923,14 @@ function escapeHtml(str: string): string {
 // Avatar picker
 // ---------------------------------------------------------------------------
 
-/** A style row, six generated options, and Shuffle.
+/** The compact picker in the profile editor: a big preview, six variations,
+ *  and a way into the character creator.
  *
- *  The options are seeded from the profile's name where there is one, so the
- *  first thing shown is already personal rather than arbitrary, and Shuffle
- *  moves to a fresh set. Nothing is fetched: every image here is generated in
- *  the browser and cached. */
+ *  DELIBERATELY SMALL. Most profiles are made in ten seconds and never touched
+ *  again, so the fast path stays a preview and a Shuffle. What changed is that
+ *  the slow path is no longer eight dropdowns hidden behind a disclosure
+ *  triangle -- it is a full screen with every option the library has, and this
+ *  panel's job is to make it obvious that it exists. */
 async function wireAvatarPicker(
   root: HTMLElement,
   o: {
@@ -923,165 +939,180 @@ async function wireAvatarPicker(
     recipe: AvatarRecipe | null;
     color: () => string;
     onPick: (dataUri: string, recipe: AvatarRecipe | null) => void;
+    /** Handed back a function that regenerates everything against the current
+     *  colour. The colour swatches sit outside this picker and used to change
+     *  nothing at all; see the note where it is called. */
+    register?: (recolor: () => void) => void;
   },
 ): Promise<void> {
-  const styleRowEl = root.querySelector<HTMLElement>('#avatarStyleRow');
   const gridEl = root.querySelector<HTMLElement>('#avatarPickerRow');
   const previewEl = root.querySelector<HTMLElement>('#avatarPreview');
-  const optionsEl = root.querySelector<HTMLElement>('#avatarOptions');
-  if (!styleRowEl || !gridEl || !previewEl || !optionsEl) return;
-  const styleRow = styleRowEl, grid = gridEl, preview = previewEl, optionsBox = optionsEl;
+  const summaryEl = root.querySelector<HTMLElement>('#avatarSummary');
+  if (!gridEl || !previewEl) return;
+  const grid = gridEl, preview = previewEl;
 
-  const { AVATAR_STYLES, avatarSpec, parseAvatar, renderAvatar, renderCustom, avatarOptions, isRemoteAvatar }
-    = await import('./avatars');
+  const av = await import('./avatars');
+  const { AVATAR_STYLES, parseAvatar, renderAvatar, renderRecipe, blankRecipe, isRemoteAvatar } = av;
 
   const existing = parseAvatar(o.initial);
   // The saved recipe wins. It is the only thing that knows which features were
-  // set, and without it every control reopened at Random and changing one
-  // meant rebuilding the whole avatar from memory.
-  let style = o.recipe?.style || existing?.style || AVATAR_STYLES[0]!.id;
-  let seed = o.recipe?.seed || (o.initialName || 'veedeeoh').trim();
-  let choices: Record<string, string> = { ...(o.recipe?.choices || {}) };
-  let round = 0;
+  // set; without it every control reopened at Random and changing one meant
+  // rebuilding the whole avatar from memory.
+  let recipe: AvatarRecipe = o.recipe
+    ? { ...o.recipe, choices: { ...(o.recipe.choices || {}) } }
+    : blankRecipe(existing?.style || AVATAR_STYLES[0]!.id,
+                  existing?.seed || (o.initialName || 'veedeeoh').trim() || 'veedeeoh');
   let chosen = o.initial;
-  let chosenSeed = seed;
+  // Which seed the chosen image came from.
+  //
+  // The grid used to mark its selection by comparing data URIs, and that broke
+  // the moment the creator existed: the creator renders its preview at 240px
+  // and the grid renders at 96px, so the same avatar produces two different
+  // strings. Coming back from the creator left six tiles with the real one
+  // among them and none of them marked. The seed is what identifies an avatar;
+  // the pixel size is a rendering detail.
+  let chosenSeed = o.recipe?.seed || existing?.seed || '';
+  let round = 0;
 
   // A legacy api.dicebear.com value is regenerated locally here, so opening the
   // editor is what heals a profile that would otherwise keep making the
   // request the display paths now refuse.
   if (isRemoteAvatar(o.initial)) {
     chosen = (await renderAvatar(o.initial, { size: 96, background: o.color() })) || '';
-    if (chosen) o.onPick(chosen, existing ? { style: existing.style, seed: existing.seed, choices: {} } : null);
+    if (chosen) { chosenSeed = recipe.seed; o.onPick(chosen, recipe); }
   }
 
   const letter = (o.initialName || 'A').charAt(0).toUpperCase();
 
-  // A select rather than thirty-one chips: the list is long, grouped, and gets
-  // longer as the library publishes more.
-  const groups: string[] = [];
-  for (const s of AVATAR_STYLES) if (!groups.includes(s.group)) groups.push(s.group);
-  styleRow.innerHTML = `
-    <select class="avSelect" id="avatarStyleSel" aria-label="Avatar style">
-      ${groups.map((g) => `
-        <optgroup label="${escapeHtml(g)}">
-          ${AVATAR_STYLES.filter((s) => s.group === g).map((s) =>
-            `<option value="${s.id}"${s.id === style ? ' selected' : ''}>${escapeHtml(s.label)}</option>`).join('')}
-        </optgroup>`).join('')}
-    </select>`;
-  styleRow.querySelector<HTMLSelectElement>('#avatarStyleSel')!
-    .addEventListener('change', (e) => {
-      style = (e.target as HTMLSelectElement).value;
-      // Feature choices belong to the style that defined them: "eyes: wink"
-      // means nothing to Shapes, and carrying it over would silently do
-      // nothing while appearing to be set.
-      choices = {};
-      void paintOptions();
-      void paint('reselect');
-    });
+  function styleLabel(): string {
+    const s = AVATAR_STYLES.find((x) => x.id === recipe.style);
+    return s ? s.label : recipe.style;
+  }
 
-  root.querySelector('#avatarShuffle')?.addEventListener('click', () => {
-    round += 1;
-    seed = `${o.initialName || 'veedeeoh'}-${round}-${Math.floor(Math.random() * 1e6)}`;
-    void paint('reselect');
-  });
+  function paintSummary(): void {
+    if (!summaryEl) return;
+    if (!chosen) { summaryEl.textContent = 'No picture, just the initial'; return; }
+    // Saying so matters: without it, an avatar carrying eight settings looks
+    // identical in this panel to one that came out of a shuffle, and Shuffle
+    // is right next to it.
+    const custom = Object.keys(recipe.choices || {}).length
+      || Object.keys(recipe.colors || {}).length
+      || Object.keys(recipe.toggles || {}).length
+      || Object.keys(recipe.frame || {}).length;
+    summaryEl.textContent = custom ? `${styleLabel()}, customised` : styleLabel();
+  }
 
-  root.querySelector('#avatarNone')?.addEventListener('click', () => void paint('clear'));
-
-  /** The big one. Picking from 48px tiles and hoping was the complaint. */
-  async function paintPreview(): Promise<void> {
+  function paintPreview(): void {
     if (!chosen) {
       preview.style.backgroundImage = '';
       preview.style.background = o.color();
       preview.innerHTML = `<span class="avPreviewLetter">${escapeHtml(letter)}</span>`;
+      paintSummary();
       return;
     }
     preview.innerHTML = '';
     preview.style.backgroundImage = `url("${chosen}")`;
+    paintSummary();
   }
 
   function select(uri: string, seedUsed: string): void {
     chosen = uri;
     chosenSeed = seedUsed;
-    o.onPick(uri, { style, seed: seedUsed, choices: { ...choices } });
-    void paintPreview();
-    grid.querySelectorAll('.avOpt').forEach((x) => x.classList.remove('on'));
+    recipe = { ...recipe, seed: seedUsed };
+    o.onPick(uri, { ...recipe, choices: { ...recipe.choices } });
+    paintPreview();
     grid.querySelectorAll<HTMLElement>('.avOpt').forEach((x) => {
-      if (x.dataset.uri === uri) x.classList.add('on');
+      x.classList.toggle('on', x.dataset.seed === seedUsed);
     });
   }
 
-  /** Six variations on the current seed, honouring any customisation.
+  /** Six variations on the current recipe, differing only in seed.
    *
    *  @param mode what happens to the selection afterwards.
    *    'init'     keep an existing avatar, otherwise take the first.
-   *    'reselect' take the first -- a style, feature or shuffle change has to
-   *               be visible in the preview, and it was not: the old image
-   *               stayed selected so nothing appeared to happen.
-   *    'clear'    select nothing. Needed for "use initial", which the previous
+   *    'reselect' take the first. A shuffle has to be visible in the preview,
+   *               and it was not: the old image stayed selected so nothing
+   *               appeared to happen.
+   *    'clear'    select nothing, for "use initial", which the previous
    *               auto-select undid the instant it ran. */
   async function paint(mode: 'init' | 'reselect' | 'clear' = 'reselect'): Promise<void> {
     // The saved seed leads, so reopening shows the current avatar as the first
     // option and selected, rather than six strangers with the real one nowhere.
-    const seeds = [mode === 'init' ? chosenSeed : seed,
-                   ...Array.from({ length: 5 }, (_v, i) => `${seed}-${round}-${i}`)];
+    const seeds = [recipe.seed, ...Array.from({ length: 5 }, (_v, i) => `${recipe.seed}-${round}-${i}`)];
     grid.innerHTML = seeds.map(() => `<button type="button" class="avOpt"></button>`).join('');
     const uris = await Promise.all(seeds.map((sd) =>
-      renderCustom(style, sd, choices, { size: 96, background: o.color() })));
+      renderRecipe({ ...recipe, seed: sd }, { size: 96, background: o.color() })));
 
-    const btns = Array.from(grid.querySelectorAll<HTMLElement>('.avOpt'));
-    btns.forEach((b, i) => {
+    Array.from(grid.querySelectorAll<HTMLElement>('.avOpt')).forEach((b, i) => {
       const uri = uris[i] || '';
       if (!uri) { b.remove(); return; }
       b.dataset.uri = uri;
       b.dataset.seed = seeds[i];
       b.style.backgroundImage = `url("${uri}")`;
-      if (uri === chosen) b.classList.add('on');
+      if (chosen && seeds[i] === chosenSeed) b.classList.add('on');
       b.addEventListener('click', () => select(uri, seeds[i]!));
     });
 
     if (mode === 'clear') {
       chosen = '';
+      chosenSeed = '';
       o.onPick('', null);
       grid.querySelectorAll('.avOpt').forEach((x) => x.classList.remove('on'));
-      await paintPreview();
+      paintPreview();
       return;
     }
-    // Choosing a style or a feature should show its result immediately rather
-    // than waiting for a click nobody knows they have to make.
     const firstIdx = uris.findIndex(Boolean);
     if (firstIdx >= 0 && (mode === 'reselect' || !chosen)) select(uris[firstIdx]!, seeds[firstIdx]!);
-    else await paintPreview();
+    else paintPreview();
   }
 
-  /** Feature controls, built from the style's own schema. */
-  async function paintOptions(): Promise<void> {
-    const opts = await avatarOptions(style);
-    if (!opts.length) {
-      optionsBox.innerHTML = `<p class="avNoOpts">This style has no separate features to set. Shuffle for a different one.</p>`;
-      return;
-    }
-    optionsBox.innerHTML = opts.map((op) => `
-      <label class="avOptField">
-        <span>${escapeHtml(op.label)}</span>
-        <select data-opt="${escapeHtml(op.key)}">
-          <option value="">Random</option>
-          ${op.values.map((v) => `<option value="${escapeHtml(v)}">${escapeHtml(humaniseValue(v))}</option>`).join('')}
-        </select>
-      </label>`).join('');
-    optionsBox.querySelectorAll<HTMLSelectElement>('[data-opt]').forEach((sel) => {
-      sel.value = choices[sel.dataset.opt!] || '';
-      sel.addEventListener('change', () => {
-        const key = sel.dataset.opt!;
-        if (sel.value) choices[key] = sel.value; else delete choices[key];
-        void paint('reselect');
+  root.querySelector('#avatarShuffle')?.addEventListener('click', () => {
+    round += 1;
+    recipe = { ...recipe, seed: `${o.initialName || 'veedeeoh'}-${round}-${Math.floor(Math.random() * 1e6)}` };
+    void paint('reselect');
+  });
+
+  root.querySelector('#avatarNone')?.addEventListener('click', () => void paint('clear'));
+
+  root.querySelector('#avatarCustomise')?.addEventListener('click', () => {
+    void import('./avatar-studio').then(({ openAvatarStudio }) => {
+      openAvatarStudio({
+        recipe,
+        name: o.initialName,
+        color: o.color(),
+        onDone: (dataUri, next) => {
+          recipe = next;
+          chosen = dataUri;
+          chosenSeed = next.seed;
+          o.onPick(dataUri, next);
+          paintPreview();
+          // The variations below are variations on what came back, so they
+          // have to be rebuilt. Leaving the old six would show the customised
+          // avatar next to six copies of the one it replaced.
+          void paint('init');
+        },
       });
     });
+  });
+
+  o.register?.(() => { void recolor(); });
+
+  /** Redraw against the profile colour that is selected right now.
+   *
+   *  The background is baked into the stored image, so a colour change has to
+   *  regenerate it. An avatar whose background was set explicitly in the
+   *  creator keeps that colour: the frame wins over the profile colour by
+   *  design, which is the difference between "I did not choose one" and "I
+   *  chose this one". */
+  async function recolor(): Promise<void> {
+    if (!chosen) { paintPreview(); return; }
+    const uri = await renderRecipe(recipe, { size: 96, background: o.color() });
+    if (uri) {
+      chosen = uri;
+      o.onPick(uri, { ...recipe, choices: { ...recipe.choices } });
+    }
+    await paint('init');
   }
 
-  await Promise.all([paintOptions(), paint('init')]);
-}
-
-function humaniseValue(v: string): string {
-  const s = v.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[-_]/g, ' ').toLowerCase();
-  return s.charAt(0).toUpperCase() + s.slice(1);
+  await paint('init');
 }

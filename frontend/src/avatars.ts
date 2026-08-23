@@ -223,76 +223,217 @@ export async function avatarCredits(): Promise<AvatarCredit[]> {
 // ---------------------------------------------------------------------------
 // Customisation
 // ---------------------------------------------------------------------------
+//
+// WHAT WE WERE OFFERING AND WHAT THE LIBRARY ACTUALLY HAS. The first version
+// read each style's schema, kept the enumerated features, sorted them by
+// length and took eight -- rendered as text dropdowns of raw identifiers like
+// "winterHat02". For Avataaars that meant 8 of 21 properties, described in a
+// vocabulary nobody outside the library speaks, with no picture attached.
+//
+// The three things it dropped are the three worth having:
+//
+//   COLOURS. Six properties on Avataaars alone -- skin, hair, clothes, hat,
+//   facial hair, accessories -- each shipping its own palette in the schema
+//   default. Skipping them meant you could not make an avatar look like you.
+//
+//   TOGGLES. The *Probability integers are not settings that need a slider,
+//   they are yes/no questions: glasses, facial hair, a hat. Set to 0 or 100
+//   they stop being probabilities at all.
+//
+//   FRAMING. flip, rotate, scale, radius, background type and colour live on
+//   the core rather than the style, so reading the style schema never saw
+//   them.
+//
+// The reason to show all of it as pictures rather than words is that
+// generating is close to free: 170 avatars render in 10ms and average 5 KB.
+// A full repaint of every thumbnail in the editor costs less than one frame,
+// which is why nothing here is lazy, paged or debounced.
 
-export interface AvatarOption {
-  key: string;
-  label: string;
-  values: string[];
+export interface AvatarFrame {
+  flip?: boolean;
+  rotate?: number;
+  scale?: number;
+  radius?: number;
+  /** Hex without '#'. Absent means follow the profile colour. */
+  bg?: string;
+  bgType?: "solid" | "gradientLinear";
+  bg2?: string;
 }
 
-/** The features a style lets you choose, read from its own JSON schema.
+/** How an avatar was made. Stored in household_profiles.avatar_recipe as jsonb
+ *  and read only by the editor, so new keys are additive: a recipe written
+ *  before colours existed simply has no colours, and the stored image stays
+ *  authoritative for display either way. */
+export interface AvatarRecipe {
+  style: string;
+  seed: string;
+  /** Enumerated features. Absent key means "leave it to the seed". */
+  choices: Record<string, string>;
+  /** Hex without '#', per colour property. */
+  colors?: Record<string, string>;
+  /** Explicit yes/no for a *Probability property. Absent means leave alone. */
+  toggles?: Record<string, boolean>;
+  frame?: AvatarFrame;
+}
+
+export type AvatarFeature =
+  | { kind: "enum";   key: string; label: string; values: string[] }
+  | { kind: "color";  key: string; label: string; palette: string[] }
+  | { kind: "toggle"; key: string; label: string; base: string };
+
+export interface AvatarFeatures {
+  enums: Extract<AvatarFeature, { kind: "enum" }>[];
+  colors: Extract<AvatarFeature, { kind: "color" }>[];
+  toggles: Extract<AvatarFeature, { kind: "toggle" }>[];
+}
+
+const HEX = /^[0-9a-f]{6}$/i;
+
+/** Everything a style lets you set, read from its own JSON schema.
  *
- *  SCHEMA-DRIVEN, not a hardcoded list per style. Avataaars alone has 21
- *  options and every style has a different set; writing them out would mean
- *  maintaining 31 lists that silently rot whenever the library changes. Reading
- *  the schema means a style added next year is customisable the day it appears.
+ *  SCHEMA-DRIVEN AND UNCAPPED. Every style has a different set and the library
+ *  adds to them; a hand-written list would be 31 lists rotting in parallel.
+ *  The previous version also capped the result at eight, which is a sensible
+ *  limit for a column of dropdowns and a pointless one for rows of pictures.
  *
- *  Only enumerated features are offered. The rest are colour arrays with no
- *  fixed values, and probability integers that would need a slider to express
- *  something nobody is asking for. */
-export async function avatarOptions(styleId: string): Promise<AvatarOption[]> {
+ *  backgroundColor is excluded on purpose: it is offered in the frame controls
+ *  alongside the background type it depends on, and offering it twice would
+ *  let the two disagree. */
+export async function avatarFeatures(styleId: string): Promise<AvatarFeatures> {
+  const out: AvatarFeatures = { enums: [], colors: [], toggles: [] };
   const { col } = await collection();
   const props = (col as any)[styleId]?.schema?.properties;
-  if (!props) return [];
+  if (!props) return out;
 
-  const out: AvatarOption[] = [];
+  const has = (k: string) => Object.prototype.hasOwnProperty.call(props, k);
+
   for (const [key, raw] of Object.entries(props as Record<string, any>)) {
-    // backgroundColor is ours: it follows the profile colour picker, and
-    // offering it twice would let the two disagree.
-    if (key === "backgroundColor" || key === "base") continue;
-    if (/Probability$/.test(key)) continue;
+    if (key === "backgroundColor") continue;
+
+    const m = /^(.*)Probability$/.exec(key);
+    if (m) {
+      // Only a real question if there is something for it to turn on. A stray
+      // probability with no matching feature would be a switch labelled with a
+      // word that appears nowhere else on the screen.
+      const base = m[1]!;
+      if (has(base)) out.toggles.push({ kind: "toggle", key, label: humanise(base), base });
+      continue;
+    }
+
     const values: string[] | undefined = raw?.items?.enum || raw?.enum;
-    if (!Array.isArray(values) || values.length < 2) continue;
-    out.push({ key, label: humanise(key), values });
+    if (Array.isArray(values)) {
+      // A single-valued enum -- Avataaars' nose, base -- is not a choice.
+      if (values.length >= 2) out.enums.push({ kind: "enum", key, label: humanise(key), values });
+      continue;
+    }
+
+    // Colour properties carry their palette as the schema default. Matching on
+    // that rather than on a name ending in "Color" means a style that names one
+    // differently still gets swatches.
+    const def = raw?.default;
+    if (Array.isArray(def) && def.length && def.every((v: unknown) => typeof v === "string" && HEX.test(v))) {
+      out.colors.push({ kind: "color", key, label: humanise(key), palette: def as string[] });
+    }
   }
-  // Longest lists first: the features with the most variety are the ones worth
-  // putting in front of someone.
-  return out.sort((a, b) => b.values.length - a.values.length).slice(0, 8);
+
+  // Most variety first: the features that change the face most are the ones
+  // worth putting at the top of the panel.
+  out.enums.sort((a, b) => b.values.length - a.values.length);
+  out.colors.sort((a, b) => b.palette.length - a.palette.length);
+  return out;
 }
 
+// A handful of schema keys are unreadable or collide with something else on
+// the screen. Everything not listed here is derived, so a style added next year
+// still gets a label.
+const RELABEL: Record<string, string> = {
+  // Avataaars calls its outline variant "style", which in an editor whose first
+  // tab is Style means two different things one click apart.
+  style: "Shape",
+  clothingGraphic: "Shirt print",
+};
+
 function humanise(key: string): string {
+  const fixed = RELABEL[key];
+  if (fixed) return fixed;
   const s = key.replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase();
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-/** Generate with explicit feature choices layered over the seed.
+/** A value identifier turned into something readable. */
+export function humaniseValue(v: string): string {
+  const s = String(v).replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/[-_]/g, " ").toLowerCase();
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** The options object a recipe describes, ready for createAvatar.
  *
- *  An empty value means "leave it to the seed", so a half-customised avatar is
- *  still mostly random rather than snapping to whatever happens to be first in
- *  every list. */
-export async function renderCustom(
-  styleId: string,
-  seed: string,
-  choices: Record<string, string>,
-  opts: { size?: number; background?: string } = {},
+ *  Kept separate from the render so the editor can build a thumbnail by
+ *  layering one override on top of the current recipe without cloning it. */
+function recipeOptions(r: AvatarRecipe, fallbackBg: string): Record<string, unknown> {
+  const o: Record<string, unknown> = { seed: r.seed };
+
+  for (const [k, v] of Object.entries(r.choices || {})) if (v) o[k] = [v];
+  for (const [k, v] of Object.entries(r.colors || {})) if (v) o[k] = [v.replace("#", "")];
+  for (const [k, v] of Object.entries(r.toggles || {})) o[k] = v ? 100 : 0;
+
+  const f = r.frame || {};
+  if (f.flip) o.flip = true;
+  if (f.rotate) o.rotate = f.rotate;
+  if (typeof f.scale === "number" && f.scale !== 100) o.scale = f.scale;
+  if (typeof f.radius === "number" && f.radius > 0) o.radius = f.radius;
+
+  const bg = (f.bg ?? fallbackBg ?? "").replace("#", "");
+  if (bg) {
+    const second = (f.bg2 || "").replace("#", "");
+    o.backgroundColor = f.bgType === "gradientLinear" && second ? [bg, second] : [bg];
+    if (f.bgType) o.backgroundType = [f.bgType];
+  }
+  return o;
+}
+
+// Renders are cheap but not free, and the editor asks for the same tile many
+// times while someone moves around the panel. Capped rather than unbounded:
+// every entry holds a few kilobytes of SVG.
+const recipeCache = new Map<string, string>();
+const RECIPE_CACHE_MAX = 3000;
+
+/** Render a recipe, optionally with one property overridden.
+ *
+ *  The override is how every thumbnail in the editor is drawn: the current
+ *  avatar, with only the value under the cursor changed, so a row of choices
+ *  is a row of previews of THIS avatar rather than of a generic one. */
+export async function renderRecipe(
+  recipe: AvatarRecipe,
+  opts: { size?: number; background?: string; override?: Record<string, unknown> } = {},
 ): Promise<string | null> {
   try {
     const { createAvatar, col } = await collection();
-    const style = (col as any)[styleId];
+    const style = (col as any)[recipe.style];
     if (!style) return null;
 
-    const overrides: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(choices)) if (v) overrides[k] = [v];
+    const size = opts.size ?? 128;
+    const built = {
+      ...recipeOptions(recipe, opts.background || ""),
+      size,
+      ...(opts.override || {}),
+    };
 
-    const bg = (opts.background || "").replace("#", "");
-    const built = createAvatar(style, {
-      seed,
-      size: opts.size ?? 128,
-      ...(bg ? { backgroundColor: [bg] } : {}),
-      ...overrides,
-    });
-    return smallestUri(built.toString(), built.toDataUri());
+    const key = `${recipe.style}|${size}|${JSON.stringify(built)}`;
+    const hit = recipeCache.get(key);
+    if (hit) return hit;
+
+    const res = createAvatar(style, built as any);
+    const uri = smallestUri(res.toString(), res.toDataUri());
+    if (recipeCache.size > RECIPE_CACHE_MAX) recipeCache.clear();
+    recipeCache.set(key, uri);
+    return uri;
   } catch {
     return null;
   }
+}
+
+/** A recipe with nothing set, ready to be customised. */
+export function blankRecipe(style: string, seed: string): AvatarRecipe {
+  return { style, seed, choices: {}, colors: {}, toggles: {}, frame: {} };
 }
