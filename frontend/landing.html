@@ -894,9 +894,28 @@
         border-bottom: 1px solid var(--border);
       }
 
+      /* THREE TIERS, NOT ONE. There was a single $4 card, because the app used
+         to be behind it. Watching is free now and always was free to serve, so
+         the honest page shows all three ways to have veedeeoh and lets the
+         paid one earn its place in the middle. */
+      .pricing-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 20px;
+        max-width: 1000px;
+        margin: 0 auto;
+        align-items: stretch;
+      }
+      .pricing-card.muted {
+        border-color: var(--border);
+        box-shadow: none;
+      }
       .pricing-card {
         max-width: 580px;
         margin: 0 auto;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
         background: var(--card-bg);
         border: 1px solid var(--accent);
         box-shadow: 0 0 40px var(--accent-glow);
@@ -938,6 +957,7 @@
         margin-bottom: 32px;
       }
 
+      .pricing-card .btn { margin-top: auto; }
       .pricing-list {
         list-style: none;
         padding: 0;
@@ -1666,10 +1686,17 @@
         </p>
 
         <div class="hero-cta">
-          <button class="btn btn-accent" id="heroTrialBtn">Start free trial</button>
+          <button class="btn btn-accent" id="heroTrialBtn">Start watching, free</button>
           <button class="btn btn-outline" id="heroSignInBtn">Sign in</button>
         </div>
-        <p class="hero-trust">7 days free, then $4/mo for 3 profiles. Cancel anytime.</p>
+        <!-- It said "7 days free, then $4/mo for 3 profiles", which described a
+             gate that no longer exists and, worse, implied the catalogue stops
+             after a week. It does not: watching is free permanently, because
+             the providers do not charge us and we do not host the video. The
+             $4 buys hosted watch parties. Overstating what lapses is how you
+             get a visitor who opens the app, finds it working, and concludes
+             the pricing page was lying about something. -->
+        <p class="hero-trust">Free to watch, always. $4/mo adds 10 hours of hosted watch party. Self-host it for nothing.</p>
 
       </div>
     </section>
@@ -1742,24 +1769,62 @@
     <!-- Cloud Plan Pricing -->
     <section class="pricing-section" id="pricing">
       <div class="badge" style="margin-bottom: 16px;">SIMPLE PRICING</div>
-      <h2 class="section-title">One plan, your whole household</h2>
-      <p class="section-subtitle">Start with a 7-day free trial. No card charged until it ends.</p>
+      <h2 class="section-title">Watching is free. Hosting is what costs.</h2>
+      <p class="section-subtitle">
+        The catalogue comes from Pluto TV, Tubi and the Internet Archive, and none of them
+        charge for it &mdash; so neither do we. What costs real money is running watch parties,
+        so that is the only thing metered.
+      </p>
 
-      <div class="pricing-card">
-        <div class="pricing-header">
-          <div class="pricing-title">Cloud access</div>
-          <div class="pricing-cost">$4 <span>/ mo</span></div>
+      <div class="pricing-grid">
+        <div class="pricing-card muted">
+          <div class="pricing-header">
+            <div class="pricing-title">Free</div>
+            <div class="pricing-cost">$0</div>
+          </div>
+          <div class="pricing-desc">The whole catalogue, no card needed.</div>
+          <ul class="pricing-list">
+            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Thousands of movies and TV shows, one app</li>
+            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Profiles, Kids mode and rating limits</li>
+            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> My List and resume across devices</li>
+            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Join any watch party, unlimited</li>
+            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Host 3 hours of watch party a month</li>
+          </ul>
+          <button class="btn btn-outline" style="width: 100%; padding: 16px;" id="pricingFreeBtn">Start watching</button>
         </div>
-        <div class="pricing-desc">
-          Three profiles included. Add more household members for $2/mo each.
+
+        <div class="pricing-card">
+          <div class="pricing-header">
+            <div class="pricing-title">Cloud</div>
+            <div class="pricing-cost">$4 <span>/ mo</span></div>
+          </div>
+          <div class="pricing-desc">
+            For the household that actually runs watch nights. You are paying us to run
+            veedeeoh, not for permission to use it.
+          </div>
+          <ul class="pricing-list">
+            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Everything in Free</li>
+            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Host 10 hours of watch party a month</li>
+            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> 3 profiles included, $2/mo per extra member</li>
+            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Cancel anytime, no lock-in</li>
+          </ul>
+          <button class="btn btn-accent" style="width: 100%; padding: 16px;" id="pricingTrialBtn">Start free trial</button>
         </div>
-        <ul class="pricing-list">
-          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Thousands of movies and TV shows, one app</li>
-          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> 3 profiles with Kids mode and rating limits</li>
-          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Your list and watch progress sync across devices</li>
-          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Cancel anytime, no lock-in</li>
-        </ul>
-        <button class="btn btn-accent" style="width: 100%; padding: 16px;" id="pricingTrialBtn">Start free trial</button>
+
+        <div class="pricing-card muted">
+          <div class="pricing-header">
+            <div class="pricing-title">Self-host</div>
+            <div class="pricing-cost">$0</div>
+          </div>
+          <div class="pricing-desc">Run the whole thing yourself. Open source.</div>
+          <ul class="pricing-list">
+            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Everything, with no limits from us</li>
+            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Docker, Unraid, Synology or plain Linux</li>
+            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Your server, your data, your bill</li>
+            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Same code we run</li>
+          </ul>
+          <a class="btn btn-outline" style="width: 100%; padding: 16px;" href="/self-hosting.html">Read the guide</a>
+        </div>
       </div>
     </section>
 
@@ -1878,7 +1943,7 @@ Health Check: /api/health</div>
             <span class="faq-icon">+</span>
           </button>
           <div class="faq-answer">
-            Cloud access is $4 a month and includes three profiles. Extra household members are $2 a month each. Every account starts with a 7-day free trial, and you can cancel anytime. If you would rather run it on your own hardware, self-hosting is free and open-source.
+            Watching is free and stays free &mdash; the catalogue comes from Pluto TV, Tubi and the Internet Archive, none of which charge for it. The $4 a month plan is for watch party hosting, which is the part that costs us real money to run: ten hours a month instead of the three every free account gets. It includes three profiles, with extra household members at $2 a month each, and every account starts with a 7-day trial of the paid tier. Cancel anytime. If you would rather run it on your own hardware, self-hosting is free and open-source.
           </div>
         </div>
 

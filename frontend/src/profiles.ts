@@ -585,7 +585,7 @@ export function openProfileSwitcher(
             </div>
             <div style="display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 540px; text-align: center">
               <div style="font-size: 30px; font-weight: 800; letter-spacing: -0.03em; color: #fff">Your household is full</div>
-              <div style="font-size: 16px; font-weight: 500; line-height: 1.55; color: #7C828C; text-wrap: pretty">All ${profiles.length} seats are in use. Add an extra seat for $1.50 a month, or free one up from settings.</div>
+              <div style="font-size: 16px; font-weight: 500; line-height: 1.55; color: #7C828C; text-wrap: pretty">All ${profiles.length} seats are in use. Add an extra seat for $2 a month, or free one up from settings.</div>
             </div>
             <div style="display: flex; gap: 14px">
               <button id="closeFullBtn" style="padding: 15px 26px; border-radius: 10px; background: #C6F53A; color: #0A0B0E; font-size: 15px; font-weight: 800; cursor: pointer; border: none;">Go back</button>

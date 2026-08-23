@@ -274,6 +274,11 @@ if (navAuthBtn) navAuthBtn.addEventListener('click', openAuth);
 if (closeAuthBtn) closeAuthBtn.addEventListener('click', closeAuth);
 document.getElementById('heroTrialBtn')?.addEventListener('click', openAuthSignup);
 document.getElementById('pricingTrialBtn')?.addEventListener('click', openAuthSignup);
+// Same destination as the trial buttons, deliberately. Signing up IS starting
+// on the free tier; the trial is a seven-day upgrade layered on top of it. Two
+// buttons that do the same thing is right here, because the two visitors
+// pressing them believe different things about what they are agreeing to.
+document.getElementById('pricingFreeBtn')?.addEventListener('click', openAuthSignup);
 document.getElementById('heroSignInBtn')?.addEventListener('click', openAuth);
 
 if (authModal) {
