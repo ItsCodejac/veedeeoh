@@ -245,23 +245,80 @@ $('check').onclick = async () => {
 $('lookup').onclick = async () => {
   const email = $('email').value.trim();
   if (!email) return;
-  const u = await j('/api/user?email=' + encodeURIComponent(email));
+  // The fuller snapshot: tier AND the things a bundle also sets, because
+  // granting one and then being shown only the tier tells you a third of what
+  // just happened.
+  const u = await j('/api/account?email=' + encodeURIComponent(email));
   if (!u || u.error) { $('user').innerHTML = '<span class="bad">No account found.</span>'; return; }
   const expired = u.tier_expires && new Date(u.tier_expires) < new Date();
   const access = PAID.includes(u.tier) && !expired;
+  const ref = u.referral;
   $('user').innerHTML =
     row('Email', u.email) +
     row('Tier', `${u.tier || 'none'} ${access ? '<span class="ok">active</span>' : '<span class="bad">no access</span>'}`) +
     row('Expires', u.tier_expires ? (expired ? `<span class="bad">${u.tier_expires}</span>` : u.tier_expires) : 'never') +
-    row('Seats', u.seats ?? '—') +
+    row('Party credits', u.party_credits_exempt
+        ? '<span class="ok">exempt</span>'
+        : (u.party_credits ?? 0)) +
+    row('Referral', ref
+        ? `${ref.code} &middot; ${(ref.rate_bps / 100).toFixed(0)}% &middot; ${
+            Number(ref.duration_months) === 0 ? 'for life' : ref.duration_months + ' months'}${
+            ref.kind ? ' &middot; ' + ref.kind : ''}`
+        : '<span class="dim">none yet</span>') +
     `<div class="actions">
        <select id="tierSel">${PAID.map(t => `<option ${t===u.tier?'selected':''}>${t}</option>`).join('')}</select>
        <button id="setTier">Set tier</button>
-     </div>`;
+     </div>
+     <div class="lbl" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#61666F;margin:16px 0 8px">Apply a bundle</div>
+     <div class="dim" style="font-size:11.5px;margin-bottom:8px">
+       The same grants an invite of that kind would give, applied to this
+       account. Only what the bundle mentions is touched.
+     </div>
+     <div class="actions" style="margin-top:0">
+       <select id="grantSel"></select>
+       <button id="applyGrant">Apply</button>
+     </div>
+     <div id="grantNote" class="dim" style="font-size:11.5px;margin-top:6px"></div>`;
+
   $('setTier').onclick = async () => {
     const btn = $('setTier'); btn.disabled = true; btn.textContent = 'Saving…';
     await j('/api/tier', { method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ email, tier: $('tierSel').value }) });
+    $('lookup').click();
+  };
+
+  // Editions come from the server rather than being listed here, so the panel
+  // cannot drift from what a bundle actually grants.
+  const eds = await j('/api/editions');
+  const sel = $('grantSel');
+  sel.innerHTML = eds.map(e => `<option value="${e.id}">${e.label}</option>`).join('');
+  const describe = () => {
+    const e = eds.find(x => x.id === sel.value);
+    const g = (e && e.grants) || {};
+    const bits = [];
+    if (g.tier) bits.push(`tier ${g.tier}${g.tier_days ? ` for ${g.tier_days} days` : ' with no expiry'}`);
+    if (g.party_credits_exempt) bits.push('unlimited hosting');
+    if (g.party_credits) bits.push(`+${g.party_credits} credits`);
+    if (g.referral_rate_bps) {
+      bits.push(`${g.referral_rate_bps / 100}% referral${
+        Number(g.referral_duration_months) === 0 ? ' for life' : ` for ${g.referral_duration_months} months`}`);
+    }
+    $('grantNote').textContent = bits.length ? 'Grants: ' + bits.join(', ') + '.' : 'Grants nothing.';
+  };
+  sel.onchange = describe;
+  describe();
+
+  $('applyGrant').onclick = async () => {
+    const btn = $('applyGrant'); btn.disabled = true; btn.textContent = 'Applying…';
+    const res = await j('/api/grant', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email, edition: sel.value }) });
+    btn.disabled = false; btn.textContent = 'Apply';
+    if (!res || res.ok === false) {
+      $('grantNote').innerHTML = `<span class="bad">${(res && res.error) || 'failed'}</span>`;
+      return;
+    }
+    // Re-read, so what is on screen is the account as it now is rather than
+    // what was requested.
     $('lookup').click();
   };
 };

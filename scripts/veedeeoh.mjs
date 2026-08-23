@@ -588,12 +588,67 @@ async function setTier(email, tier) {
 }
 
 // ------------------------------------------------------------------- http ---
+/** Apply a named benefits bundle to an account that already exists.
+ *
+ *  The bundles were only reachable through an invite, which by definition goes
+ *  to someone who has not joined. Making an existing account a partner meant
+ *  four separate writes across three tables with nothing recording that they
+ *  belonged together -- and the referral half failed outright unless that
+ *  person had happened to open Settings once, because the code is minted
+ *  lazily.
+ *
+ *  Goes through admin_apply_grants so the meaning of a bundle is defined in
+ *  exactly one place, shared with invite redemption. A partner granted today
+ *  and a partner invited last week get identical terms, which is not true if
+ *  the two paths each carry their own copy of the numbers.
+ */
+async function applyEdition({ email, edition, grants, note }) {
+  const target = (email || "").trim().toLowerCase();
+  if (!target) return { ok: false, error: "email required" };
+
+  // An explicit grants object wins, so the panel can override a preset before
+  // applying it -- same rule the invite form already follows.
+  const g = grants && typeof grants === "object" ? grants : EDITIONS[edition]?.grants;
+  if (!g) return { ok: false, error: `unknown edition: ${edition}` };
+
+  const r = await sb("rpc/admin_apply_grants", {
+    method: "POST",
+    body: JSON.stringify({
+      target_email: target,
+      g,
+      note: note || `admin grant: ${EDITIONS[edition]?.label || edition}`,
+    }),
+  });
+  if (!r.ok) return { ok: false, error: await r.text() };
+
+  const out = await r.json();
+  if (out && out.ok === false) return out;
+
+  // Read back rather than report the request. Saying "done" on the strength of
+  // a 200 is how a grant that silently applied to nobody looks like a success.
+  const after = await accountSnapshot(target);
+  return { ok: true, applied: EDITIONS[edition]?.label || edition, user: after };
+}
+
+/** Everything the panel should show about one account after a change. */
+async function accountSnapshot(email) {
+  const r = await sb(`profiles?select=id,email,tier,tier_expires,party_credits,party_credits_exempt&email=eq.${encodeURIComponent(email)}`);
+  const rows = r.ok ? await r.json() : [];
+  const u = rows[0];
+  if (!u) return null;
+  const c = await sb(`referral_codes?select=code,kind,rate_bps,duration_months&user_id=eq.${u.id}`);
+  const codes = c.ok ? await c.json() : [];
+  return { ...u, referral: codes[0] || null };
+}
+
 const routes = {
   "GET /api/status": () => catalogStatus(),
   "POST /api/warm": () => rebuildCatalog(),
   "GET /api/providers": () => checkProviders(),
   "GET /api/user": (u) => findUser(u.searchParams.get("email") || ""),
   "POST /api/tier": (u, b) => setTier(b.email, b.tier),
+  "POST /api/grant": (u, b) => applyEdition(b),
+  "GET /api/account": (u) => accountSnapshot((u.searchParams.get("email") || "").toLowerCase()),
   "GET /api/editions": () => Object.entries(EDITIONS).map(([id, e]) =>
     ({ id, label: e.label, subject: e.subject, grants: e.grants })),
   "GET /api/invites": () => listInvites(),
