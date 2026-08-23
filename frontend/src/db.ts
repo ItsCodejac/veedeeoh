@@ -126,8 +126,21 @@ export function filterRailsForKids<T extends { name?: string; items: any[] }>(ra
 
 const PAID_TIERS = new Set(["founder_vip", "giveaway", "cloud_paid", "trial_7day", "trial_dollar_month"]);
 
-/** Client-side access gate: an active, non-expired paid/trial tier. Server RLS
- *  (has_active_access) is the real enforcement; this drives the UI. */
+/** Client-side access gate: an active, non-expired paid/trial tier.
+ *
+ *  THIS IS THE ONLY GATE ON BROWSING. The comment here used to say server RLS
+ *  (has_active_access) was the real enforcement and this merely drove the UI.
+ *  No such function exists in any migration -- it was never written -- so
+ *  anyone willing to edit the client can browse the catalogue while lapsed.
+ *
+ *  Left alone deliberately, and written down rather than quietly patched: what
+ *  is behind this gate is Pluto, Tubi and Internet Archive listings, which are
+ *  public and free to reach directly. The account's own data -- household
+ *  profiles, favorites, watch_progress -- is RLS'd by user_id and genuinely
+ *  protected. Hosting and joining parties are enforced in the database, because
+ *  those cost us money. This one is a conversion boundary, not a security one,
+ *  and saying so is worth more than a claim that fails the first time somebody
+ *  relies on it. */
 export async function hasActiveAccess(): Promise<boolean> {
   const acct = await getAccount();
 
