@@ -274,6 +274,12 @@ if (navAuthBtn) navAuthBtn.addEventListener('click', openAuth);
 if (closeAuthBtn) closeAuthBtn.addEventListener('click', closeAuth);
 document.getElementById('heroTrialBtn')?.addEventListener('click', openAuthSignup);
 document.getElementById('pricingTrialBtn')?.addEventListener('click', openAuthSignup);
+// Same destination as the trial button, deliberately. Signup IS the free
+// account; the 7-day trial is an upgrade layered on top of it. Two buttons
+// reaching one screen is right here, because the two people pressing them
+// believe different things about what they are agreeing to, and both are
+// correct.
+document.getElementById('pricingFreeBtn')?.addEventListener('click', openAuthSignup);
 document.getElementById('heroSignInBtn')?.addEventListener('click', openAuth);
 
 if (authModal) {

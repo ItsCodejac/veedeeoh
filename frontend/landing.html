@@ -899,13 +899,18 @@
          like a footnote when it is half the offer. */
       .pricing-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
         gap: 20px;
-        max-width: 800px;
+        max-width: 1020px;
         margin: 0 auto;
         align-items: stretch;
       }
       .pricing-card.muted { border-color: var(--border); box-shadow: none; }
+      /* What a tier does NOT include, said out loud. A free box listing only
+         its two upsides reads like a smaller version of the paid one; the
+         point of this box is that it is a different shape. */
+      .pricing-list li.no { color: var(--dim); }
+      .pricing-list li.no svg { color: #6b7482; }
       .pricing-card .btn { margin-top: auto; }
       .pricing-card {
         max-width: 580px;
@@ -1765,6 +1770,23 @@
       </p>
 
       <div class="pricing-grid">
+        <div class="pricing-card muted">
+          <div class="pricing-header">
+            <div class="pricing-title">Free</div>
+            <div class="pricing-cost">$0</div>
+          </div>
+          <div class="pricing-desc">
+            An account for when someone invites you.
+          </div>
+          <ul class="pricing-list">
+            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Join 4 watch parties a month</li>
+            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Rating limits still apply to your profile</li>
+            <li class="no"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> No browsing the catalogue on your own</li>
+            <li class="no"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> No hosting your own parties</li>
+          </ul>
+          <button class="btn btn-outline" style="width: 100%; padding: 16px;" id="pricingFreeBtn">Create a free account</button>
+        </div>
+
         <div class="pricing-card">
           <div class="pricing-header">
             <div class="pricing-title">Cloud</div>
@@ -1793,7 +1815,7 @@
             The same code we run, on your hardware.
           </div>
           <ul class="pricing-list">
-            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Everything above, with no limits from us</li>
+            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Everything in Cloud, with no limits from us</li>
             <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Docker, Unraid, Synology or plain Linux</li>
             <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Your server, your data, your bill</li>
             <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> No account with us required</li>
@@ -1802,12 +1824,10 @@
         </div>
       </div>
 
-      <!-- Stated plainly rather than left for someone to discover after signing
-           up. A free cloud account is a real thing and a small one: it exists so
-           you can accept an invitation, not so you can live here. -->
-      <p class="section-subtitle" style="margin: 28px auto 0; max-width: 620px; font-size: 0.95rem;">
-        A free account can join <strong>4 watch parties a month</strong> when someone invites
-        you. Browsing the catalogue on your own, and hosting your own parties, are part of Cloud.
+      <p class="section-subtitle" style="margin: 28px auto 0; max-width: 640px; font-size: 0.95rem;">
+        The free account is not a trial that runs out &mdash; it is what a cloud account is
+        when nobody is paying for it. It exists so you can accept an invitation without
+        a card.
       </p>
     </section>
 
