@@ -268,13 +268,26 @@ export class Party extends DurableObject<Env> {
     // no headcount. Only whether this one person can get in, which is the
     // question being asked.
     if (url.pathname.endsWith("/access")) {
+      // IDENTITY FIRST, before saying whether the party exists.
+      //
+      // The "gone" check used to come first, so an unauthenticated request got
+      // {"status":"gone"} with a 200 and a live code got something else. That
+      // is an oracle: anyone could walk join codes and learn which ones are
+      // real without holding an account. Six characters is two billion
+      // combinations, so it is slow rather than free -- but a free endpoint
+      // that answers the question at all is the wrong shape, and it is the
+      // only endpoint here that would answer it.
+      //
+      // Caught by probing the deployed worker rather than by reading this: it
+      // returned 200 where I expected 401.
+      const asker = await verifyCaller(url.searchParams.get("jwt") || "", this.env.SUPABASE_JWT_SECRET);
+      if (!asker) return Response.json({ status: "unauthorised" }, { status: 401, headers: cors });
+
       const config = await this.ctx.storage.get<Config>(CONFIG_KEY);
       if (!config) return Response.json({ status: "gone" }, { headers: cors });
 
-      // From the token, not the query string. The ban list is keyed on this,
-      // so a client-supplied value made removal a formality.
-      const asker = await verifyCaller(url.searchParams.get("jwt") || "", this.env.SUPABASE_JWT_SECRET);
-      if (!asker) return Response.json({ status: "unauthorised" }, { status: 401, headers: cors });
+      // The ban list is keyed on this, so a client-supplied value made removal
+      // a formality.
       const who = asker.sub;
       const bans = (await this.ctx.storage.get<string[]>(BANNED_KEY)) ?? [];
       if (who !== "" && bans.includes(who)) {
