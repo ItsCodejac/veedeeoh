@@ -44,6 +44,16 @@ export interface PartySetup {
  *  Kept to ~520ms on purpose. Long enough to read as deliberate, short enough
  *  that it never becomes the thing standing between a host and their party.
  */
+// How many waiting people to list individually before collapsing. Thirty
+// knocks at once -- a link posted in a group chat -- rendered thirty rows in a
+// 460px column, pushing Start watching a screen and a half below the fold and
+// asking the host to tap sixty buttons while everyone waited.
+//
+// SHARED BY BOTH DOORS. The green room had the cap, the tail and the bulk
+// pair; the in-player dock had none of them, so a link posted mid-party
+// arrived as an unbounded list of individual knocks in a narrow panel.
+const KNOCK_LIST_MAX = 6;
+
 export function partyTransition(): Promise<void> {
   return new Promise((resolve) => {
     // The detail overlay must go BEFORE the wipe covers the screen, or it is
@@ -208,6 +218,15 @@ export function openPartySetup(item: VodItem): Promise<PartySetup | null> {
       done({
         seatLimit: Number.isFinite(n) && n >= 1 ? Math.min(500, n) : null,
         requireApproval: approval !== "0",
+        // A LISTED PARTY IS ALWAYS WALK-IN. This reads like a bug and is not:
+        // the directory tab is called Open parties, its explainer promises no
+        // approval and no waiting, and every card's action reads Join. A
+        // listed party with a door would make that copy a lie on some unknown
+        // fraction of cards, and the viewer cannot tell which from outside.
+        // The want behind "listed but vetted" is real; the answer is a private
+        // party with Ask me first, and if hosts ask for both it becomes a
+        // third visible kind with its own tab and badge -- never a hidden
+        // property of an open one.
         isPublic: publicBox.checked && approval === "0",
         blurb: (el.querySelector<HTMLInputElement>("#psBlurb")?.value || "").trim() || null,
       });
@@ -260,12 +279,6 @@ export function showHostLobby(
       </div>`;
     document.body.appendChild(el);
     requestAnimationFrame(() => el.classList.add("in"));
-
-    // How many waiting people to list individually before collapsing. Thirty
-    // knocks at once -- a link posted in a group chat -- rendered thirty rows
-    // in a 460px column, pushing Start watching a screen and a half below the
-    // fold and asking the host to tap sixty buttons while everyone waited.
-    const KNOCK_LIST_MAX = 6;
 
     const paintRoster = (e?: Event) => {
       const d = (e as CustomEvent)?.detail || {};
@@ -507,7 +520,12 @@ function render(): void {
       ${waiting ? `
         <div class="ppSection ppUrgent">
           <div class="ppHead">${waiting === 1 ? "1 person wants to join" : `${waiting} people want to join`}</div>
-          ${roster.waiting.map((w) => `
+          ${waiting > 1 ? `
+            <div class="ppRow">
+              <button class="ppBtn primary" data-bulk="admit">Let everyone in</button>
+              <button class="ppBtn danger" data-bulk="refuse">Refuse all</button>
+            </div>` : ""}
+          ${roster.waiting.slice(0, KNOCK_LIST_MAX).map((w) => `
             <div class="ppRow" data-uid="${escapeHtml(w.userId)}">
               <span class="ppName">${escapeHtml(w.name)}</span>
               <span>
@@ -515,6 +533,9 @@ function render(): void {
                 <button class="ppBtn" data-act="refuse">No</button>
               </span>
             </div>`).join("")}
+          ${waiting > KNOCK_LIST_MAX
+            ? `<div class="ppEmpty">and ${waiting - KNOCK_LIST_MAX} more waiting &middot; the buttons above act on all ${waiting}</div>`
+            : ""}
         </div>` : ""}
 
       <div class="ppSection">
@@ -562,6 +583,18 @@ function render(): void {
     const { endParty } = await import("./party");
     endParty();
     unmountHostLobby();
+  });
+
+  lobby.querySelectorAll<HTMLElement>("[data-bulk]").forEach((b) => {
+    b.addEventListener("click", async () => {
+      const admit = b.dataset.bulk === "admit";
+      const all = roster.waiting.slice();
+      if (!admit && !confirm(`Refuse all ${all.length}?`)) return;
+      const { respondToKnock } = await import("./party");
+      // THE FULL WAITING ARRAY, not the visible slice. The list is capped at
+      // six and the button says it acts on all of them, so it has to.
+      for (const w of all) respondToKnock(w.userId, admit);
+    });
   });
 
   lobby.querySelectorAll<HTMLElement>("[data-act]").forEach((b) => {

@@ -1,0 +1,389 @@
+/* veedeeoh.party -- the directory surface.
+ *
+ * Ported from the design handoff's party-app.html by script, not by hand, so
+ * every declaration is byte-for-byte the one that was designed. Three
+ * mechanical changes, all of them structural:
+ *
+ *   1. EVERY SELECTOR IS SCOPED to #partyApp. The design is a whole page and
+ *      names things .btn, .row, .chip, .grid, .info, .tag, .empty -- all of
+ *      which already mean something else in style.css. Unscoped, this file
+ *      would restyle half the app.
+ *   2. @keyframes pulse became pa-pulse, for the same reason.
+ *   3. The design's mock host chrome -- .sidebar, .navItem, .acct, and the
+ *      .preview state switcher -- is dropped. That part was context for the
+ *      designer; this app supplies its own.
+ *
+ * :root became #partyApp, so the tokens are declared on the container. Same
+ * values as tokens.css, kept locally so this surface still renders correctly
+ * if it is ever lifted out on its own.
+ */
+
+#partyApp{
+  --bg:#06070a; --panel:#10141e; --panel2:#161b28;
+  --text:#e9ecf2; --dim:#8a93a3; --accent:#c5f04e; --ink-on-accent:#05231f;
+  --b-chrome:#1e2432; --b-card:#262d3d; --b-overlay:#2f3749;
+  --alive:#00e0b0; --dead:#ff5252; --star:#ffc107; --destructive:#ff3b30;
+  --sidebar:#090a0f; --sidebar-border:#1a2030;
+  --font-display:'Bricolage Grotesque',sans-serif;
+  --font-label:'Space Grotesk',sans-serif;
+  --font-body:'Space Grotesk',sans-serif;
+}
+#partyApp *{box-sizing:border-box}
+#partyApp a{color:var(--accent);text-decoration:none}
+#partyApp a:hover{color:var(--text)}
+#partyApp button{font:inherit;cursor:pointer}
+#partyApp :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+#partyApp [hidden]{display:none !important}
+#partyApp{flex:1;min-width:0;display:flex;flex-direction:column;position:relative;background:#080a10}
+#partyApp::before{content:"";position:absolute;top:-180px;left:50%;transform:translateX(-50%);width:900px;height:400px;background:radial-gradient(ellipse at center,rgba(197,240,78,.055),transparent 70%);pointer-events:none;z-index:0}
+#partyApp .pBar{position:relative;z-index:3;flex:none;display:flex;align-items:center;gap:20px;height:68px;padding:0 28px;border-bottom:1px solid var(--b-chrome);background:rgba(6,7,10,.72);backdrop-filter:blur(12px)}
+#partyApp .pMark{font:800 21px/1 var(--font-display);letter-spacing:-.02em;color:#fff;white-space:nowrap;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis}
+#partyApp .pMark i{color:var(--accent);font-style:normal}
+#partyApp .pLive{display:flex;align-items:center;gap:7px;padding:5px 11px;border-radius:999px;background:rgba(0,224,176,.1);border:1px solid rgba(0,224,176,.28);flex:none}
+#partyApp .pLive .dot{width:6px;height:6px;border-radius:50%;background:var(--alive);animation:pa-pulse 2s ease-in-out infinite}
+@keyframes pa-pulse{0%,100%{opacity:1}50%{opacity:.35}}
+#partyApp .pLive span{font:700 11px/1 var(--font-label);letter-spacing:.1em;text-transform:uppercase;color:var(--alive);white-space:nowrap}
+#partyApp .pBar .grow{flex:1 1 auto;min-width:8px}
+#partyApp .codeEntry{display:flex;align-items:center;gap:8px}
+#partyApp .codeEntry input{width:8.4em;background:#04050a;border:1px solid var(--b-overlay);border-radius:8px;color:#fff;padding:9px 12px;font:700 14px/1 var(--font-label);letter-spacing:.18em;text-indent:.18em;text-align:center;text-transform:uppercase;transition:border-color .2s}
+#partyApp .codeEntry input::placeholder{color:#4c535f;font-weight:600}
+#partyApp .codeEntry input:focus{outline:none;border-color:var(--accent)}
+#partyApp .btn{border-radius:8px;padding:9px 16px;font-weight:600;font-size:13px;border:1px solid var(--b-chrome);background:var(--panel);color:var(--dim);transition:color .2s,border-color .2s,background .2s;white-space:nowrap}
+#partyApp .btn:hover{color:var(--text);border-color:#39424f}
+#partyApp .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--ink-on-accent)}
+#partyApp .btn.primary:hover{background:#d3f76a;border-color:#d3f76a}
+#partyApp .btn.danger{border-color:rgba(255,82,82,.4);color:#ff8f8f;background:transparent}
+#partyApp .btn.danger:hover{border-color:var(--dead);color:#fff;background:rgba(255,82,82,.12)}
+#partyApp .btn.icon{display:inline-flex;align-items:center;gap:7px}
+#partyApp .btn.sm{padding:7px 12px;font-size:12px}
+#partyApp .strip{position:relative;z-index:2;flex:none;display:flex;align-items:center;gap:18px;padding:14px 28px;border-bottom:1px solid rgba(197,240,78,.22);background:linear-gradient(90deg,rgba(197,240,78,.1),rgba(197,240,78,.03))}
+#partyApp .strip .badge{font:700 10px/1 var(--font-label);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-on-accent);background:var(--accent);padding:5px 9px;border-radius:4px;flex:none}
+#partyApp .strip .what{display:flex;flex-direction:column;gap:3px;flex:1 1 180px;min-width:120px;overflow:hidden}
+#partyApp .strip .what b{font:700 14px/1.2 var(--font-body);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#partyApp .strip .what small{font-size:12px;color:#a8b0a0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#partyApp .strip .code{font:800 20px/1 var(--font-label);letter-spacing:.2em;color:var(--accent);padding-left:20px;border-left:1px solid rgba(197,240,78,.25);flex:none;white-space:nowrap}
+#partyApp .strip .grow{flex:0 1 auto;min-width:0}
+#partyApp .strip .acts{display:flex;gap:8px;flex:none;flex-wrap:wrap;justify-content:flex-end}
+#partyApp .tabs{position:relative;z-index:2;flex:none;display:flex;align-items:center;gap:4px;padding:0 28px;border-bottom:1px solid var(--b-chrome)}
+#partyApp .tab{position:relative;background:none;border:none;padding:15px 14px;font:600 13.5px/1 var(--font-body);color:var(--dim);display:flex;align-items:center;gap:8px;transition:color .2s;white-space:nowrap}
+#partyApp .tab:hover{color:var(--text)}
+#partyApp .tab[aria-selected="true"]{color:#fff}
+#partyApp .tab[aria-selected="true"]::after{content:"";position:absolute;left:14px;right:14px;bottom:-1px;height:2px;background:var(--accent);border-radius:2px}
+#partyApp .tab .n{font:700 10.5px/1 var(--font-label);padding:3px 6px;border-radius:20px;background:rgba(255,255,255,.07);color:var(--dim)}
+#partyApp .tab[aria-selected="true"] .n{background:rgba(197,240,78,.14);color:var(--accent)}
+#partyApp .filterBar{position:relative;z-index:2;flex:none;display:flex;flex-direction:column;gap:10px;padding:14px 28px;border-bottom:1px solid var(--b-chrome);background:rgba(8,10,16,.5)}
+#partyApp .fRow{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+#partyApp .search{flex:1 1 260px;min-width:200px;display:flex;align-items:center;gap:9px;background:var(--panel);border:1px solid var(--b-chrome);border-radius:10px;padding:0 14px;transition:border-color .2s}
+#partyApp .search:focus-within{border-color:var(--accent)}
+#partyApp .search svg{flex:none;color:var(--dim)}
+#partyApp .search input{flex:1;min-width:0;background:none;border:none;color:var(--text);font:400 14px/1 var(--font-body);padding:10px 0}
+#partyApp .search input:focus{outline:none}
+#partyApp .search input::placeholder{color:var(--dim)}
+#partyApp .search .clr{background:none;border:none;color:var(--dim);padding:2px;display:grid;place-items:center;border-radius:4px}
+#partyApp .search .clr:hover{color:var(--text)}
+#partyApp .sel{position:relative;display:flex;align-items:center}
+#partyApp .sel select{appearance:none;background:var(--panel);border:1px solid var(--b-chrome);border-radius:8px;color:var(--dim);font:600 12.5px/1 var(--font-body);padding:9px 28px 9px 12px;transition:.2s;cursor:pointer}
+#partyApp .sel select:hover{color:var(--text);border-color:#39424f}
+#partyApp .sel select:focus{outline:none;border-color:var(--accent)}
+#partyApp .sel.on select{background:rgba(197,240,78,.1);border-color:rgba(197,240,78,.4);color:var(--accent)}
+#partyApp .sel::after{content:"";position:absolute;right:11px;width:0;height:0;border-left:3.5px solid transparent;border-right:3.5px solid transparent;border-top:4px solid currentColor;color:var(--dim);pointer-events:none}
+#partyApp .sel.on::after{color:var(--accent)}
+#partyApp .tgl{background:var(--panel);border:1px solid var(--b-chrome);border-radius:999px;color:var(--dim);font:600 12.5px/1 var(--font-body);padding:9px 14px;transition:.2s;display:inline-flex;align-items:center;gap:6px}
+#partyApp .tgl:hover{color:var(--text);border-color:#39424f}
+#partyApp .tgl[aria-pressed="true"]{background:rgba(197,240,78,.12);border-color:rgba(197,240,78,.45);color:var(--accent)}
+#partyApp .tgl .tick{width:0;overflow:hidden;transition:width .15s}
+#partyApp .tgl[aria-pressed="true"] .tick{width:11px}
+#partyApp .fGroup{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+#partyApp .fGroup+.fGroup{padding-left:9px;border-left:1px solid var(--b-chrome)}
+@media (max-width:1240px){
+#partyApp .fGroup+.fGroup{padding-left:0;border-left:none}
+}
+#partyApp .fMeta{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+#partyApp .fCount{font:600 12.5px/1 var(--font-label);color:var(--dim)}
+#partyApp .fCount b{color:var(--text)}
+#partyApp .fClear{background:none;border:none;color:var(--accent);font:600 12.5px/1 var(--font-body);padding:0;text-decoration:underline;text-underline-offset:3px}
+#partyApp .fClear:hover{color:var(--text)}
+#partyApp .sortWrap{margin-left:auto;display:flex;align-items:center;gap:8px}
+#partyApp .sortWrap>span{font:700 10px/1 var(--font-label);letter-spacing:.13em;text-transform:uppercase;color:#5c6472}
+#partyApp .pBody{position:relative;z-index:1;flex:1;overflow-y:auto;padding:24px 28px 56px}
+#partyApp .sectionHead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0 0 16px}
+#partyApp .sectionHead h2{flex:0 0 auto;white-space:nowrap;margin:0;font:600 15px/1 var(--font-label);letter-spacing:.4px;color:var(--text)}
+#partyApp .sectionHead p{flex:1 1 240px;min-width:0;margin:0;font-size:12.5px;color:var(--dim)}
+#partyApp .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(292px,1fr));gap:18px}
+#partyApp .explain{display:flex;align-items:flex-start;gap:11px;padding:13px 16px;border-radius:10px;border:1px solid var(--b-card);background:var(--panel);margin-bottom:20px}
+#partyApp .explain svg{flex:none;margin-top:1px}
+#partyApp .explain p{margin:0;font-size:12.5px;line-height:1.55;color:var(--dim);text-wrap:pretty}
+#partyApp .explain b{color:var(--text)}
+#partyApp .pCard{background:var(--panel);border:1px solid var(--b-card);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;transition:border-color .12s,transform .12s;text-align:left;padding:0;color:inherit;width:100%}
+#partyApp .pCard:hover{border-color:var(--accent);transform:translateY(-2px)}
+#partyApp .pCard:hover .art::after{opacity:1}
+#partyApp .pCard:hover .joinCta{opacity:1;transform:none}
+#partyApp .art{position:relative;aspect-ratio:16/9;background:linear-gradient(150deg,#1d2433,var(--panel2) 60%,#0f131c);overflow:hidden}
+#partyApp .frameSlot{background:
+  repeating-linear-gradient(135deg,rgba(255,255,255,.022) 0 8px,transparent 8px 16px),
+  linear-gradient(150deg,#1b2130,#141926 60%,#0e121a)}
+#partyApp .art .fill{position:absolute;inset:0}
+#partyApp .art::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,rgba(4,5,10,.92),rgba(4,5,10,.15) 55%);opacity:.85;transition:opacity .12s}
+#partyApp .art .tl{position:absolute;top:10px;left:10px;display:flex;gap:6px;z-index:2;flex-wrap:wrap}
+#partyApp .art .tr{position:absolute;top:10px;right:10px;z-index:2}
+#partyApp .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:999px;background:rgba(4,5,10,.75);backdrop-filter:blur(6px);font:700 10px/1 var(--font-label);letter-spacing:.09em;text-transform:uppercase;color:#fff}
+#partyApp .pill.live{color:var(--dead)}
+#partyApp .pill.live .d{width:6px;height:6px;border-radius:50%;background:var(--dead);box-shadow:0 0 0 3px rgba(255,82,82,.22);animation:pa-pulse 2s ease-in-out infinite}
+#partyApp .pill.seats{color:var(--dim)}
+#partyApp .pill.seats.full{color:var(--star)}
+#partyApp .pill.curated{color:var(--ink-on-accent);background:var(--accent)}
+#partyApp .joinCta{position:absolute;left:10px;bottom:10px;z-index:2;opacity:0;transform:translateY(4px);transition:opacity .12s,transform .12s;background:var(--accent);color:var(--ink-on-accent);border-radius:8px;padding:7px 14px;font:700 12.5px/1 var(--font-body)}
+#partyApp .pMeta{padding:13px 14px 14px;display:flex;flex-direction:column;gap:9px;flex:1}
+#partyApp .pTitle{font:700 15px/1.25 var(--font-display);color:#fff;letter-spacing:-.2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+#partyApp .hostRow{display:flex;align-items:center;gap:8px}
+#partyApp .hAv{width:22px;height:22px;border-radius:50%;flex:none;display:grid;place-items:center;font:700 10px/1 var(--font-label);color:var(--ink-on-accent)}
+#partyApp .hName{font-size:12.5px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#partyApp .hFollow{font:700 9px/1 var(--font-label);letter-spacing:.1em;text-transform:uppercase;color:var(--accent);border:1px solid rgba(197,240,78,.35);border-radius:4px;padding:3px 5px;flex:none}
+#partyApp .hDot{color:#3f4759;font-size:12px}
+#partyApp .hTime{font:500 11.5px/1 var(--font-label);color:var(--dim);white-space:nowrap}
+#partyApp .blurb{font-size:12.5px;line-height:1.45;color:var(--dim);text-wrap:pretty;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+#partyApp .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto;padding-top:2px}
+#partyApp .chip{font:600 10.5px/1 var(--font-label);letter-spacing:.04em;padding:4px 8px;border-radius:999px;border:1px solid var(--b-overlay);color:var(--dim)}
+#partyApp .chip.social{border-color:rgba(197,240,78,.3);color:var(--accent)}
+#partyApp .empty{max-width:620px;margin:56px auto;text-align:center;display:flex;flex-direction:column;align-items:center;gap:16px}
+#partyApp .empty .glyph{width:64px;height:64px;border-radius:50%;display:grid;place-items:center;background:rgba(197,240,78,.08);border:1px solid rgba(197,240,78,.22)}
+#partyApp .empty h3{margin:0;font:700 22px/1.15 var(--font-display);color:#fff;letter-spacing:-.4px}
+#partyApp .empty p{margin:0;font-size:13.5px;line-height:1.6;color:var(--dim);text-wrap:pretty;max-width:460px}
+#partyApp .empty .acts{display:flex;gap:10px;margin-top:4px;flex-wrap:wrap;justify-content:center}
+#partyApp .rows{display:flex;flex-direction:column;border:1px solid var(--b-card);border-radius:12px;overflow:hidden;background:var(--panel)}
+#partyApp .row{display:grid;grid-template-columns:88px 1fr auto auto;gap:16px;align-items:center;padding:12px 16px;border-left:none;border-right:none;border-top:none;border-bottom:1px solid #1a2030;text-align:left;background:none;color:inherit;transition:background .12s}
+#partyApp .row:last-child{border-bottom:none}
+#partyApp .row:hover{background:var(--panel2)}
+#partyApp .row .thumb{width:88px;aspect-ratio:16/9;border-radius:6px;background:var(--panel2);overflow:hidden}
+#partyApp .row .info{display:flex;flex-direction:column;gap:3px;min-width:0}
+#partyApp .row .info b{font:600 13.5px/1.3 var(--font-body);color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#partyApp .row .info small{font-size:11.5px;color:var(--dim)}
+#partyApp .row .stat{font:600 11.5px/1 var(--font-label);color:var(--dim);text-align:right;white-space:nowrap}
+#partyApp .row .stat b{display:block;font:700 15px/1.2 var(--font-label);color:var(--text)}
+#partyApp .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:28px}
+#partyApp .statCard{background:var(--panel);border:1px solid var(--b-card);border-radius:12px;padding:15px 17px;display:flex;flex-direction:column;gap:5px}
+#partyApp .statCard .k{font:700 10px/1 var(--font-label);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+#partyApp .statCard .v{font:800 26px/1 var(--font-display);color:#fff;letter-spacing:-.5px;display:flex;align-items:baseline;gap:6px}
+#partyApp .statCard .v small{font:600 12px/1 var(--font-label);color:var(--dim)}
+#partyApp .statCard .s{font-size:11.5px;color:var(--dim);line-height:1.4}
+#partyApp .statCard.accent .v{color:var(--accent)}
+#partyApp .cols{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);gap:18px;align-items:start}
+#partyApp .block{background:var(--panel);border:1px solid var(--b-card);border-radius:12px;overflow:hidden;margin-bottom:18px}
+#partyApp .blockHead{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid #1a2030}
+#partyApp .blockHead h3{margin:0;font:600 13.5px/1 var(--font-label);letter-spacing:.3px;color:#fff}
+#partyApp .blockHead .n{font:700 10.5px/1 var(--font-label);padding:3px 7px;border-radius:20px;background:rgba(197,240,78,.14);color:var(--accent)}
+#partyApp .blockHead .grow{flex:1}
+#partyApp .blockHead .link{font:600 12px/1 var(--font-body);color:var(--dim);background:none;border:none;padding:0}
+#partyApp .blockHead .link:hover{color:var(--accent)}
+#partyApp .blockNote{padding:11px 16px;font-size:12px;line-height:1.5;color:var(--dim);border-bottom:1px solid #1a2030;background:var(--panel2)}
+#partyApp .blockBody{padding:16px}
+#partyApp .req{display:grid;grid-template-columns:44px 64px 1fr auto;gap:13px;align-items:center;padding:11px 16px;border-bottom:1px solid #1a2030}
+#partyApp .req:last-child{border-bottom:none}
+#partyApp .req:hover{background:var(--panel2)}
+#partyApp .votes{display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 0;border-radius:8px;background:rgba(197,240,78,.09);border:1px solid rgba(197,240,78,.22)}
+#partyApp .votes b{font:800 15px/1 var(--font-label);color:var(--accent)}
+#partyApp .votes span{font:700 8px/1 var(--font-label);letter-spacing:.1em;text-transform:uppercase;color:#7d9440}
+#partyApp .req .thumb{width:64px;aspect-ratio:16/9;border-radius:5px;background:var(--panel2)}
+#partyApp .req .info{min-width:0;display:flex;flex-direction:column;gap:3px}
+#partyApp .req .info b{font:600 13.5px/1.3 var(--font-body);color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#partyApp .req .info small{font-size:11.5px;color:var(--dim)}
+#partyApp .reqActs{display:flex;gap:7px}
+#partyApp .sched{display:flex;flex-direction:column;gap:12px}
+#partyApp .schedNow{display:flex;align-items:center;gap:12px;padding:13px 15px;border-radius:10px;background:rgba(197,240,78,.07);border:1px solid rgba(197,240,78,.24)}
+#partyApp .schedNow .cal{width:42px;flex:none;border-radius:8px;overflow:hidden;text-align:center;border:1px solid rgba(197,240,78,.3)}
+#partyApp .schedNow .cal .m{font:700 8px/1 var(--font-label);letter-spacing:.1em;text-transform:uppercase;background:var(--accent);color:var(--ink-on-accent);padding:3px 0}
+#partyApp .schedNow .cal .d{font:800 17px/1 var(--font-label);color:#fff;padding:5px 0;background:rgba(0,0,0,.25)}
+#partyApp .schedNow .t{display:flex;flex-direction:column;gap:3px;min-width:0}
+#partyApp .schedNow .t b{font:700 13.5px/1.2 var(--font-body);color:#fff}
+#partyApp .schedNow .t small{font-size:11.5px;color:#a8b0a0}
+#partyApp .fieldRow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+#partyApp .field{display:flex;flex-direction:column;gap:6px}
+#partyApp .field label{font:700 10px/1 var(--font-label);letter-spacing:.13em;text-transform:uppercase;color:var(--dim)}
+#partyApp .field select, #partyApp .field input{background:#04050a;border:1px solid var(--b-overlay);border-radius:8px;color:var(--text);padding:9px 11px;font:400 13px/1 var(--font-body);width:100%}
+#partyApp .field select:focus, #partyApp .field input:focus{outline:none;border-color:var(--accent)}
+#partyApp .meter{height:6px;border-radius:6px;background:#232a3a;overflow:hidden;margin:2px 0 4px}
+#partyApp .meter i{display:block;height:100%;background:var(--accent);border-radius:6px}
+#partyApp .ledger{display:flex;flex-direction:column}
+#partyApp .ldg{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:baseline;padding:9px 0;border-bottom:1px solid #1a2030;font-size:12.5px}
+#partyApp .ldg:last-child{border-bottom:none}
+#partyApp .ldg .w{color:var(--text);display:flex;flex-direction:column;gap:2px}
+#partyApp .ldg .w small{font-size:11px;color:var(--dim)}
+#partyApp .ldg .d{font:700 12.5px/1 var(--font-label);color:var(--dead);white-space:nowrap}
+#partyApp .ldg .d.plus{color:var(--alive)}
+#partyApp .shelf{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:9px}
+#partyApp .shelf .p{aspect-ratio:347/500;border-radius:7px;background:var(--panel2)}
+#partyApp .shelf .add{aspect-ratio:347/500;border-radius:7px;border:1px dashed var(--b-overlay);background:none;color:var(--dim);display:grid;place-items:center;font-size:20px;transition:.15s}
+#partyApp .shelf .add:hover{border-color:var(--accent);color:var(--accent)}
+#partyApp .profCard{display:flex;flex-direction:column;gap:12px}
+#partyApp .handle{display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:9px;background:#04050a;border:1px solid var(--b-overlay)}
+#partyApp .handle .at{font:700 14px/1 var(--font-label);color:var(--dim)}
+#partyApp .handle b{font:700 14px/1 var(--font-label);color:#fff;flex:1}
+#partyApp .up{display:grid;grid-template-columns:52px 1fr auto auto;gap:14px;align-items:center;padding:12px 16px;border-left:none;border-right:none;border-top:none;border-bottom:1px solid #1a2030;background:none;text-align:left;color:inherit;width:100%;transition:background .12s}
+#partyApp .up:last-child{border-bottom:none}
+#partyApp .up:hover{background:var(--panel2)}
+#partyApp .up .cal{width:52px;flex:none;border-radius:8px;overflow:hidden;text-align:center;border:1px solid var(--b-card)}
+#partyApp .up .cal .m{font:700 8.5px/1 var(--font-label);letter-spacing:.11em;text-transform:uppercase;background:var(--panel2);color:var(--dim);padding:4px 0}
+#partyApp .up .cal .d{font:800 18px/1 var(--font-label);color:#fff;padding:6px 0}
+#partyApp .up .info{min-width:0;display:flex;flex-direction:column;gap:3px}
+#partyApp .up .info b{font:600 13.5px/1.3 var(--font-body);color:#fff}
+#partyApp .up .info small{font-size:11.5px;color:var(--dim)}
+#partyApp .up .when{font:600 12px/1 var(--font-label);color:var(--accent);white-space:nowrap}
+#partyApp .joinBig{display:flex;align-items:center;gap:24px;flex-wrap:wrap;padding:22px 24px;border-radius:12px;border:1px solid rgba(197,240,78,.28);background:linear-gradient(90deg,rgba(197,240,78,.08),rgba(197,240,78,.02))}
+#partyApp .jbText{flex:1 1 260px;min-width:0}
+#partyApp .jbText h3{margin:0 0 5px;font:700 19px/1.15 var(--font-display);color:#fff;letter-spacing:-.3px}
+#partyApp .jbText p{margin:0;font-size:12.5px;color:var(--dim)}
+#partyApp .jbForm{display:flex;align-items:center;gap:9px;flex:0 0 auto}
+#partyApp .jbForm input{width:9.5em;background:#04050a;border:1px solid var(--b-overlay);border-radius:9px;color:#fff;padding:12px 14px;font:700 18px/1 var(--font-label);letter-spacing:.2em;text-indent:.2em;text-align:center;text-transform:uppercase;transition:border-color .2s}
+#partyApp .jbForm input::placeholder{color:#3d434e;font-weight:700}
+#partyApp .jbForm input:focus{outline:none;border-color:var(--accent)}
+#partyApp .jbForm .btn{padding:12px 22px;font-size:14px}
+#partyApp .kinds{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+#partyApp .kind{background:var(--panel);border:1px solid var(--b-card);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:8px}
+#partyApp .kHead{display:flex;align-items:center;gap:9px}
+#partyApp .kHead b{font:700 14px/1 var(--font-body);color:#fff}
+#partyApp .kind p{margin:0;font-size:12.5px;line-height:1.5;color:var(--dim);text-wrap:pretty}
+#partyApp .codeCell{font:800 15px/1 var(--font-label);letter-spacing:.16em;color:var(--accent);white-space:nowrap}
+@media (max-width:760px){
+#partyApp .kinds{grid-template-columns:1fr}
+}
+#partyApp .segs{display:flex;gap:4px;padding:10px 16px;border-bottom:1px solid #1a2030;background:var(--panel2)}
+#partyApp .seg{background:none;border:1px solid transparent;border-radius:7px;padding:6px 11px;font:600 12px/1 var(--font-body);color:var(--dim);display:flex;align-items:center;gap:7px;transition:.15s}
+#partyApp .seg:hover{color:var(--text)}
+#partyApp .seg[aria-selected="true"]{background:var(--panel);border-color:var(--b-overlay);color:#fff}
+#partyApp .seg .b{font:700 9.5px/1 var(--font-label);padding:3px 5px;border-radius:20px;background:rgba(255,255,255,.08);color:var(--dim)}
+#partyApp .seg .b.hot{background:var(--star);color:#2a2100}
+#partyApp .person{display:grid;grid-template-columns:30px 1fr auto;gap:12px;align-items:start;padding:12px 16px;border-bottom:1px solid #1a2030}
+#partyApp .person:last-child{border-bottom:none}
+#partyApp .person:hover{background:var(--panel2)}
+#partyApp .pAv{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font:700 12px/1 var(--font-label);color:var(--ink-on-accent)}
+#partyApp .pWho{min-width:0;display:flex;flex-direction:column;gap:5px}
+#partyApp .pLine{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#partyApp .pLine b{font:600 13.5px/1 var(--font-body);color:#fff}
+#partyApp .pLine small{font-size:11.5px;color:var(--dim)}
+#partyApp .tag{font:700 9.5px/1 var(--font-label);letter-spacing:.09em;text-transform:uppercase;padding:4px 7px;border-radius:4px;border:1px solid var(--b-overlay);color:var(--dim)}
+#partyApp .tag.ban{border-color:rgba(255,82,82,.4);color:#ff8f8f}
+#partyApp .tag.soft{border-color:rgba(255,193,7,.35);color:var(--star)}
+#partyApp .tag.ok{border-color:rgba(0,224,176,.35);color:var(--alive)}
+#partyApp .note{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-radius:7px;background:#04050a;border:1px solid var(--b-chrome);font-size:12px;line-height:1.45;color:var(--dim);text-wrap:pretty}
+#partyApp .note svg{flex:none;margin-top:2px;opacity:.7}
+#partyApp .note b{color:var(--text);font-weight:600}
+#partyApp .pActs{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+#partyApp .warn{display:flex;align-items:flex-start;gap:10px;margin:0 16px 14px;padding:11px 13px;border-radius:9px;background:rgba(255,193,7,.07);border:1px solid rgba(255,193,7,.26)}
+#partyApp .warn svg{flex:none;margin-top:1px}
+#partyApp .warn p{margin:0;font-size:12px;line-height:1.5;color:#d8cfae;text-wrap:pretty}
+#partyApp .warn b{color:#fff}
+#partyApp .scrim{position:fixed;inset:0;z-index:60;background:rgba(4,5,10,.84);backdrop-filter:blur(10px);display:grid;place-items:center;padding:24px}
+#partyApp .sheet{width:min(480px,100%);background:var(--panel);border:1px solid var(--b-overlay);border-radius:16px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.6)}
+#partyApp .sheetTop{padding:24px 26px 20px;display:flex;flex-direction:column;gap:11px;border-bottom:1px solid #1a2030}
+#partyApp .sheetTop .kick{font:700 10px/1 var(--font-label);letter-spacing:.16em;text-transform:uppercase;color:var(--dead)}
+#partyApp .sheetTop h2{margin:0;font:700 23px/1.15 var(--font-display);color:#fff;letter-spacing:-.4px}
+#partyApp .sheetTop p{margin:0;font-size:13px;line-height:1.55;color:var(--dim);text-wrap:pretty}
+#partyApp .reasonBox{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:9px;background:#04050a;border:1px solid var(--b-chrome)}
+#partyApp .reasonBox .rl{font:700 9.5px/1 var(--font-label);letter-spacing:.13em;text-transform:uppercase;color:var(--dim)}
+#partyApp .reasonBox b{font:600 13.5px/1 var(--font-body);color:var(--text)}
+#partyApp .sheetBody{padding:20px 26px 24px;display:flex;flex-direction:column;gap:14px}
+#partyApp .sheetBody label{font:700 10px/1 var(--font-label);letter-spacing:.13em;text-transform:uppercase;color:var(--dim)}
+#partyApp .sheetBody textarea{background:#04050a;border:1px solid var(--b-overlay);border-radius:9px;color:var(--text);padding:11px 13px;font:400 13px/1.5 var(--font-body);resize:vertical;min-height:76px;width:100%}
+#partyApp .sheetBody textarea:focus{outline:none;border-color:var(--accent)}
+#partyApp .cnt{font:600 11px/1 var(--font-label);color:#5c6472;text-align:right}
+#partyApp .sheetActs{display:flex;gap:9px;justify-content:flex-end;flex-wrap:wrap}
+#partyApp .bulkBar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #1a2030;background:rgba(255,193,7,.06)}
+#partyApp .bulkTxt{font-size:12.5px;line-height:1.45;color:#d8cfae;flex:1 1 200px;text-wrap:pretty}
+#partyApp .bulkTxt b{color:#fff;font-weight:700}
+#partyApp .backBtn{display:inline-flex;align-items:center;gap:8px;background:none;border:none;color:var(--dim);font:600 12.5px/1 var(--font-body);padding:0;margin-bottom:20px;transition:color .2s}
+#partyApp .backBtn:hover{color:var(--accent)}
+#partyApp .profTop{display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap;padding-bottom:24px;border-bottom:1px solid var(--b-chrome);margin-bottom:24px}
+#partyApp .profAv{width:88px;height:88px;border-radius:50%;flex:none;display:grid;place-items:center;font:800 34px/1 var(--font-display);color:var(--ink-on-accent)}
+#partyApp .profWho{flex:1 1 280px;min-width:0;display:flex;flex-direction:column;gap:9px}
+#partyApp .profName{display:flex;align-items:baseline;gap:11px;flex-wrap:wrap}
+#partyApp .profName h1{margin:0;font:800 30px/1 var(--font-display);color:#fff;letter-spacing:-.7px}
+#partyApp .profName .at{font:600 14px/1 var(--font-label);color:var(--dim)}
+#partyApp .profFacts{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+#partyApp .fact{font:600 12px/1 var(--font-label);color:var(--dim);display:inline-flex;align-items:center;gap:6px}
+#partyApp .fact b{color:var(--text);font-weight:700}
+#partyApp .profBio{font-size:13.5px;line-height:1.6;color:var(--dim);max-width:62ch;text-wrap:pretty;margin:0}
+#partyApp .profActs{display:flex;gap:9px;flex-wrap:wrap;flex:none}
+#partyApp .btn.following{background:rgba(197,240,78,.12);border-color:rgba(197,240,78,.45);color:var(--accent)}
+#partyApp .liveStrip{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:14px 18px;border-radius:12px;border:1px solid rgba(255,82,82,.3);background:rgba(255,82,82,.06);margin-bottom:24px}
+#partyApp .liveStrip .t{flex:1 1 200px;min-width:0;display:flex;flex-direction:column;gap:3px}
+#partyApp .liveStrip .t b{font:700 14px/1.2 var(--font-body);color:#fff}
+#partyApp .liveStrip .t small{font-size:12px;color:#c9a8a8}
+#partyApp .hostLink{background:none;border:none;padding:0;color:inherit;font:inherit;display:flex;align-items:center;gap:8px;border-radius:6px}
+#partyApp .hostLink:hover .hName{color:var(--accent)}
+#partyApp .hostLink:hover .hAv{box-shadow:0 0 0 2px rgba(197,240,78,.45)}
+#partyApp .pCard{cursor:default}
+#partyApp .joinCta{cursor:pointer;border:none}
+#partyApp .toast{position:fixed;left:50%;bottom:78px;transform:translateX(-50%) translateY(8px);z-index:70;background:var(--panel);border:1px solid var(--b-overlay);color:var(--text);border-radius:10px;padding:11px 18px;font:600 13px/1 var(--font-body);box-shadow:0 12px 34px rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity .18s,transform .18s}
+#partyApp .toast.in{opacity:1;transform:translateX(-50%)}
+@media (max-width:1180px){
+#partyApp .strip{flex-wrap:wrap;row-gap:12px}
+#partyApp .strip .what{flex:1 1 200px}
+#partyApp .strip .acts{flex:1 1 100%;justify-content:flex-start}
+}
+@media (max-width:1080px){
+#partyApp .pLive{display:none}
+#partyApp .cols{grid-template-columns:1fr}
+}
+@media (max-width:900px){
+#partyApp .pBar{flex-wrap:wrap;height:auto;padding:14px 20px;row-gap:12px}
+#partyApp .pBar .grow{flex-basis:100%;min-width:100%;order:1}
+#partyApp .codeEntry, #partyApp .pBar .btn.primary{order:2}
+#partyApp .pBody, #partyApp .tabs, #partyApp .strip, #partyApp .filterBar{padding-left:20px;padding-right:20px}
+#partyApp .sortWrap{margin-left:0}
+}
+
+/* ---------------------------------------------------------------------------
+ * Integration
+ * ---------------------------------------------------------------------------
+ *
+ * The design owns a whole viewport: .app is a flex row at 100vh, .party is the
+ * column inside it, and .pBody is the only thing that scrolls. This app already
+ * has that column -- #mainContent -- and its own scroller in #scrollableArea.
+ *
+ * So the design's inner scroller is handed back to the app's, and the three
+ * chrome bars become sticky instead of flex:none. They sit at the top of the
+ * surface either way; the difference is which element scrolls under them. This
+ * is also what makes the surface work on a phone, where a nested scroller
+ * inside a scroller is a trap.
+ */
+
+#partyView { padding: 0; }
+#partyApp { min-height: 100%; }
+/* Cancel #scrollableArea's 24px/32px gutter: the design has its own 28px ones,
+   and doubling them is what makes a ported layout look subtly wrong. Written
+   as a descendant of the scroller that actually has the padding, so the rule
+   cannot pull the surface off the left edge anywhere else it is mounted. */
+#scrollableArea #partyApp { margin: -24px -32px -48px; }
+#partyApp .pBody { overflow: visible; flex: none; }
+#partyApp .pBar, #partyApp .tabs, #partyApp .filterBar, #partyApp .strip {
+  position: sticky;
+}
+#partyApp .pBar     { top: 0; }
+#partyApp .strip    { top: 68px; }
+#partyApp .tabs     { top: 68px; }
+#partyApp .filterBar{ top: 113px; }
+/* With the strip showing, the two below it move down by its height. */
+#partyApp.hasStrip .tabs      { top: 130px; }
+#partyApp.hasStrip .filterBar { top: 175px; }
+
+@media (max-width: 900px) {
+  /* The bars stop being sticky where there is not enough height for them to be
+     worth the room they take. */
+  #partyApp .pBar, #partyApp .tabs, #partyApp .filterBar, #partyApp .strip {
+    position: relative; top: auto;
+  }
+  #scrollableArea #partyApp { margin: -24px -16px -48px; }
+
+  /* NOT IN THE DESIGN, AND IT HAS TO BE. The four tabs need 515px and a phone
+     column is 375, so with the design's overflow:visible the Host tab is not
+     merely cut off -- it cannot be reached at all. The handoff was drawn at
+     desktop widths and this is the one place that shows. Scrolling the row
+     keeps every tab reachable without changing any of them. */
+  #partyApp .tabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  #partyApp .tabs::-webkit-scrollbar { display: none; }
+  #partyApp .tab { flex: none; }
+}

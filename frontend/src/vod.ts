@@ -515,6 +515,20 @@ export async function startWatchParty(item: VodItem, startIdx = 0): Promise<bool
       title: item.title,
       seatLimit: setup.seatLimit,
       requireApproval: setup.requireApproval,
+      // THE CATALOGUE SNAPSHOT the directory filters on. Taken here because
+      // this is the only side of the wire the catalogue exists on: it is
+      // resolved per viewer and never reaches the server, so genre and rating
+      // cannot be joined to at query time.
+      //
+      // Decade and language are deliberately absent. Nothing in VodItem
+      // carries a release year or an audio language, so there is nothing
+      // honest to write -- and public_party_facets() builds its dropdowns from
+      // the values that are actually present, so those two filters stay hidden
+      // until the catalogue carries the fields rather than shipping as
+      // controls that can only ever return nothing.
+      genre: item.genre ?? null,
+      rating: item.rating ?? null,
+      runtimeMins: item.duration ? Math.round(item.duration / 60) : null,
     });
 
     // Connect FIRST so the green room can show people arriving, but do not
@@ -531,6 +545,13 @@ export async function startWatchParty(item: VodItem, startIdx = 0): Promise<bool
     (await import("./party-reactions")).mountReactions();
     return true;
   } catch (e: any) {
+    // One party at a time, refused by a unique index in the database rather
+    // than by everyone remembering. The only thing this can honestly offer is
+    // a way back to the room that is already running.
+    if (e?.message === "ALREADY_HOSTING") {
+      showToast("You are already hosting. End that party before starting another.");
+      return false;
+    }
     showToast(e?.message || "Couldn't start the party");
     return false;
   }
