@@ -849,6 +849,46 @@ export async function spendPartyCredits(minutes: number, partyId?: string): Prom
   return !!(data as any)?.ok;
 }
 
+export interface CreditEntry {
+  id: number;
+  delta: number;
+  reason: "monthly_grant" | "purchase" | "spend" | "admin";
+  party_id: string | null;
+  note: string | null;
+  created_at: string;
+  /** Title of the party this was spent on, when there was one. */
+  party_title: string | null;
+}
+
+/** Every grant, purchase and spend, newest first.
+ *
+ *  The ledger has been written to since the day credits existed and read by
+ *  nothing, so "where did my hours go" had no answer -- only a balance, which
+ *  is the one number that cannot explain itself.
+ *
+ *  Read directly rather than through a definer function: the row-level policy
+ *  already restricts this to the caller's own entries, and the party title
+ *  comes through the foreign key, whose rows are the caller's own parties. A
+ *  function here would add a layer that enforces nothing the policies do not.
+ */
+export async function partyCreditLedger(limit = 25): Promise<CreditEntry[]> {
+  const { data, error } = await getSupabase()
+    .from("party_credit_ledger")
+    .select("id, delta, reason, party_id, note, created_at, parties(title)")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) { console.warn("[credits] ledger", error); return []; }
+  return (data ?? []).map((r: any) => ({
+    id: r.id, delta: r.delta, reason: r.reason, party_id: r.party_id,
+    note: r.note, created_at: r.created_at,
+    // PostgREST returns an embedded many-to-one as an object, but returns an
+    // array when it cannot settle the cardinality. Both shapes are accepted
+    // rather than assumed, because getting it wrong shows every spend as
+    // "A party" and looks like missing data instead of a wrong access.
+    party_title: (Array.isArray(r.parties) ? r.parties[0]?.title : r.parties?.title) ?? null,
+  }));
+}
+
 /** Redirect to one-time Checkout for a top-up. */
 export async function buyPartyCredits(): Promise<void> {
   const { url } = await authedPost("/api/billing/credits");

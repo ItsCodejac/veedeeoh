@@ -18,7 +18,7 @@ import {
   type PartyFilters, type PublicParty, type PrivateParty, type ComingUp,
   type BlockedPerson, type PublicProfile,
 } from "./party";
-import { partyCreditSummary } from "./db";
+import { partyCreditSummary, partyCreditLedger, type CreditEntry } from "./db";
 import { getSupabase } from "./auth";
 import "./party-app.css";
 
@@ -711,8 +711,8 @@ let credits: Awaited<ReturnType<typeof partyCreditSummary>> = null;
 let picks: Array<{ content_id: string; title: string | null; poster: string | null }> = [];
 
 async function paintHostSide(): Promise<void> {
-  const [sugg, cr, pk] = await Promise.all([
-    mySuggestions(), partyCreditSummary(), myPicks(),
+  const [sugg, cr, pk, entries] = await Promise.all([
+    mySuggestions(), partyCreditSummary(), myPicks(), partyCreditLedger(25),
   ]);
   if (!root) return;
   credits = cr; picks = pk;
@@ -739,18 +739,7 @@ async function paintHostSide(): Promise<void> {
       '<button class="add" data-addpick aria-label="Add a recommendation">+</button>';
   }
 
-  // The itemised ledger has no reader yet -- party_credit_ledger records every
-  // grant, purchase and spend and nothing displays it. Saying so is better than
-  // an empty box that looks broken, and much better than inventing rows.
-  const ledger = $("#ledger");
-  if (ledger) {
-    ledger.innerHTML = credits
-      ? `<div class="ldg"><div class="w">Balance<small>${credits.exempt ? "Not metered on your plan" : "Refills monthly"}</small></div><div class="d plus">${hoursMins(credits.balance)}</div></div>
-         <div class="ldg"><div class="w">Used this cycle<small>Across every party you ran</small></div><div class="d">${hoursMins(credits.spent)}</div></div>
-         <div class="ldg"><div class="w">Granted this cycle<small>Allowance and top-ups</small></div><div class="d plus">${hoursMins(credits.accrued)}</div></div>
-         <div class="blockNote" style="border-bottom:none">The party-by-party breakdown is recorded but has no reader yet.</div>`
-      : noneRow("No credit record yet. It appears the first time you host.");
-  }
+  paintLedger(entries);
 
   paintSlot();
   paintMyProfile();
@@ -761,6 +750,54 @@ const hoursMins = (mins: number) => {
   const m = Math.max(0, Math.round(mins));
   return m >= 60 ? `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}` : `${m}m`;
 };
+
+/** Where the hours went.
+ *
+ *  The ledger has been written to since credits existed and read by nothing,
+ *  so the only answer to "where did my hours go" was a balance -- the one
+ *  number that cannot explain itself. Every row here is a real entry; there is
+ *  no synthesised "used this cycle" line, because a summary that does not
+ *  reconcile with the rows under it is worse than no summary.
+ */
+function paintLedger(entries: CreditEntry[]): void {
+  const box = $("#ledger");
+  if (!box) return;
+
+  if (!credits && !entries.length) {
+    box.innerHTML = noneRow("No credit record yet. It appears the first time you host.");
+    return;
+  }
+
+  const head = credits
+    ? `<div class="ldg"><div class="w">Balance<small>${credits.exempt ? "Not metered on your plan" : "Refills monthly"}</small></div><div class="d plus">${hoursMins(credits.balance)}</div></div>`
+    : "";
+
+  if (!entries.length) {
+    box.innerHTML = head +
+      noneRow("Nothing has moved yet. Grants, top-ups and each party you host appear here.");
+    return;
+  }
+
+  box.innerHTML = head + entries.map((e) => {
+    const plus = e.delta > 0;
+    // A spend names the party it paid for; that is the whole point of the
+    // party_id column, which nothing has read until now.
+    const what = e.reason === "spend"
+      ? (e.party_title || "A party")
+      : e.reason === "monthly_grant" ? "Monthly allowance"
+      : e.reason === "purchase" ? "Topped up"
+      : (e.note || "Adjustment");
+    const sub = e.reason === "spend" ? `Hosted ${relDay(e.created_at)}` : relDay(e.created_at);
+    const amount = `${plus ? "+" : "\u2212"}${hoursMins(Math.abs(e.delta))}`;
+    return `<div class="ldg">
+      <div class="w">${esc(what)}<small>${esc(sub)}</small></div>
+      <div class="d${plus ? " plus" : ""}">${amount}</div>
+    </div>`;
+  }).join("") +
+  (entries.length >= 25
+    ? `<div class="blockNote" style="border-bottom:none">Showing the last 25 entries.</div>`
+    : "");
+}
 
 function paintSlot(): void {
   const box = $("#sched");
