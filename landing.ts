@@ -3,7 +3,7 @@ import { getSession, restoreSession, signIn, signUp } from './frontend/src/auth'
 async function checkAuth() {
   const session = await restoreSession();
   if (session) {
-    window.location.href = '/index.html';
+    window.location.href = '/home';
   }
 }
 
@@ -212,7 +212,7 @@ if (authForm) {
         authMessage.style.color = '#c5f04e';
         authMessage.textContent = '✅ Account created! Redirecting to setup...';
         setTimeout(() => {
-          window.location.href = '/index.html';
+          window.location.href = '/home';
         }, 500);
       } else {
         const { mustChangePassword } = await signIn(email, password);
@@ -226,7 +226,7 @@ if (authForm) {
         } else {
           authMessage.textContent = 'Access granted! Redirecting to streaming app...';
           setTimeout(() => {
-            window.location.href = '/index.html';
+            window.location.href = '/home';
           }, 400);
         }
       }

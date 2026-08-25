@@ -2,7 +2,7 @@
   "name": "veedeeoh.",
   "short_name": "veedeeoh.",
   "description": "veedeeoh. is a streaming app that brings thousands of free movies and TV shows into one clean, ad-free experience for your whole household.",
-  "start_url": "/index.html",
+  "start_url": "/home",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#07080b",

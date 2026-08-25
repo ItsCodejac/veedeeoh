@@ -5395,3 +5395,65 @@ body.no-element-fullscreen .vds-fullscreen-button { display: none !important; }
    this replaces. */
 #partyJoining .pjIdent { position: absolute; inset: 0; z-index: 2; }
 #partyJoining .pjInner { position: relative; z-index: 1; }
+
+/* ---- Not found -----------------------------------------------------------
+ *
+ * Lives inside the app shell rather than on its own page, so the sidebar stays
+ * and the way out is the navigation the person already knows. A standalone
+ * error page has to rebuild all of that or offer a single "go home" link, and
+ * the second option is why dead links feel like a wall.
+ */
+.nfWrap {
+  max-width: 460px;
+  margin: 14vh auto 0;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.nfGlyph {
+  width: 62px; height: 62px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  color: var(--accent);
+  background: var(--vd-accent-glow);
+  border: 1px solid var(--vd-border-inner);
+}
+.nfWrap h1 {
+  margin: 0;
+  font: 700 26px/1.15 var(--brand);
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+.nfWrap p { margin: 0; font-size: 14.5px; line-height: 1.55; color: var(--dim); }
+#nfPath {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 12px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.nfHint { font-size: 13px; }
+.nfActs { display: flex; flex-wrap: wrap; gap: 9px; justify-content: center; margin-top: 8px; }
+.nfBtn {
+  border-radius: 8px;
+  padding: 9px 16px;
+  font: 600 13px/1 var(--display);
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--dim);
+  cursor: pointer;
+  transition: color .2s, border-color .2s, background .2s;
+}
+.nfBtn:hover { color: var(--text); border-color: #39424f; }
+.nfBtn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.nfBtn.primary:hover { background: #d3f76a; border-color: #d3f76a; }

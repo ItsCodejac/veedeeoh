@@ -196,6 +196,32 @@
         <div id="partyPanel"></div>
       </div>
 
+      <!-- Not found. IN THE APP, not a separate page: now that any unmatched
+           path serves the app shell so /movies and /@handle survive a reload,
+           a dead link arrives here rather than at 404.html. Keeping it inside
+           the shell means the sidebar is still there, so the way out is the
+           navigation the person already knows -- which a standalone error page
+           cannot offer. -->
+      <div id="notFoundView" class="viewPanel" hidden>
+        <div class="nfWrap">
+          <div class="nfGlyph" aria-hidden="true">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </div>
+          <h1>We cannot find that page</h1>
+          <p id="nfPath"></p>
+          <p class="nfHint">The link may be old, or mistyped. Everything is still where it was.</p>
+          <div class="nfActs">
+            <button class="nfBtn primary" data-nf="tabHome">Go home</button>
+            <button class="nfBtn" data-nf="tabMovies">Movies</button>
+            <button class="nfBtn" data-nf="tabShows">Shows</button>
+            <button class="nfBtn" data-nf="tabParty">veedeeoh.party</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Panel 7: veedeeoh.kids (parent shortcut to a kid-safe browse) -->
       <div id="kidsView" class="viewPanel" hidden>
         <div id="kidsRails"></div>

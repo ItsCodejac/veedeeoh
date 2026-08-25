@@ -226,7 +226,7 @@ async function renderPublicProfile(root: HTMLElement): Promise<void> {
          ${cur.handle ? "" : "hidden"}>View page</a>
     </div>
     <p class="setHint" id="ppLink">${cur.handle
-      ? `People can find you at <strong>veedeeoh.com/app#host/${escapeHtml(cur.handle)}</strong>`
+      ? `People can find you at <strong>veedeeoh.com/@${escapeHtml(cur.handle)}</strong>`
       : ""}</p>`,
     "Claim a handle and people can follow you, so your public parties reach them. Leave the handle blank to take the page down. Lowercase letters, numbers and underscores.");
   root.appendChild(box);
@@ -268,7 +268,7 @@ async function renderPublicProfile(root: HTMLElement): Promise<void> {
       if (view) { view.href = `#host/${encodeURIComponent(handle)}`; view.toggleAttribute("hidden", !handle); }
       if (hint) {
         hint.innerHTML = handle
-          ? `People can find you at <strong>veedeeoh.com/app#host/${escapeHtml(handle)}</strong>` : "";
+          ? `People can find you at <strong>veedeeoh.com/@${escapeHtml(handle)}</strong>` : "";
       }
     } finally { b.disabled = false; }
   });

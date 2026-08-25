@@ -199,7 +199,11 @@ export function recentParty(): LastParty | null {
 }
 
 export function partyLink(joinCode: string): string {
-  return `${location.origin}/index.html?party=${joinCode}`;
+  // Read aloud, retyped and pasted into group chats, so it is a path and not a
+  // query string hanging off a filename. `/join/ABC234` also survives being
+  // linkified by a chat client, which `/index.html?party=ABC234` frequently
+  // did not -- the trailing code got cut at the ? by more than one of them.
+  return `${location.origin}/join/${joinCode}`;
 }
 
 // ---------------------------------------------------------------- hosting ---

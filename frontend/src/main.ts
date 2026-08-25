@@ -187,18 +187,78 @@ function paintProfileAvatar(el: HTMLElement | null, p: { name: string; avatar_co
 
 // ---------------------------------------------------------------- routing ---
 //
-// The location hash is the single source of truth for which view is open.
-// localStorage would restore a reload just as well, but only the URL also gives
+// The path is the single source of truth for which view is open. localStorage
+// would restore a reload just as well, but only the URL also gives
 // Back/Forward and a link someone can send -- and reload-restore without a
 // working Back button is the more annoying half of the problem.
 //
-// Hash, not path: the app is a static SPA behind Vercel's filesystem handler,
-// and a real path would 404 on a hard load before any JS ran.
+// PATHS, NOT A HASH. This used to read `/index.html#party`, because a real path
+// would 404 on a hard load behind Vercel's filesystem handler. That was true
+// and it is now fixed in vercel.json, which serves the app shell for anything
+// the filesystem does not claim -- so `/party` and `/movies` survive a reload,
+// a bookmark and a paste into a chat window.
+//
+// The hash was never only cosmetic. It is not sent to the server, so it cannot
+// be redirected or rewritten; search engines do not index it; and every link
+// anyone shared carried `/index.html` in front of it. Streaming apps put the
+// section in the path -- /browse, /movies -- and so does this now.
+//
+// EVERY OLD LINK STILL WORKS. `#party`, `#host/<handle>`, `/index.html` and
+// `/app` are all rewritten to their clean equivalent on arrival, once, with
+// replaceState so Back does not bounce between the two spellings.
 
 const ROUTES: Record<string, string> = {
   home: "tabHome", shows: "tabShows", movies: "tabMovies",
   favorites: "tabFavs", party: "tabParty", kids: "tabKids",
 };
+
+/** What the address bar shows for each route. `favorites` is the internal name
+ *  and `list` is the one people read, which is the whole point of the change. */
+const PATH_ALIAS: Record<string, string> = { favorites: "list" };
+const ALIAS_BACK: Record<string, string> = { list: "favorites" };
+
+/** The paths this app owns. Anything else on the origin is a real file or a
+ *  static page, and the filesystem handler gets there first. */
+function pathFor(route: string): string {
+  if (!route || route === "home") return "/home";
+  // A person is `/@handle` and nothing else. `u/` and `host/` both arrive here
+  // from links that predate the rename, and both leave as the one spelling --
+  // otherwise the same profile has three addresses and none of them is the
+  // one printed on the settings page.
+  const person = route.match(/^(?:u|host)\/(.+)$/);
+  if (person) return "/@" + person[1];
+  const [head, ...rest] = route.split("/");
+  const mapped = PATH_ALIAS[head!] ?? head!;
+  return "/" + [mapped, ...rest].join("/");
+}
+
+/** The inverse: read the current address and say which route it means.
+ *
+ *  A profile permalink is `/@handle`, which is the shape people already expect
+ *  from every other place handles appear. `/u/` and the old `#host/` spelling
+ *  are still accepted because links outlive renames. */
+function routeFromPath(): string {
+  const raw = decodeURIComponent(location.pathname).replace(/^\/+|\/+$/g, "");
+  if (!raw || raw === "index.html" || raw === "app") return "home";
+  if (raw.startsWith("@")) return "u/" + raw.slice(1);
+  const [head, ...rest] = raw.split("/");
+  const mapped = ALIAS_BACK[head!] ?? head!;
+  return [mapped, ...rest].join("/");
+}
+
+/** Fold an old-style address into the new one, once, before anything routes.
+ *
+ *  Runs before the first applyRoute so the app never renders one spelling and
+ *  then jumps to the other. replaceState rather than push: the address someone
+ *  arrived with should not become a Back destination that sends them straight
+ *  out again. */
+export function normaliseUrl(): void {
+  const hash = decodeURIComponent(location.hash.replace(/^#/, ""));
+  const stale = /^\/(index\.html|app)\/?$/.test(location.pathname);
+  if (!hash && !stale) return;
+  const target = pathFor(hash || "home") + location.search;
+  history.replaceState({}, "", target);
+}
 
 /** Set by wireSidebar so the router can drive the same code a click does. */
 let switchViewRef: ((tabId: string) => void) | null = null;
@@ -227,7 +287,7 @@ function routeAllowed(tabId: string): boolean {
  *  tabs (search, settings) need this because switchView only knows about tabs. */
 function showOnly(panelId: string): void {
   for (const id of ["homeView", "showsView", "moviesView", "kidsView", "partyView",
-                    "categoryView", "searchView", "settingsView"]) {
+                    "categoryView", "searchView", "settingsView", "notFoundView"]) {
     document.getElementById(id)?.setAttribute("hidden", "");
   }
   document.getElementById(panelId)?.removeAttribute("hidden");
@@ -237,7 +297,7 @@ function showOnly(panelId: string): void {
 /** Apply the current hash. Falls back to Home whenever the route is unknown or
  *  not permitted, rather than leaving the app in a half-navigated state. */
 export async function applyRoute(): Promise<void> {
-  const raw = decodeURIComponent(location.hash.replace(/^#/, ""));
+  const raw = routeFromPath();
   if (!raw || raw === "home") { switchViewRef?.("tabHome"); return; }
 
   if (raw === "settings" || raw.startsWith("settings/")) {
@@ -287,7 +347,26 @@ export async function applyRoute(): Promise<void> {
   }
 
   const tabId = ROUTES[raw];
-  switchViewRef?.(tabId && routeAllowed(tabId) ? tabId : "tabHome");
+  if (!tabId) { showNotFound(raw); return; }
+  // A KNOWN ROUTE THIS PROFILE MAY NOT REACH IS NOT A DEAD LINK. A kids
+  // profile opening /party should land on Home, not be told the page does not
+  // exist -- it does exist, it is just not theirs. Only an unrecognised route
+  // gets the not-found screen.
+  switchViewRef?.(routeAllowed(tabId) ? tabId : "tabHome");
+}
+
+/** The dead-link screen, inside the shell so the sidebar is still the way out. */
+function showNotFound(route: string): void {
+  const panel = document.getElementById("notFoundView");
+  if (!panel) { switchViewRef?.("tabHome"); return; }
+  showOnly("notFoundView");
+  const where = document.getElementById("nfPath");
+  // The address is shown as TEXT, never as markup: it came from the address
+  // bar, which anyone can write anything into.
+  if (where) where.textContent = "/" + route;
+  panel.querySelectorAll<HTMLElement>("[data-nf]").forEach((b) => {
+    b.onclick = () => switchViewRef?.(b.dataset.nf!);
+  });
 }
 
 // Land on Home: hide other panels, reveal home, mark the Home tab active.
@@ -326,10 +405,10 @@ async function enterAsProfile(
     // routeAllowed still applies either way, so an incoming route a kids
     // profile may not reach falls back to Home on its own merits rather than
     // because the hash was deleted first.
-    if (!atBoot && location.hash) {
-      history.replaceState({}, "", location.pathname + location.search);
+    if (!atBoot && routeFromPath() !== "home") {
+      history.replaceState({}, "", "/home" + location.search);
     }
-    if (atBoot && location.hash && location.hash !== "#home") {
+    if (atBoot && routeFromPath() !== "home") {
       applyingRoute = true;
       await applyRoute().finally(() => { applyingRoute = false; });
     } else {
@@ -404,6 +483,11 @@ async function mountTrialNotice(): Promise<void> {
 }
 
 async function boot(): Promise<void> {
+  // BEFORE ANYTHING ELSE READS THE URL. An arriving `#party` or `/index.html`
+  // is folded into its clean equivalent here, so every later reader sees one
+  // spelling and the app never renders one address then jumps to another.
+  normaliseUrl();
+
   if (isCloudMode()) {
     const session = await restoreSession();
     if (!session) {
@@ -502,8 +586,9 @@ async function boot(): Promise<void> {
     // first, Home renders, and joining happens behind it -- so a link that is
     // slow, or that fails, leaves someone looking at the catalogue with no
     // sign they were ever invited anywhere.
-    const joining = !!new URLSearchParams(location.search).get("party");
-    const restoring = joining || (!!location.hash && location.hash !== "#home");
+    const joining = !!new URLSearchParams(location.search).get("party")
+      || /^join\//.test(routeFromPath());
+    const restoring = joining || routeFromPath() !== "home";
     if (!restoring) renderHome();
     // Applied only now that the profile's chrome is on, so routeAllowed can see
     // which tabs this profile actually has.
@@ -542,20 +627,23 @@ async function boot(): Promise<void> {
     if (ref) {
       const { rememberReferral } = await import("./db");
       rememberReferral(ref);
-      history.replaceState({}, "", location.pathname + location.hash);
+      history.replaceState({}, "", location.pathname);
     }
     void import("./db").then((db) => db.redeemPendingReferral());
   }
 
   // A party link lands here: ?party=CODE. Handled after the profile is resolved,
   // so the joining profile's rating limits are known before anything plays.
-  const partyCode = new URLSearchParams(location.search).get("party");
+  // Both spellings: the readable `/join/ABC234` that partyLink now produces,
+  // and `?party=ABC234`, which is on every invite anyone has already sent.
+  const joinPath = routeFromPath().match(/^join\/([A-Za-z0-9]{4,8})$/);
+  const partyCode = joinPath?.[1] || new URLSearchParams(location.search).get("party");
   if (partyCode) {
     const { joinParty } = await import("./party");
     // The code is stripped from the URL only AFTER the attempt starts, so a
     // reload during a slow join still carries the invite.
     void joinParty(partyCode.toUpperCase()).finally(() => {
-      history.replaceState({}, "", location.pathname + "#party");
+      history.replaceState({}, "", "/party");
     });
   }
 
@@ -654,8 +742,8 @@ function wireSidebar(): void {
     // land here again. replaceState when the route is unchanged, so repeatedly
     // clicking the same tab does not stack identical history entries.
     if (!applyingRoute) {
-      const next = `#${routeForTab(activeTabId)}`;
-      if (location.hash !== next) history.pushState({}, "", next);
+      const next = pathFor(routeForTab(activeTabId));
+      if (location.pathname !== next) history.pushState({}, "", next + location.search);
     }
 
 
@@ -779,7 +867,7 @@ function wireSidebar(): void {
   // once they are there, or restoring a reload into a custom section silently
   // falls back to Home.
   void mountSections().then(() => {
-    if (!location.hash.startsWith("#section/")) return;
+    if (!routeFromPath().startsWith("section/")) return;
     applyingRoute = true;
     void applyRoute().finally(() => { applyingRoute = false; });
   });
