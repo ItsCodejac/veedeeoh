@@ -45,9 +45,34 @@ const FIRST_MS = 20_000;
 let timer: number | null = null;
 let firstTimer: number | null = null;
 let partyId: string | null = null;
-/** Set when the canvas turns out to be tainted. One attempt is enough to know;
- *  retrying every ninety seconds would just be noise in the console. */
+/** Set when the canvas turns out to be tainted, or when the database has no
+ *  column to write to. One attempt is enough to know either; retrying every
+ *  ninety seconds would just be noise in the console. */
 let refused = false;
+
+/** Whether public.parties actually has the frame columns. Null until asked.
+ *
+ *  NOT A DEPLOYMENT WORKAROUND -- a permanent condition. A self-hosted instance
+ *  runs whatever schema its owner last applied, and there is no version of this
+ *  project in which every database is guaranteed to be current. Code that
+ *  assumes otherwise fails by writing to a column that is not there, which
+ *  costs a request and a console error every ninety seconds and gives the
+ *  person running it nothing to act on.
+ *
+ *  Asked once per session, with a request that returns no rows. */
+let hasColumns: boolean | null = null;
+
+async function schemaSupportsFrames(): Promise<boolean> {
+  if (hasColumns !== null) return hasColumns;
+  const { error } = await getSupabase().from("parties").select("frame").limit(0);
+  // PGRST204 / 42703 both mean the column is not there. Anything else is a
+  // transient problem and should not permanently disable the feature.
+  hasColumns = !error;
+  if (error) {
+    console.info("[frames] this database has no frame column; captures are off");
+  }
+  return hasColumns;
+}
 
 /** The element Vidstack is painting into. Looked up each time rather than held:
  *  the player is destroyed and rebuilt when the host changes what is playing,
@@ -83,6 +108,7 @@ function grab(): string | null {
 
 async function capture(): Promise<void> {
   if (!partyId || refused) return;
+  if (!(await schemaSupportsFrames())) { refused = true; return; }
   const frame = grab();
   if (!frame) return;
   // The cap is enforced by a CHECK constraint. Failing the write because a
@@ -123,7 +149,7 @@ export function stopFrameCapture(clearNow = false): void {
   if (timer !== null) { clearInterval(timer); timer = null; }
   const id = partyId;
   partyId = null;
-  if (clearNow && id) {
+  if (clearNow && id && hasColumns) {
     void getSupabase().from("parties")
       .update({ frame: null, frame_at: null }).eq("id", id);
   }
