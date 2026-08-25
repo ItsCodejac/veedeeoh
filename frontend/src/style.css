@@ -3557,14 +3557,19 @@ body.kids-mode aside .navBtn svg { width: 24px; height: 24px; }
 
 /* Branded loading states (native rebuild of the "Brand Loaders" spec):
    pure CSS/SVG, no media payload, inherits --brand-accent. */
-:root { --brand-accent: #c5f04e; }
-body.kids-mode { --brand-accent: #ff9f1c; }
+:root { --brand-accent: #c5f04e; --brand-glow: 197, 240, 78; }
+/* Both halves, always together. --brand-accent alone was flipped for kids and
+   the glow beside it stayed hardcoded green, so the kids splash pulsed an
+   orange dot inside a green halo. The rgb triple exists because a box-shadow
+   needs an alpha and a hex token cannot supply one. */
+body.kids-mode { --brand-accent: #ff9f1c; --brand-glow: 255, 159, 28; }
+body.zzz-mode  { --brand-accent: #7cc7ff; --brand-glow: 124, 199, 255; }
 
 @keyframes vdShimmer { 0% { background-position: 130% 0; } 100% { background-position: -130% 0; } }
 @keyframes vdSweep { 0% { transform: translateX(-140%); } 100% { transform: translateX(240%); } }
 @keyframes vdPulse {
-  0%, 100% { transform: scale(1); box-shadow: 0 0 10px var(--brand-accent), 0 0 34px rgba(197,240,78,0.4); }
-  50% { transform: scale(1.4); box-shadow: 0 0 16px var(--brand-accent), 0 0 60px rgba(197,240,78,0.65); }
+  0%, 100% { transform: scale(1); box-shadow: 0 0 10px var(--brand-accent), 0 0 34px rgba(var(--brand-glow), 0.4); }
+  50% { transform: scale(1.4); box-shadow: 0 0 16px var(--brand-accent), 0 0 60px rgba(var(--brand-glow), 0.65); }
 }
 @keyframes vdTrack { 0% { transform: translateX(-100%); } 50% { transform: translateX(0%); } 100% { transform: translateX(100%); } }
 @keyframes vdBounce { 0%, 100% { transform: translateY(0) scale(1.14, 0.86); } 45% { transform: translateY(-22px) scale(0.92, 1.08); } }

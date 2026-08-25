@@ -300,18 +300,41 @@ function goHome(): void {
 
 // The full profile-entry cycle used at boot AND on every later switch: apply the
 // profile's chrome, play the branded bump, then reveal a freshly rendered Home.
-async function enterAsProfile(profile: { name?: string; avatar_color?: string; is_kids?: boolean }, dataReady?: Promise<unknown>): Promise<void> {
+/** @param atBoot true when this selection is the first of the session, i.e. the
+ *  switcher appeared because nobody was signed into a profile yet. */
+async function enterAsProfile(
+  profile: { name?: string; avatar_color?: string; is_kids?: boolean },
+  dataReady?: Promise<unknown>,
+  atBoot = false,
+): Promise<void> {
   applyProfileChrome(profile);
   const vod = await import("./vod");
   // Warm the VOD catalog WHILE the branded bump plays, so Home is already built
   // by the time the bump ends — no plain "loading" screen between them.
   const railsReady = vod.getVodRails().catch(() => {});
   playIdent(!!profile.is_kids, async () => {
-    // A deliberate profile selection always starts at Home. Any hash still in
-    // the bar belongs to the PREVIOUS profile, and honouring it could drop a
-    // kids profile onto a panel that profile is not supposed to reach.
-    if (location.hash) history.replaceState({}, "", location.pathname + location.search);
-    goHome();
+    // SWITCHING profiles starts at Home: the hash in the bar belongs to the
+    // profile being left, and honouring it could drop a kids profile onto a
+    // panel it is not supposed to reach.
+    //
+    // ARRIVING does not. At boot the switcher appears because nobody was
+    // signed into a profile yet, and the hash came from the address the person
+    // just opened -- so treating it as leftover threw away every deep link on
+    // a cold load. veedeeoh.com/#kids, a bookmark, anything shared: all of
+    // them landed on Home once a profile was picked.
+    //
+    // routeAllowed still applies either way, so an incoming route a kids
+    // profile may not reach falls back to Home on its own merits rather than
+    // because the hash was deleted first.
+    if (!atBoot && location.hash) {
+      history.replaceState({}, "", location.pathname + location.search);
+    }
+    if (atBoot && location.hash && location.hash !== "#home") {
+      applyingRoute = true;
+      await applyRoute().finally(() => { applyingRoute = false; });
+    } else {
+      goHome();
+    }
     if (dataReady) await dataReady;
     await railsReady;
     void vod.renderHome();
@@ -497,7 +520,7 @@ async function boot(): Promise<void> {
   } else {
     // Boot, with no active profile: picking one IS the screen, so there is
     // nothing behind it to go back to and no close control to offer.
-    prof.openProfileSwitcher((sel) => { void enterAsProfile(sel, dataReady); }, { dismissible: false });
+    prof.openProfileSwitcher((sel) => { void enterAsProfile(sel, dataReady, true); }, { dismissible: false });
     hideBootSplash();
   }
 
