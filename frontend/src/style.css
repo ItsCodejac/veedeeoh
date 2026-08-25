@@ -1,16 +1,39 @@
+@import "./tokens.css";
+
+/* Every legacy name still works; they point at the tokens so there is one
+   source of truth. Rules across 5,000 lines read --bg and --panel, and
+   renaming them all would be a large diff to change nothing.
+   
+   THIS IS A VISUAL CHANGE, deliberately. Ground moves #07080b -> #06070a and
+   panel #0d1017 -> #10141e; both already appeared in this file and v2 picks
+   one of each. Body type moves Instrument Sans -> Space Grotesk, which is a
+   migration rather than a correction. party-app.html is the reference build
+   for all of it: where the app and that file disagree, the app is wrong. */
 :root {
-  --bg: #07080b;
-  --panel: #0d1017;
-  --panel2: #121620;
-  --text: #e9ecf2;
-  --dim: #8a93a3;
-  --accent: #c5f04e;
-  --star: #ffc107;
-  --dead: #ff5252;
-  --alive: #00e0b0;
-  --display: "Space Grotesk", sans-serif;
-  --mono: "Instrument Sans", sans-serif;
-  --brand: "Bricolage Grotesque", sans-serif;
+  --bg:     var(--vd-ground);
+  --panel:  var(--vd-panel);
+  --panel2: var(--vd-panel-2);
+  --text:   var(--vd-text);
+  --dim:    var(--vd-dim);
+  --accent: var(--vd-accent);
+  --star:   var(--vd-saved);
+  --dead:   var(--vd-offline);
+  --alive:  var(--vd-live);
+
+  /* DECLARED AT LAST. These five were referenced and never defined, so every
+     rule using them did nothing: --border alone appears 13 times and --fg
+     four. The Shows and Movies search inputs had no border and no card fill,
+     the rail headings no colour, and the carousel watch button no text colour
+     at all. Fixing them changes those places on purpose. */
+  --fg:          var(--vd-text);
+  --border:      var(--vd-border-chrome);
+  --bg-card:     var(--vd-panel);
+  --accent-glow: var(--vd-accent-glow);
+  --accent-ink:  var(--vd-ink-on-lime);
+
+  --display: var(--vd-font-body);
+  --mono:    var(--vd-font-body);
+  --brand:   var(--vd-font-display);
 }
 
 * { box-sizing: border-box; }
@@ -50,7 +73,7 @@ body {
 aside {
   width: 220px;
   background: #090a0f;
-  border-right: 1px solid #141822;
+  border-right: 1px solid var(--vd-border-inner);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -172,7 +195,7 @@ header {
   align-items: center;
   gap: 16px;
   padding: 16px 32px;
-  border-bottom: 1px solid #1a2029;
+  border-bottom: 1px solid var(--vd-border-chrome);
   background: rgba(7, 8, 11, 0.5);
   backdrop-filter: blur(12px);
   z-index: 5;
@@ -187,7 +210,7 @@ header {
   align-items: center;
   gap: 10px;
   background: var(--panel);
-  border: 1px solid #1a2029;
+  border: 1px solid var(--vd-border-chrome);
   border-radius: 10px;
   padding: 9px 16px;
   transition: border-color .2s;
@@ -219,7 +242,7 @@ header {
   align-items: center;
   gap: 10px;
   background: var(--panel);
-  border: 1px solid #1a2029;
+  border: 1px solid var(--vd-border-chrome);
   border-radius: 10px;
   padding: 9px 16px;
   transition: border-color .2s;
@@ -318,7 +341,7 @@ header {
 
 .actionBtn {
   background: var(--panel);
-  border: 1px solid #1a2029;
+  border: 1px solid var(--vd-border-chrome);
   border-radius: 8px;
   color: var(--dim);
   padding: 9px 16px;
@@ -336,7 +359,7 @@ header {
 }
 .actionBtn.primary {
   background: var(--accent);
-  color: #05231f;
+  color: var(--vd-ink-on-lime);
   border: none;
 }
 .actionBtn.primary:hover {
@@ -402,7 +425,7 @@ header {
 
 .programBox {
   background: var(--panel);
-  border: 1px solid #1a2029;
+  border: 1px solid var(--vd-border-chrome);
   border-radius: 10px;
   padding: 12px;
   display: flex;
@@ -439,7 +462,7 @@ header {
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 15px 40px rgba(0,0,0,0.5);
-  border: 1px solid #1a2029;
+  border: 1px solid var(--vd-border-chrome);
 }
 
 .simulatedScreen {
@@ -470,7 +493,7 @@ header {
   width: 28px;
   height: 50px;
   background: rgba(13, 16, 23, 0.85);
-  border: 1px solid #1a2029;
+  border: 1px solid var(--vd-border-chrome);
   color: var(--dim);
   display: flex;
   align-items: center;
@@ -539,7 +562,7 @@ header {
   align-items: center;
   gap: 12px;
   background: var(--panel);
-  border: 1px solid #1a2029;
+  border: 1px solid var(--vd-border-chrome);
   border-radius: 10px;
   padding: 8px;
   cursor: pointer;
@@ -606,7 +629,7 @@ header {
 
 .vibeCard {
   background: var(--panel);
-  border: 1px solid #1a2029;
+  border: 1px solid var(--vd-border-chrome);
   border-radius: 12px;
   padding: 12px;
   display: flex;
@@ -662,7 +685,7 @@ header {
 input[type="search"], select {
   background: var(--panel);
   color: var(--text);
-  border: 1px solid #2c3242;
+  border: 1px solid var(--vd-border-overlay);
   border-radius: 8px;
   padding: 8px 10px;
   font-size: 14px;
@@ -673,14 +696,14 @@ select { max-width: 190px; }
 .chip {
   background: var(--panel);
   color: var(--text);
-  border: 1px solid #2c3242;
+  border: 1px solid var(--vd-border-overlay);
   border-radius: 999px;
   padding: 8px 14px;
   font-size: 13px;
   cursor: pointer;
 }
 .chip:hover { border-color: var(--accent); }
-.chip.active { background: var(--accent); color: #05231f; border-color: var(--accent); }
+.chip.active { background: var(--accent); color: var(--vd-ink-on-lime); border-color: var(--accent); }
 
 .sectionHead {
   font-family: var(--mono);
@@ -702,7 +725,7 @@ select { max-width: 190px; }
 
 .card {
   background: var(--panel);
-  border: 1px solid #232837;
+  border: 1px solid var(--vd-border-card);
   border-radius: 12px;
   padding: 12px;
   cursor: pointer;
@@ -1275,7 +1298,7 @@ select { max-width: 190px; }
 #player {
   width: min(1120px, 96vw);
   background: var(--panel);
-  border: 1px solid #2c3242;
+  border: 1px solid var(--vd-border-overlay);
   border-radius: 14px;
   padding: 16px;
   display: flex; flex-direction: column; gap: 10px;
@@ -1318,7 +1341,7 @@ select { max-width: 190px; }
   justify-content: center;
   gap: 8px;
   background: var(--panel2);
-  border: 1px solid #2c3242;
+  border: 1px solid var(--vd-border-overlay);
   border-radius: 8px;
   color: var(--text);
   padding: 10px 8px;
@@ -1353,10 +1376,10 @@ select { max-width: 190px; }
 #playerActions { display: flex; gap: 8px; align-items: center; }
 #playerActions button {
   background: var(--panel2); color: var(--text);
-  border: 1px solid #2c3242; border-radius: 8px;
+  border: 1px solid var(--vd-border-overlay); border-radius: 8px;
   padding: 9px 16px; cursor: pointer; font-size: 14px;
 }
-#pVlc { background: var(--accent); color: #05231f; border: none; font-weight: 600; }
+#pVlc { background: var(--accent); color: var(--vd-ink-on-lime); border: none; font-weight: 600; }
 #pFav.on { color: var(--star); }
 #pStreams { max-width: 200px; }
 
@@ -1380,7 +1403,7 @@ select { max-width: 190px; }
   width: min(1080px, 94vw);
   max-height: 90vh;
   background: var(--panel);
-  border: 1px solid #2c3242;
+  border: 1px solid var(--vd-border-overlay);
   border-radius: 16px;
   display: flex;
   flex-direction: column;
@@ -1447,18 +1470,13 @@ select { max-width: 190px; }
   color: var(--accent);
   font-weight: 600;
 }
-#vdStars {
-  color: #ffc107;
-  font-size: 14px;
-  letter-spacing: 2px;
-}
 #vdActions {
   display: flex;
   gap: 12px;
   margin: 4px 0;
 }
 #vdPlayBtn {
-  background: #f47521;
+  background: var(--vd-accent);
   color: #fff;
   border: none;
   border-radius: 6px;
@@ -1522,7 +1540,7 @@ select { max-width: 190px; }
 }
 #vdSeasonSelect {
   background: var(--panel2);
-  border: 1px solid #2c3242;
+  border: 1px solid var(--vd-border-overlay);
   color: #fff;
   padding: 8px 14px;
   border-radius: 6px;
@@ -1534,7 +1552,7 @@ select { max-width: 190px; }
   transition: border-color .1s;
 }
 #vdSeasonSelect:hover {
-  border-color: #f47521;
+  border-color: var(--vd-accent);
 }
 #vdEpisodeGrid {
   display: grid;
@@ -1605,7 +1623,7 @@ select { max-width: 190px; }
 .epCardWatchedBadge {
   position: absolute; top: 6px; left: 6px;
   background: #00e0b0;
-  color: #05231f;
+  color: var(--vd-ink-on-lime);
   font-size: 9px;
   font-weight: 800;
   padding: 2px 5px;
@@ -1679,7 +1697,7 @@ select { max-width: 190px; }
 #pNextEp {
   margin-left: 8px;
   background: var(--accent) !important;
-  color: #05231f !important;
+  color: var(--vd-ink-on-lime) !important;
   border: none !important;
   font-weight: 600;
 }
@@ -2615,7 +2633,7 @@ select { max-width: 190px; }
     height: 34px;
     border-radius: 50%;
     background: var(--panel);
-    border: 1px solid #1a2029;
+    border: 1px solid var(--vd-border-chrome);
     color: var(--dim);
     cursor: pointer;
     flex-shrink: 0;
@@ -2725,7 +2743,7 @@ select { max-width: 190px; }
     width: 100%;
     height: calc(64px + env(safe-area-inset-bottom));
     border-right: none;
-    border-top: 1px solid #141822;
+    border-top: 1px solid var(--vd-border-inner);
     flex-direction: row;
     align-items: center;
     justify-content: space-around;
@@ -2989,13 +3007,6 @@ select { max-width: 190px; }
     text-align: left;
     font-weight: 600;
   }
-
-  #vdStars {
-    font-size: 11px;
-    text-align: left;
-    margin: 0;
-  }
-
   #vdActions {
     width: auto;
     justify-content: flex-start;
@@ -3096,7 +3107,7 @@ select { max-width: 190px; }
     top: 4px;
     left: 4px;
     background: rgba(0, 224, 176, 0.95);
-    color: #05231f;
+    color: var(--vd-ink-on-lime);
     font-size: 8px;
     font-weight: 800;
     padding: 1px 5px;
@@ -3324,7 +3335,7 @@ select { max-width: 190px; }
 
 .pwa-install-btn {
   background: var(--accent);
-  color: #05231f;
+  color: var(--vd-ink-on-lime);
   border: none;
   border-radius: 8px;
   padding: 8px 14px;
@@ -3460,7 +3471,7 @@ select { max-width: 190px; }
   height: 28px;
   border-radius: 50%;
   background: var(--accent);
-  color: #05231f;
+  color: var(--vd-ink-on-lime);
   font-family: var(--display);
   font-weight: 800;
   font-size: 13px;
@@ -3491,7 +3502,7 @@ select { max-width: 190px; }
   width: 100%;
   padding: 14px;
   background: var(--accent);
-  color: #05231f;
+  color: var(--vd-ink-on-lime);
   border: none;
   border-radius: 12px;
   font-family: var(--display);

@@ -1,0 +1,67 @@
+/* veedeeoh. brand tokens v2 — 23 August 2026
+   CHANGED FROM v1. Read the note in PARTY-BACKEND.md and the README before
+   importing: adopting these is a visual change, not a no-op remap.
+
+   One accent green, #c5f04e. The v1 rule of three limes by surface produced
+   the failure it was meant to prevent — #c6f53a leaked into the product twice
+   — so the motion lime is retired. A single print exception remains, because
+   #c5f04e genuinely fails contrast on white and documents need something. */
+
+:root {
+  /* Accent. One value in every product and motion context. */
+  --vd-accent:      #c5f04e;
+  --vd-ink-on-lime: #05231f;   /* every lime fill, every surface */
+  --vd-accent-print:#a8ce1f;   /* THE ONLY EXCEPTION: lime on white paper */
+  --vd-accent-glow: rgba(197, 240, 78, 0.25);
+
+  /* Fields */
+  --vd-ground:      #06070a;   /* app and brand background */
+  --vd-panel:       #10141e;   /* cards, bars, wells */
+  --vd-panel-2:     #161b28;   /* thumbnails, hover fill, recessed areas */
+  --vd-sidebar:     #090a0f;   /* nav dock — LIGHTER than ground, not darker */
+  --vd-field-kids:  #0b0e24;
+  --vd-paper:       #ffffff;
+  --vd-ink:         #16181c;
+
+  /* Text */
+  --vd-text: #e9ecf2;
+  --vd-dim:  #8a93a3;
+
+  /* Borders. Three, and only three. Tuned to sit on --vd-panel; the v1 values
+     (#1a2029 / #232837 / #2c3242) were tuned against the darker #0d1017 and
+     read too faint on the new panel. */
+  --vd-border-chrome:  #1e2432;  /* bars, sidebar, inputs, buttons */
+  --vd-border-card:    #262d3d;  /* cards and tiles */
+  --vd-border-overlay: #2f3749;  /* modals, selects, popovers */
+  --vd-border-inner:   #1a2030;  /* dividers inside a panel */
+  --vd-well:           #04050a;  /* recessed input, one step under ground */
+
+  /* Signals — never decorative */
+  --vd-live:        #00e0b0;
+  --vd-offline:     #ff5252;
+  --vd-saved:       #ffc107;
+  --vd-destructive: #ff3b30;
+
+  /* Party. The suffix is one flat hue, pink. The dot stays the accent and
+     keeps its glow. Blue and amber belong to the bump animation only. */
+  --vd-party-pink:  #e82a7e;
+  --vd-party-blue:  #2ba6dd;
+  --vd-party-amber: #e5a82b;
+
+  /* Kids */
+  --vd-kids-accent: #ff9f1c;   /* --brand-accent flips to this in .kids-mode */
+  --vd-kids-1: #ff7a5a;   /* k */
+  --vd-kids-2: #ffc93a;   /* i */
+  --vd-kids-3: #3ac9f5;   /* d */
+  /* s takes --vd-accent. The party and kids palettes never share a hue. */
+
+  /* Type. Two families in product. Instrument Sans is retired; Space Grotesk
+     already carried every label, so it takes body as well. */
+  --vd-font-display: "Bricolage Grotesque", sans-serif;
+  --vd-font-body:    "Space Grotesk", sans-serif;
+  --vd-font-ident:   "Manrope", sans-serif;   /* ident and wordmark only */
+
+  /* Wordmark geometry */
+  --vd-mark-tracking: -0.045em;
+  --vd-mark-dot-ratio: 0.158;
+}
