@@ -40,6 +40,10 @@ const ago = (m: number) =>
 
 const esc = escapeHtml;
 
+/** A base64 image data URI and nothing else. Deliberately strict: it is the
+ *  client half of the same constraint the parties.frame column carries. */
+const FRAME_URI = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/;
+
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
@@ -347,9 +351,22 @@ function card(p: PublicParty, i: number): string {
   const full = p.seat_limit != null && p.joined_count >= p.seat_limit;
   const host = p.host_handle || p.host_name || "someone";
   const mins = minsSince(p.started_at);
+  // The empty well is the default and stays the default. A frame replaces it
+  // only when one exists, which is never for a private room and not at all for
+  // a provider whose media cannot be read off the canvas.
+  //
+  // AN <img>, NOT A CSS BACKGROUND, and re-validated here. The string was
+  // written by one account and is rendered on everyone else's screen; a data
+  // URI dropped into a style attribute is a place for a host to write CSS that
+  // runs on a stranger's page. The database constrains the column to this
+  // shape too -- this is the second of the two checks, not the only one.
+  const fill = p.frame && FRAME_URI.test(p.frame)
+    ? `<img class="fill" src="${esc(p.frame)}" alt="" loading="lazy" decoding="async"
+            style="object-fit:cover;width:100%;height:100%">`
+    : `<div class="fill frameSlot"></div>`;
   return `<div class="pCard">
     <div class="art">
-      <div class="fill frameSlot"></div>
+      ${fill}
       <div class="tl">
         <span class="pill live"><span class="d"></span>Live</span>
         <span class="pill">${p.joined_count} watching</span>

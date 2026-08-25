@@ -764,6 +764,8 @@ export async function unblockUser(userId: string): Promise<boolean> {
 
 /** Host ends the party for everyone, rather than leaving it to time out. */
 export function endParty(): void {
+  // The card should stop showing what was on the moment it stops being on.
+  void import("./party-frames").then((m) => m.stopFrameCapture(true));
   const secs = partyStartedAt ? (Date.now() - partyStartedAt) / 1000 : 0;
   const code = currentCode || "";
   const peak = peakViewers;
@@ -782,6 +784,8 @@ export function endParty(): void {
 }
 
 export function disconnect(): void {
+  // The card should stop showing what was on the moment it stops being on.
+  void import("./party-frames").then((m) => m.stopFrameCapture(false));
   // Before anything else: invalidate the live socket's generation so its close
   // event cannot schedule a reconnect to a party the user has just left.
   generation += 1;
@@ -1303,6 +1307,9 @@ export interface PublicParty {
   decade: string | null; language: string | null;
   runtime_mins: number | null;
   following: boolean;
+  /** A small still from what is playing, or null. Null is a correct and
+   *  permanent state for plenty of parties -- see party-frames.ts. */
+  frame: string | null;
   /** How many open parties there are before filtering, so the bar can say
    *  "6 of 41" without a second round trip. */
   total_rows: number;

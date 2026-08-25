@@ -509,7 +509,7 @@ export async function startWatchParty(item: VodItem, startIdx = 0): Promise<bool
     // out-of-range index would open the party on nothing.
     const idx = Math.max(0, Math.min(startIdx, (streams?.length || 1) - 1));
 
-    const { joinCode, link } = await party.createParty({
+    const created = await party.createParty({
       contentId: String(item.id),
       streamIdx: idx,
       title: item.title,
@@ -530,6 +530,7 @@ export async function startWatchParty(item: VodItem, startIdx = 0): Promise<bool
       rating: item.rating ?? null,
       runtimeMins: item.duration ? Math.round(item.duration / 60) : null,
     });
+    const { joinCode, link, partyId } = created;
 
     // Connect FIRST so the green room can show people arriving, but do not
     // open the player: the host gathers everyone, then starts.
@@ -542,6 +543,11 @@ export async function startWatchParty(item: VodItem, startIdx = 0): Promise<bool
     party.startPlayback();
     await openVodPlayer(asChannel(item, streams as any), idx);
     mountHostLobby(joinCode, link);
+    // Only a LISTED party is captured, and only from here -- after the player
+    // is actually open, because there is no frame before there is a picture.
+    if (setup.isPublic) {
+      (await import("./party-frames")).startFrameCapture(partyId, true);
+    }
     (await import("./party-reactions")).mountReactions();
     return true;
   } catch (e: any) {
