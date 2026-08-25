@@ -46,14 +46,6 @@ interface Env {
   /** The Supabase project's JWT secret. Set with
    *  `wrangler secret put SUPABASE_JWT_SECRET`; never in wrangler.toml. */
   SUPABASE_JWT_SECRET?: string;
-  /** Project URL, e.g. https://abcd.supabase.co. Needed to ask whether a host
-   *  has a standing block against the person connecting. */
-  SUPABASE_URL?: string;
-  /** The ANON key, not the service key. This worker deliberately holds no
-   *  privileged credential: every question it asks Supabase is asked with the
-   *  caller's own token, so RLS still applies and a leaked worker gains an
-   *  attacker nothing they did not already have from the browser bundle. */
-  SUPABASE_ANON_KEY?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -93,37 +85,39 @@ interface Caller { sub: string; role: string }
 // BANNED_KEY is a string array in this object's own storage and IDLE_CLOSE_MS
 // is five minutes, so the strongest action a host has expired shortly after
 // the party did and the same account walked into the next one freely. The
-// standing decision lives in public.party_blocks now; this asks about it.
+// standing decision lives in public.party_blocks now.
 //
-// Asked with the CALLER'S OWN TOKEN through a security-definer function that
-// answers about auth.uid() and nobody else. The worker therefore needs no
-// service key, and the answer cannot be used to enumerate anyone else's
-// blocks -- which matters, because a readable block list is a map of how to
-// come back with a second account.
+// THE HOST BRINGS THE LIST; THE RELAY NEVER ASKS FOR IT. The obvious design is
+// for this worker to query Supabase on every connect, and it is worse in three
+// ways: it needs the project URL and an API key stored on the worker, it adds
+// a round trip to the hot path that verifyCaller was specifically written to
+// avoid, and it makes joining depend on a second service being up.
 //
-// FAILS OPEN, on purpose. If Supabase is unreachable the local BANNED_KEY list
-// still covers the room in progress, which is the case that is actually
-// underway. Refusing every connection during an outage would take down joining
-// entirely to enforce a decision that, at worst, is a day late.
-async function isBlockedByHost(
-  hostUserId: string, jwt: string, env: Env,
-): Promise<boolean> {
-  if (!hostUserId || !jwt || !env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) return false;
-  try {
-    const res = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/am_i_blocked`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: env.SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${jwt}`,
-      },
-      body: JSON.stringify({ host: hostUserId }),
-    });
-    if (!res.ok) return false;
-    return (await res.json()) === true;
-  } catch {
-    return false;
+// The host's own client already holds the list -- RLS lets exactly one account
+// read it -- so it sends it at /init and again whenever its socket opens. The
+// list is authoritative at the moment the room opens, which is precisely when
+// it matters: the whole point is that someone cannot walk into your NEXT
+// party. A block made DURING a party is covered separately, by the kick path
+// writing BANNED_KEY at the same time as the database row.
+//
+// Nothing a guest sends can reach this. The refresh message is host-only, and
+// the host is the only person a block list belongs to, so there is no attacker
+// who benefits from tampering with their own.
+
+/** Ids the host has blocked, carried over from previous parties. */
+const BLOCKLIST_KEY = "hostBlocks";
+
+/** Accept a block list from the host: strings, deduped, and capped so a bad
+ *  client cannot use it to fill the object's storage. */
+function sanitiseBlocks(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  for (const v of raw) {
+    const id = String(v || "").slice(0, 64);
+    if (id && !out.includes(id)) out.push(id);
+    if (out.length >= 500) break;
   }
+  return out;
 }
 
 function b64urlToBytes(s: string): Uint8Array<ArrayBuffer> {
@@ -291,6 +285,9 @@ export class Party extends DurableObject<Env> {
       // which is what would let someone steal a room mid-session.
       if (existing) return new Response("already initialised", { status: 409, headers: cors });
 
+      // Carried in with the party rather than fetched: see BLOCKLIST_KEY.
+      await this.ctx.storage.put(BLOCKLIST_KEY, sanitiseBlocks(body?.blocks));
+
       const seats = Number(body?.seatLimit);
       await this.ctx.storage.put<Config>(CONFIG_KEY, {
         seatLimit: Number.isFinite(seats) && seats > 0 ? seats : null,
@@ -338,12 +335,12 @@ export class Party extends DurableObject<Env> {
       // a formality.
       const who = asker.sub;
       const bans = (await this.ctx.storage.get<string[]>(BANNED_KEY)) ?? [];
-      // Both lists. The local one covers this room; the durable one covers the
-      // host's standing decision, which is the whole point of section 1 -- and
-      // /access has to agree with the upgrade, or a blocked person is told the
-      // party ended and then refused for a different reason on the way in.
-      if (who !== "" && (bans.includes(who)
-          || await isBlockedByHost(config.hostUserId, url.searchParams.get("jwt") || "", this.env))) {
+      // BOTH lists. The local one covers this room; the standing one covers
+      // every party this host has run. /access has to agree with the upgrade,
+      // or a blocked person is told the party ended here and then refused for
+      // a different reason a moment later.
+      const standing = (await this.ctx.storage.get<string[]>(BLOCKLIST_KEY)) ?? [];
+      if (who !== "" && (bans.includes(who) || standing.includes(who))) {
         return Response.json({ status: "removed" }, { headers: cors });
       }
       if (config.seatLimit != null && this.viewerCount() >= config.seatLimit) {
@@ -391,8 +388,8 @@ export class Party extends DurableObject<Env> {
     // dangling. Checked here as well as in /access because /access is advisory:
     // a client that skips it goes straight to the upgrade.
     const banned = (await this.ctx.storage.get<string[]>(BANNED_KEY)) ?? [];
-    if (!isHost && (banned.includes(userId)
-        || await isBlockedByHost(config.hostUserId, url.searchParams.get("jwt") || "", this.env))) {
+    const standingBans = (await this.ctx.storage.get<string[]>(BLOCKLIST_KEY)) ?? [];
+    if (!isHost && (banned.includes(userId) || standingBans.includes(userId))) {
       return new Response("removed from this party", { status: 403 });
     }
 
@@ -468,6 +465,15 @@ export class Party extends DurableObject<Env> {
       return;
     }
 
+    // The host's standing block list, refreshed. Sent when the host's socket
+    // opens, so a party resumed on another device -- where /init already ran
+    // and is one-shot -- still knows who is not welcome.
+    if (msg?.type === "blocks") {
+      if (!att.isHost) return;
+      await this.ctx.storage.put(BLOCKLIST_KEY, sanitiseBlocks(msg.ids));
+      return;
+    }
+
     // Lifting a block. Without this a misclick was permanent for the life of
     // the room, and the Blocked list in the Host tab had nothing to call.
     //
@@ -481,6 +487,10 @@ export class Party extends DurableObject<Env> {
       if (!target) return;
       const bans = (await this.ctx.storage.get<string[]>(BANNED_KEY)) ?? [];
       await this.ctx.storage.put(BANNED_KEY, bans.filter((u) => u !== target));
+      // And the standing list, or someone unblocked mid-party is still refused
+      // by the copy that came in with the room.
+      const std = (await this.ctx.storage.get<string[]>(BLOCKLIST_KEY)) ?? [];
+      await this.ctx.storage.put(BLOCKLIST_KEY, std.filter((u) => u !== target));
       try {
         ws.send(JSON.stringify({ type: "unbanned", userId: target }));
       } catch { /* the host went away mid-call */ }

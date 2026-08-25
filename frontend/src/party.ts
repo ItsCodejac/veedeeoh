@@ -269,6 +269,23 @@ function readHostToken(joinCode: string): string | null {
   try { return localStorage.getItem(tokenKey(joinCode)); } catch { return null; }
 }
 
+/** The ids this account has blocked, for handing to the relay.
+ *
+ *  RLS lets exactly one person read this table, and that person is the host --
+ *  which is why the list travels with the host rather than being fetched by
+ *  the worker. Empty on any failure: a party that starts is better than a
+ *  party that refuses to, and a block missed for one room is recovered the
+ *  next time the host connects. */
+async function myBlockIds(): Promise<string[]> {
+  try {
+    const { data: u } = await getSupabase().auth.getUser();
+    if (!u.user) return [];
+    const { data } = await getSupabase().from("party_blocks")
+      .select("blocked_user_id").eq("host_user_id", u.user.id).limit(500);
+    return (data ?? []).map((r: any) => String(r.blocked_user_id));
+  } catch { return []; }
+}
+
 export async function createParty(opts: PartyOptions): Promise<{ joinCode: string; link: string; partyId: string }> {
   const { data: u } = await getSupabase().auth.getUser();
   if (!u.user) throw new Error("not signed in");
@@ -314,6 +331,9 @@ export async function createParty(opts: PartyOptions): Promise<{ joinCode: strin
       accessToken: await accessToken(),
       seatLimit: opts.seatLimit ?? null,
       requireApproval: opts.requireApproval !== false,
+      // Carried in with the party. The relay cannot read party_blocks and
+      // deliberately holds no credential that could.
+      blocks: await myBlockIds(),
     }),
   });
   if (!res.ok) throw new Error("Couldn't start the party channel");
@@ -649,6 +669,12 @@ async function connect(joinCode: string, isHost: boolean, resume = false): Promi
   }
 
   if (isHost) {
+    // /init is one-shot, so a party resumed from another device never ran it.
+    // Sending the list on every host connect is what keeps a standing block
+    // attached to the host rather than to the room they first opened.
+    void myBlockIds().then((ids) => {
+      try { socket?.send(JSON.stringify({ type: "blocks", ids })); } catch {}
+    });
     watchHostVisibility();
     setPartyEmitter((s) => {
       // Suppressed while the tab is hidden. A backgrounded browser pauses the
