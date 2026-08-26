@@ -184,6 +184,157 @@ app.get('/api/vod/tubi/:id', async (c) => {
   }
 });
 
+// Resolve a Pluto movie to a playable HLS URL. The catalog stores only the
+// short unsigned path; the signed 24h URL is minted at play time.
+//
+// THIS WAS MISSING, and it is the reason self-hosting did not work. The
+// frontend calls /api/vod/pluto and throws when it fails, so every Pluto title
+// -- most of the catalogue -- was unplayable on a self-hosted instance while
+// working fine on the hosted one. Nothing caught it because the two servers
+// were only ever compared by reading them.
+app.get('/api/vod/pluto', async (c) => {
+  try {
+    const path = c.req.query('path');
+    if (!path) return c.json({ error: 'Missing Pluto path' }, 400);
+    // Same guard as the hosted route: this value reaches an upstream fetch, so
+    // it is checked against the one shape it is allowed to have.
+    if (!path.startsWith('/stitch/')) return c.json({ error: 'Invalid Pluto path' }, 400);
+    const url = await vod.plutoStream(path, c.req.query('region') || state.region.code);
+    return c.json({ url });
+  } catch (e: any) {
+    return c.json({ error: e?.message || 'Failed to load Pluto stream' }, 502);
+  }
+});
+
+// A Supabase client carrying the CALLER's bearer token, so RLS decides what
+// they may touch. Never the service-role key on these routes: the profile id
+// arrives from the client, and service-role would happily read and write
+// somebody else's rows.
+function callerSupabase(c: any) {
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: c.req.header('authorization') || '' } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
+// Watch progress. The hosted deployment has had these since the beginning; here
+// they returned the SPA's index.html, so the ticks silently never appeared.
+app.get('/api/watched', async (c) => {
+  const profileId = c.req.query('profileId');
+  if (!profileId) return c.json({ watched: [] });
+  try {
+    const { data } = await callerSupabase(c)
+      .from('watch_progress')
+      .select('content_id, position_secs, duration_secs, completed, updated_at')
+      .eq('profile_id', profileId);
+    return c.json({ watched: data || [] });
+  } catch (e: any) {
+    return c.json({ watched: [], error: e?.message });
+  }
+});
+
+app.post('/api/watched', async (c) => {
+  try {
+    const { profileId, contentId, positionSecs, durationSecs, completed } = await c.req.json();
+    if (!profileId || !contentId) return c.json({ error: 'Missing profileId or contentId' }, 400);
+    // Only send what was provided, so toggling "completed" does not wipe the
+    // saved resume position: an omitted column keeps its value on upsert.
+    const payload: any = { profile_id: profileId, content_id: contentId, updated_at: new Date().toISOString() };
+    if (positionSecs !== undefined) payload.position_secs = positionSecs;
+    if (durationSecs !== undefined) payload.duration_secs = durationSecs;
+    if (completed !== undefined) payload.completed = !!completed;
+
+    const { error } = await callerSupabase(c)
+      .from('watch_progress')
+      .upsert(payload, { onConflict: 'profile_id,content_id' });
+    if (error) throw error;
+    return c.json({ ok: true });
+  } catch (e: any) {
+    return c.json({ error: e?.message || 'Failed to update watch progress' }, 500);
+  }
+});
+
+app.delete('/api/watched/:id?', async (c) => {
+  try {
+    const profileId = c.req.query('profileId');
+    const contentId = c.req.param('id') || c.req.query('contentId');
+    if (!profileId || !contentId) return c.json({ error: 'Missing profileId or contentId' }, 400);
+    await callerSupabase(c).from('watch_progress').delete()
+      .eq('profile_id', profileId).eq('content_id', contentId);
+    return c.json({ ok: true });
+  } catch (e: any) {
+    return c.json({ error: e?.message || 'Failed to delete watch history' }, 500);
+  }
+});
+
+// Everything this instance holds about the caller. RLS does the scoping, so
+// each select returns only their own rows.
+app.get('/api/account/export', async (c) => {
+  const sb = callerSupabase(c);
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return c.json({ error: 'unauthorized' }, 401);
+
+  const grab = async (table: string) => {
+    const { data, error } = await sb.from(table).select('*');
+    return error ? { error: error.message } : data;
+  };
+
+  return c.json({
+    exported_at: new Date().toISOString(),
+    account: { id: user.id, email: user.email },
+    profiles: await grab('household_profiles'),
+    watch_progress: await grab('watch_progress'),
+    favorites: await grab('favorites'),
+    collections: await grab('collections'),
+    parties: await grab('parties'),
+  });
+});
+
+// Deleting the auth user cascades the rest, which is true only from migration
+// 20260826040000 onward -- before it, the viewing profiles and history survived.
+//
+// No Stripe step here, unlike the hosted route: a self-hosted instance has no
+// subscription to cancel. It does need the service-role key, and says so
+// plainly rather than half-deleting an account when it is absent.
+app.post('/api/account/delete', async (c) => {
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  if (!serviceKey) {
+    return c.json({
+      error: 'account deletion needs SUPABASE_SERVICE_ROLE_KEY to be set on this instance',
+    }, 501);
+  }
+
+  const { data: { user } } = await callerSupabase(c).auth.getUser();
+  if (!user) return c.json({ error: 'unauthorized' }, 401);
+
+  // The caller retypes their email. An accidental click here is unrecoverable,
+  // so it is checked here and not only in the dialog.
+  const body = await c.req.json().catch(() => ({} as any));
+  const confirm = String(body?.confirm || '').trim().toLowerCase();
+  if (!user.email || confirm !== user.email.toLowerCase()) {
+    return c.json({ error: 'confirmation did not match the account email' }, 400);
+  }
+
+  const admin = createClient(supabaseUrl, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { error } = await admin.auth.admin.deleteUser(user.id);
+  if (error) return c.json({ error: error.message }, 500);
+  return c.json({ ok: true });
+});
+
+// Anything under /api that nothing above handled. Without this it fell through
+// to the static handler and answered with the SPA's index.html and a 200, so a
+// caller asking for JSON got a page of HTML and had to guess why. The routes
+// that legitimately do not exist here are the hosted-only ones -- billing, the
+// crons, the auth email hook -- and this says so instead of pretending.
+app.all('/api/*', (c) =>
+  c.json({
+    error: 'not available on this instance',
+    detail: 'This endpoint is part of the hosted veedeeoh deployment. A self-hosted instance has no billing, scheduled jobs or transactional email.',
+    path: c.req.path,
+  }, 501));
+
 // Proxy route
 app.get('/proxy', async (c) => {
   const rawUrl = c.req.query('url');
