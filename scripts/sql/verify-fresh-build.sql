@@ -80,3 +80,36 @@ do $$ begin
   end;
   alter table public.parties enable trigger parties_close_prior;
 end $$;
+
+-- 10. deleting an account deletes the account's data. This failed before
+-- 20260826040000: only the parties row went, and profile names, PIN hashes,
+-- viewing history, favourites and an invited third party's email address all
+-- survived with no session left that could ever read or remove them.
+insert into auth.users (id, email) values ('33333333-3333-3333-3333-333333333333','carol@example.com');
+insert into public.household_profiles (id, user_id, name, pin)
+  values ('44444444-4444-4444-4444-444444444444','33333333-3333-3333-3333-333333333333','Carol TV','hashedpin');
+insert into public.watch_progress (profile_id, content_id, title)
+  values ('44444444-4444-4444-4444-444444444444','tubi:99','Watched');
+insert into public.favorites (profile_id, content_id, title)
+  values ('44444444-4444-4444-4444-444444444444','tubi:99','Liked');
+insert into public.household_invites (owner_id, invited_email)
+  values ('33333333-3333-3333-3333-333333333333','carols-friend@example.com');
+insert into public.parties (host_user_id, join_code, content_id, title)
+  values ('33333333-3333-3333-3333-333333333333','ZZZZZZ','tubi:99','Carol Party');
+
+delete from auth.users where id = '33333333-3333-3333-3333-333333333333';
+
+select '10. deletion cascades    : ' ||
+  case when (select count(*) from public.profiles where id='33333333-3333-3333-3333-333333333333')=0
+        and (select count(*) from public.household_profiles where user_id='33333333-3333-3333-3333-333333333333')=0
+        and (select count(*) from public.watch_progress where profile_id='44444444-4444-4444-4444-444444444444')=0
+        and (select count(*) from public.favorites where profile_id='44444444-4444-4444-4444-444444444444')=0
+        and (select count(*) from public.household_invites where owner_id='33333333-3333-3333-3333-333333333333')=0
+        and (select count(*) from public.parties where host_user_id='33333333-3333-3333-3333-333333333333')=0
+       then 'PASS nothing of the account survives'
+       else 'FAIL leftovers: hp='
+            ||(select count(*) from public.household_profiles where user_id='33333333-3333-3333-3333-333333333333')
+            ||' watch='||(select count(*) from public.watch_progress where profile_id='44444444-4444-4444-4444-444444444444')
+            ||' favs='||(select count(*) from public.favorites where profile_id='44444444-4444-4444-4444-444444444444')
+            ||' invites='||(select count(*) from public.household_invites where owner_id='33333333-3333-3333-3333-333333333333')
+       end;

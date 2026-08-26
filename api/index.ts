@@ -526,12 +526,15 @@ app.post('/account/delete', async (c: Context) => {
   const { error } = await admin.auth.admin.deleteUser(user.id);
   if (error) return c.json({ error: error.message }, 500);
 
-  // profiles has NO foreign key to auth.users -- orphan rows exist in this
-  // database today, which proves it. So deleting the auth user does NOT cascade
-  // the account row, and it would have been left behind holding the email, the
-  // tier and the Stripe customer id. A deletion that leaves the personal data
-  // is not a deletion. Explicit, and after the auth delete so a failure here
-  // cannot strand a live user without a login.
+  // Belt and braces since 20260826040000, which gave profiles, household_
+  // profiles, household_members and household_invites the foreign key to
+  // auth.users they never had, so the delete above now cascades all of it.
+  //
+  // Before that migration this line was the only thing removing the account
+  // row, and it was not enough: the viewing profiles, watch history, favourites
+  // and pending invites had nothing pointing at auth.users and survived the
+  // deletion outright. Kept because it is free, and because it still holds if
+  // someone runs this against a database that has not taken that migration.
   const { error: profErr } = await admin.from('profiles').delete().eq('id', user.id);
   if (profErr) console.error('[account] profile row not removed after delete', profErr);
 
