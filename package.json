@@ -6,6 +6,7 @@
     "build": "cd frontend && npm install && npm run build",
     "deploy": "vercel --prod",
     "warm": "node scripts/warm.mjs",
+    "verify:db": "bash scripts/verify-fresh-build.sh",
     "veedeeoh": "node scripts/veedeeoh.mjs",
     "stripe:sync": "bash scripts/sync-stripe-env.sh"
   },
