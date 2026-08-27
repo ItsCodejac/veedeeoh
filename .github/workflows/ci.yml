@@ -10,23 +10,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    # Placeholders, not secrets, and deliberately obvious ones.
-    #
-    # vite.config.ts refuses to build without these, because the frontend used
-    # to fall back to the veedeeoh.com project's own credentials and that meant
-    # any build with no configuration silently pointed at our database. CI is a
-    # build with no configuration, so it started failing the moment that guard
-    # landed -- correctly.
-    #
-    # Nothing here connects to Supabase at build time. The values only need to
-    # exist for the bundle to compile, and the artifact is thrown away, so real
-    # credentials would buy nothing and put a key in a log for no reason. If a
-    # future job actually talks to a database, it needs its own secrets and its
-    # own project, never this one.
-    env:
-      VITE_SUPABASE_URL: https://ci-placeholder.supabase.co
-      VITE_SUPABASE_ANON_KEY: ci-placeholder-anon-key
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -36,11 +19,53 @@ jobs:
         with:
           node-version: 20
 
-      - name: Build frontend and type check
+      - name: Install frontend dependencies
+        run: cd frontend && npm ci
+
+      # Both products are built from this repo and CI used to build only one of
+      # them, so a change that broke the other reached main green.
+
+      - name: Build self-host
+        env:
+          VEEDEEOH_TARGET: selfhost
+        run: cd frontend && npm run build
+
+      - name: Self-host build must contain no Supabase
         run: |
           cd frontend
-          npm ci
-          npm run build
+          if grep -rlE "https://[a-z0-9]{15,}\.supabase\.co" ../src/tvlc/static/assets/*.js; then
+            echo "::error::A Supabase project URL is compiled into the self-host build."
+            echo "Self-host is standalone. Something reintroduced a credential default."
+            exit 1
+          fi
+          echo "self-host build is clean"
+
+      # Placeholders, not secrets, and deliberately obvious ones. Nothing
+      # connects to Supabase at build time; the values only need to exist for
+      # the bundle to compile, and the artifact is discarded. Real credentials
+      # would buy nothing and put a key in a log.
+      - name: Build cloud
+        env:
+          VEEDEEOH_TARGET: cloud
+          VITE_SUPABASE_URL: https://ci-placeholder.supabase.co
+          VITE_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+        run: cd frontend && npm run build
+
+      # The failure this guards against is a cloud deploy that lost its
+      # environment: it would silently compile the self-host app and ship it as
+      # the hosted service, with a passing build and no accounts for anyone.
+      - name: A cloud build with no credentials must fail
+        env:
+          VEEDEEOH_TARGET: cloud
+        run: |
+          cd frontend
+          if npm run build > /tmp/out.txt 2>&1; then
+            echo "::error::A cloud build succeeded with no Supabase credentials."
+            cat /tmp/out.txt
+            exit 1
+          fi
+          grep -q "Refusing to build" /tmp/out.txt || { cat /tmp/out.txt; exit 1; }
+          echo "refused, as it should"
 
       - name: Type check backend
         run: |
