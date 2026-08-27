@@ -261,6 +261,11 @@ export interface AvatarFrame {
   rotate?: number;
   scale?: number;
   radius?: number;
+  /** Offset within the frame, -100 to 100, as a percentage of the viewbox.
+   *  Zoom alone crops from the centre, which is the wrong middle for any style
+   *  that does not sit centred -- the tall hair ones lose the top of the head. */
+  translateX?: number;
+  translateY?: number;
   /** Hex without '#'. Absent means follow the profile colour. */
   bg?: string;
   bgType?: "solid" | "gradientLinear";
@@ -389,6 +394,8 @@ function recipeOptions(r: AvatarRecipe, fallbackBg: string): Record<string, unkn
   if (f.rotate) o.rotate = f.rotate;
   if (typeof f.scale === "number" && f.scale !== 100) o.scale = f.scale;
   if (typeof f.radius === "number" && f.radius > 0) o.radius = f.radius;
+  if (f.translateX) o.translateX = f.translateX;
+  if (f.translateY) o.translateY = f.translateY;
 
   const bg = (f.bg ?? fallbackBg ?? "").replace("#", "");
   if (bg) {

@@ -1,36 +1,49 @@
 // The avatar character creator.
 //
-// WHAT THIS REPLACES. A <select> of thirty-one style names, six 96px tiles, a
-// Shuffle button, and a collapsed "Customise" holding up to eight dropdowns of
-// raw identifiers. Everything it could do, it did in words: you chose "top:
-// winterHat02" from a list and found out what that meant afterwards.
+// WHAT THIS REPLACES, THE FIRST TIME. A <select> of thirty-one style names, six
+// 96px tiles, a Shuffle button, and a collapsed "Customise" holding up to eight
+// dropdowns of raw identifiers. Everything it could do, it did in words.
 //
-// The library underneath is a character creator and always was. Avataaars
-// alone exposes 21 properties -- 34 hairstyles, 13 eyebrows, 12 eyes, 12
-// mouths, six colour palettes and three yes/no switches -- and the core adds
-// flip, rotate, scale, radius and the background on top of that. We were
-// showing a fraction of it, unpreviewed.
+// WHAT THE SECOND PASS CHANGES, AND WHY. That version was four tabs of
+// horizontal strips. Avataaars alone is sixteen rows, one of them forty-five
+// tiles long, and a strip only shows five at a time. That shape works on a
+// desktop and nowhere else: on a phone it is an endless vertical scroll of
+// endless horizontal scrolls, and the tile that is actually selected is
+// usually off-screen in a direction nothing indicates. It also opened on a
+// grid of styles, which is a question about a library rather than about a
+// face, asked before anything had been drawn.
+//
+// So: the studio opens on twelve finished avatars and you pick one. Editing is
+// a list of parts, and choosing a part gives it the entire panel as a grid that
+// WRAPS -- forty-five options is six readable rows instead of nine screens of
+// sideways travel. Nothing is nested more than one level deep, and the same
+// layout serves both widths.
 //
 // WHY EVERY CHOICE IS A PICTURE. Because generating one costs nothing: 170
-// avatars render in 10ms and average 5 KB, locally, with no network. Once that
-// is true, a dropdown of names is not a simplification, it is a worse control
-// for the same money. Every tile here is THIS avatar with one thing changed,
-// so a row of hairstyles is a row of previews of you, not of a stranger.
+// avatars render in 10ms and average 5 KB, locally, with no network. Every tile
+// is THIS avatar with one thing changed, so a grid of hairstyles is a grid of
+// previews of you, not of a stranger.
 //
-// Nothing is lazy, paged or debounced. A full repaint of every thumbnail on
-// screen is well under one frame, so the panel simply redraws whenever
-// anything changes and there is no stale state to reason about.
+// RENDERED LOCALLY, NOT FETCHED. The reference build previews through
+// api.dicebear.com because a static HTML page has no other option. Doing that
+// here would tell a third party who is editing an avatar and from what IP,
+// which is the exact behaviour avatars.ts was rewritten to remove. Every image
+// on this screen comes from the local library.
 
 import {
   AVATAR_STYLES, avatarFeatures, renderRecipe, humaniseValue, blankRecipe,
   type AvatarRecipe, type AvatarFeatures,
 } from "./avatars";
+import { AVATAR_PRESETS, presetRecipe } from "./avatar-presets";
+import {
+  buildParts, valueText, segValue, slideValue, chipColor, isNone,
+  GROUP_ORDER, type Part,
+} from "./avatar-parts";
 import { registerOverlay } from "./overlay";
-
-type Tab = "style" | "features" | "colors" | "frame";
 
 const PREVIEW_PX = 240;
 const TILE_PX = 96;
+const HISTORY_MAX = 40;
 
 function esc(s: string): string {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -47,8 +60,6 @@ function clone(r: AvatarRecipe): AvatarRecipe {
   };
 }
 
-/** True when a recipe has nothing but a style and a seed. Used to decide
- *  whether Reset has anything to undo. */
 function isPlain(r: AvatarRecipe): boolean {
   return !Object.keys(r.choices || {}).length
     && !Object.keys(r.colors || {}).length
@@ -57,9 +68,9 @@ function isPlain(r: AvatarRecipe): boolean {
 }
 
 export interface AvatarStudioOptions {
-  /** Where to start. Null opens on the first style with nothing set. */
+  /** Where to start. Null opens on the face picker with nothing chosen. */
   recipe: AvatarRecipe | null;
-  /** The profile name, used to seed the first avatar and to label the header. */
+  /** The profile name. Seeds the first avatar and labels the preview. */
   name: string;
   /** The profile colour, used as the background when the frame does not set one. */
   color: string;
@@ -69,62 +80,96 @@ export interface AvatarStudioOptions {
 export function openAvatarStudio(o: AvatarStudioOptions): void {
   document.getElementById("avatarStudio")?.remove();
 
-  let recipe: AvatarRecipe = o.recipe
-    ? clone(o.recipe)
-    : blankRecipe(AVATAR_STYLES[0]!.id, (o.name || "veedeeoh").trim() || "veedeeoh");
-  const opened = clone(recipe);
+  const profileName = (o.name || "").trim() || "Untitled";
+  const seedBase = (o.name || "veedeeoh").trim() || "veedeeoh";
 
-  let tab: Tab = "style";
+  // Null until a face is picked. Everything on the stage acts on an avatar, so
+  // while this is null the stage is not shown at all rather than shown empty.
+  let recipe: AvatarRecipe | null = o.recipe ? clone(o.recipe) : null;
   let features: AvatarFeatures = { enums: [], colors: [], toggles: [] };
+  let parts: Part[] = [];
   let latestUri = "";
-  // Every repaint carries a number, and a render that finishes after a newer
-  // repaint has started is discarded. Without it, changing style twice quickly
-  // could leave the slower first pass painting its tiles over the second.
   let generation = 0;
+
+  /** Which parts the person has actually set, as opposed to inherited from the
+   *  preset or the seed. Drives the counter in the header and the dot on each
+   *  row, so "what did I change" is answerable without a diff. */
+  let touched = new Set<string>();
+  let openKey: string | null = null;
+  let browsing = false;
+
+  interface Snap { recipe: AvatarRecipe; touched: Set<string> }
+  const past: Snap[] = [];
+  const future: Snap[] = [];
+  let held: Array<Snap | null> = [null, null];
+
+  const snap = (): Snap => ({ recipe: clone(recipe!), touched: new Set(touched) });
+  function commit(): void {
+    if (!recipe) return;
+    past.push(snap());
+    if (past.length > HISTORY_MAX) past.shift();
+    future.length = 0;
+  }
+  function restore(s: Snap): void {
+    recipe = clone(s.recipe);
+    touched = new Set(s.touched);
+  }
 
   // THE RAIL IS A DIV, NOT AN <aside>. style.css styles the bare `aside`
   // element as the app's navigation dock, and below 768px that rule is
   // position:fixed to the bottom of the screen at 64px tall. Using the
-  // semantically correct tag put the preview, Shuffle, Reset and every tab
-  // into a 64px strip pinned to the bottom of every phone, underneath the
-  // panel. Nothing in this file was wrong; the tag name was the bug.
+  // semantically correct tag put the preview and every control into a 64px
+  // strip pinned to the bottom of every phone, underneath the panel. Nothing
+  // in this file was wrong; the tag name was the bug.
   const el = document.createElement("div");
   el.id = "avatarStudio";
-  el.className = "asWrap";
+  el.className = "asWrap picking";
   el.setAttribute("role", "dialog");
   el.setAttribute("aria-modal", "true");
   el.setAttribute("aria-label", "Avatar creator");
   el.innerHTML = `
     <div class="asShell">
       <header class="asHead">
-        <div class="asHeadTitle">
-          <h2>Avatar</h2>
-          <p id="asStyleName"></p>
+        <h2>Avatar<i>.</i></h2>
+        <div class="asMine" id="asMine" title="Parts you have chosen yourself">
+          <span class="asMineN" id="asMineN">0</span><span class="asMineL">yours</span>
         </div>
-        <div class="asHeadActions">
-          <button type="button" class="asBtn" id="asCancel">Cancel</button>
-          <button type="button" class="asBtn primary" id="asSave">Use this avatar</button>
+        <div class="asGrow"></div>
+        <div class="asHist">
+          <button type="button" class="asIcon" id="asUndo" disabled title="Undo" aria-label="Undo">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+          </button>
+          <button type="button" class="asIcon" id="asRedo" disabled title="Redo" aria-label="Redo">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>
+          </button>
         </div>
+        <button type="button" class="asBtn" id="asCancel">Cancel</button>
+        <button type="button" class="asBtn primary" id="asSave">Use<span class="asLong"> this avatar</span></button>
       </header>
 
       <div class="asBody">
-        <div class="asSide">
-          <div class="asPreview" id="asPreview"></div>
-          <div class="asSideBtns">
-            <button type="button" class="asBtn" id="asShuffle">Shuffle</button>
-            <button type="button" class="asBtn subtle" id="asReset">Reset</button>
+        <div class="asStage">
+          <div class="asHero"><div class="asHeroImg" id="asHero"></div>
+            <div class="asHeroTag"><b id="asHeroName"></b><span id="asHeroStyle"></span></div>
           </div>
-          <nav class="asTabs" id="asTabs"></nav>
+          <div class="asCompare">
+            <div class="asCompareHead">
+              <b>Holding</b>
+              <button type="button" class="asBtn sm" id="asHold">Hold</button>
+            </div>
+            <div class="asSlots" id="asSlots"></div>
+          </div>
+          <button type="button" class="asBtn subtle" id="asReset">Start this face over</button>
         </div>
+
         <div class="asPanel" id="asPanel"></div>
       </div>
     </div>`;
   document.body.appendChild(el);
 
-  const previewEl = el.querySelector<HTMLElement>("#asPreview")!;
   const panelEl = el.querySelector<HTMLElement>("#asPanel")!;
-  const tabsEl = el.querySelector<HTMLElement>("#asTabs")!;
-  const styleNameEl = el.querySelector<HTMLElement>("#asStyleName")!;
+  const heroEl = el.querySelector<HTMLElement>("#asHero")!;
+  const slotsEl = el.querySelector<HTMLElement>("#asSlots")!;
 
   // ---- closing ------------------------------------------------------------
 
@@ -144,19 +189,39 @@ export function openAvatarStudio(o: AvatarStudioOptions): void {
   el.querySelector("#asSave")!.addEventListener("click", () => {
     // The image shown is the image saved. Re-rendering at save time with a
     // different size would be a second chance to disagree with the preview.
-    if (latestUri) o.onDone(latestUri, clone(recipe));
+    if (recipe && latestUri) o.onDone(latestUri, clone(recipe));
     close();
   });
 
-  el.querySelector("#asShuffle")!.addEventListener("click", () => {
-    recipe.seed = `${(o.name || "veedeeoh").trim()}-${Math.floor(Math.random() * 1e9).toString(36)}`;
+  el.querySelector("#asReset")!.addEventListener("click", () => {
+    if (!recipe) return;
+    commit();
+    // The face survives. Reset means "undo my customisation", not "throw away
+    // the character I picked and go back to the grid".
+    recipe = blankRecipe(recipe.style, recipe.seed);
+    touched = new Set();
+    openKey = null;
     void paint();
   });
 
-  el.querySelector("#asReset")!.addEventListener("click", () => {
-    // Style and seed survive. Reset means "undo my customisation", not "throw
-    // away the character I picked and start from Avataaars again".
-    recipe = blankRecipe(recipe.style, recipe.seed);
+  el.querySelector("#asHold")!.addEventListener("click", () => {
+    if (!recipe) return;
+    held = [snap(), held[0] ?? null];
+    void paintSlots();
+  });
+
+  el.querySelector("#asUndo")!.addEventListener("click", () => {
+    if (!past.length || !recipe) return;
+    future.push(snap());
+    restore(past.pop()!);
+    openKey = null;
+    void paint();
+  });
+  el.querySelector("#asRedo")!.addEventListener("click", () => {
+    if (!future.length || !recipe) return;
+    past.push(snap());
+    restore(future.pop()!);
+    openKey = null;
     void paint();
   });
 
@@ -164,16 +229,16 @@ export function openAvatarStudio(o: AvatarStudioOptions): void {
 
   /** This avatar with one mutation applied, at thumbnail size. */
   function variant(mutate: (r: AvatarRecipe) => void, size = TILE_PX): Promise<string | null> {
-    const r = clone(recipe);
+    const r = clone(recipe!);
     mutate(r);
     return renderRecipe(r, { size, background: o.color });
   }
 
-  /** Fill a strip of buttons with their thumbnails, dropping any that fail.
-   *  Kept in one place so no row has to remember the generation check. */
-  async function fill(strip: HTMLElement, jobs: Array<{ btn: HTMLElement; uri: Promise<string | null> }>, gen: number): Promise<void> {
+  /** Fill a set of buttons with their thumbnails, dropping any that fail.
+   *  Kept in one place so no grid has to remember the generation check. */
+  async function fill(host: HTMLElement, jobs: Array<{ btn: HTMLElement; uri: Promise<string | null> }>, gen: number): Promise<void> {
     const uris = await Promise.all(jobs.map((j) => j.uri));
-    if (gen !== generation || !strip.isConnected) return;
+    if (gen !== generation || !host.isConnected) return;
     jobs.forEach((j, i) => {
       const uri = uris[i];
       if (!uri) { j.btn.remove(); return; }
@@ -181,337 +246,579 @@ export function openAvatarStudio(o: AvatarStudioOptions): void {
     });
   }
 
-  // ---- panels -------------------------------------------------------------
 
-  function tileBtn(label: string, on: boolean, extraClass = ""): HTMLButtonElement {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = `asTile ${extraClass}${on ? " on" : ""}`;
-    b.title = label;
-    b.setAttribute("aria-label", label);
-    b.setAttribute("aria-pressed", on ? "true" : "false");
-    return b;
+  // ---- painting: the opener ----------------------------------------------
+
+  async function paintOpener(gen: number): Promise<void> {
+    el.classList.add("picking");
+    panelEl.innerHTML = `
+      <section class="asOpener">
+        <h3>Pick a face to start from</h3>
+        <div class="asFaces" id="asFaces"></div>
+        <div class="asOpenMore">
+          <button type="button" class="asBtn" id="asAllStyles">Browse all ${AVATAR_STYLES.length} styles</button>
+          <button type="button" class="asBtn" id="asSurprise">Surprise me</button>
+        </div>
+      </section>`;
+
+    const grid = panelEl.querySelector<HTMLElement>("#asFaces")!;
+    const jobs: Array<{ btn: HTMLElement; uri: Promise<string | null> }> = [];
+
+    for (const p of AVATAR_PRESETS) {
+      const f = await avatarFeatures(p.style);
+      if (gen !== generation) return;
+      const r = presetRecipe(p, f);
+
+      const cell = document.createElement("button");
+      cell.type = "button";
+      cell.className = "asFace";
+      cell.setAttribute("aria-label", `Start from ${p.label}`);
+      const cap = document.createElement("span");
+      cap.className = "asFaceCap";
+      cap.textContent = p.label;
+      cell.appendChild(cap);
+      cell.addEventListener("click", () => void startFrom(r));
+      grid.appendChild(cell);
+      jobs.push({ btn: cell, uri: renderRecipe(r, { size: 160, background: o.color }) });
+    }
+
+    panelEl.querySelector("#asSurprise")!.addEventListener("click", () => {
+      const p = AVATAR_PRESETS[Math.floor(Math.random() * AVATAR_PRESETS.length)]!;
+      void avatarFeatures(p.style).then((f) => {
+        const r = presetRecipe(p, f);
+        // A new seed is what makes it a surprise rather than the same twelve.
+        r.seed = `${seedBase}-${Math.floor(Math.random() * 1e9).toString(36)}`;
+        void startFrom(r);
+      });
+    });
+    panelEl.querySelector("#asAllStyles")!.addEventListener("click", () => {
+      browsing = true;
+      void paint();
+    });
+
+    await fill(panelEl, jobs, gen);
   }
 
-  function row(title: string, value: string): { wrap: HTMLElement; strip: HTMLElement } {
-    const wrap = document.createElement("div");
-    wrap.className = "asRow";
-    wrap.innerHTML = `<div class="asRowHead"><span>${esc(title)}</span><span class="asRowVal">${esc(value)}</span></div><div class="asStrip"></div>`;
-    return { wrap, strip: wrap.querySelector<HTMLElement>(".asStrip")! };
-  }
+  /** Every style, for someone who wants one the twelve presets do not cover.
+   *  The reference build stubs this out; here it is the real list. */
+  async function paintStyles(gen: number): Promise<void> {
+    el.classList.add("picking");
+    panelEl.innerHTML = `
+      <section class="asOpener">
+        <div class="asCrumb"><button type="button" class="asBack" id="asBackFaces">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+          Faces</button></div>
+        <h3>All ${AVATAR_STYLES.length} styles</h3>
+        <div id="asStyleGroups"></div>
+      </section>`;
+    panelEl.querySelector("#asBackFaces")!.addEventListener("click", () => { browsing = false; void paint(); });
 
-  async function panelStyle(gen: number): Promise<void> {
-    panelEl.innerHTML = "";
+    const host = panelEl.querySelector<HTMLElement>("#asStyleGroups")!;
+    const seed = recipe?.seed || seedBase;
+    const jobs: Array<{ btn: HTMLElement; uri: Promise<string | null> }> = [];
     const groups: string[] = [];
     for (const s of AVATAR_STYLES) if (!groups.includes(s.group)) groups.push(s.group);
 
-    const jobs: Array<{ btn: HTMLElement; uri: Promise<string | null> }> = [];
     for (const g of groups) {
       const sec = document.createElement("section");
-      sec.className = "asGroup";
-      sec.innerHTML = `<h3>${esc(g)}</h3><div class="asGrid"></div>`;
-      const grid = sec.querySelector<HTMLElement>(".asGrid")!;
-
+      sec.className = "asGrp";
+      sec.innerHTML = `<div class="asGrpHead"><h4>${esc(g)}</h4><span class="asRule"></span></div><div class="asFaces"></div>`;
+      const grid = sec.querySelector<HTMLElement>(".asFaces")!;
       for (const s of AVATAR_STYLES.filter((x) => x.group === g)) {
-        const cell = document.createElement("div");
-        cell.className = "asCell";
-        const b = tileBtn(s.label, s.id === recipe.style);
-        b.addEventListener("click", () => {
-          if (s.id === recipe.style) return;
-          // Feature choices belong to the style that defined them. "eyes:
-          // wink" means nothing to Shapes, and carrying it across would
-          // silently do nothing while still appearing to be set. The frame
-          // survives, because a background and a rotation mean the same thing
-          // everywhere.
-          const frame = { ...(recipe.frame || {}) };
-          recipe = blankRecipe(s.id, recipe.seed);
-          recipe.frame = frame;
-          void paint();
-        });
-        cell.appendChild(b);
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "asFace";
+        b.setAttribute("aria-label", `Start from ${s.label}`);
         const cap = document.createElement("span");
-        cap.className = "asCap";
+        cap.className = "asFaceCap";
         cap.textContent = s.label;
-        cell.appendChild(cap);
-        grid.appendChild(cell);
-
-        jobs.push({
-          btn: b,
-          uri: renderRecipe({ ...blankRecipe(s.id, recipe.seed), frame: recipe.frame }, { size: TILE_PX, background: o.color }),
-        });
+        b.appendChild(cap);
+        b.addEventListener("click", () => { browsing = false; void startFrom(blankRecipe(s.id, seed)); });
+        grid.appendChild(b);
+        jobs.push({ btn: b, uri: renderRecipe(blankRecipe(s.id, seed), { size: 160, background: o.color }) });
       }
-      panelEl.appendChild(sec);
+      host.appendChild(sec);
     }
     await fill(panelEl, jobs, gen);
   }
 
-  async function panelFeatures(gen: number): Promise<void> {
-    panelEl.innerHTML = "";
-    if (!features.enums.length && !features.toggles.length) {
-      panelEl.innerHTML = `<p class="asEmpty">This style has no separate features to set. Shuffle for a different one, or try the colours and frame.</p>`;
-      return;
+  async function startFrom(r: AvatarRecipe): Promise<void> {
+    recipe = r;
+    touched = new Set();
+    past.length = 0;
+    future.length = 0;
+    openKey = null;
+    browsing = false;
+    await paint();
+  }
+
+  // ---- painting: the part list -------------------------------------------
+
+  function paintParts(): void {
+    el.classList.remove("picking");
+    panelEl.innerHTML = `
+      <section class="asEditor">
+        <div class="asCrumb">
+          <button type="button" class="asBack" id="asChangeFace">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+            Change face
+          </button>
+          <span class="asCrumbStyle">${esc(styleLabel())}</span>
+        </div>
+        <div id="asPartHost"></div>
+      </section>`;
+    panelEl.querySelector("#asChangeFace")!.addEventListener("click", () => {
+      // Deliberately does not discard: coming back to the picker and then
+      // changing your mind must not cost the face you already built.
+      recipe = null;
+      openKey = null;
+      void paint();
+    });
+
+    const host = panelEl.querySelector<HTMLElement>("#asPartHost")!;
+
+    for (const g of GROUP_ORDER) {
+      const mine = parts.filter((p) => p.group === g);
+      if (!mine.length) continue;
+
+      const sec = document.createElement("section");
+      sec.className = "asGrp";
+      sec.innerHTML = `<div class="asGrpHead"><h4>${esc(g)}</h4><span class="asRule"></span></div><div class="asParts"></div>`;
+      const grid = sec.querySelector<HTMLElement>(".asParts")!;
+
+      for (const p of mine) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "asPart";
+
+        if (p.kind === "color") {
+          const chip = document.createElement("span");
+          chip.className = "asPartChip";
+          chip.style.background = chipColor(p, recipe!, o.color);
+          b.appendChild(chip);
+        }
+
+        const txt = document.createElement("span");
+        txt.className = "asPartTxt";
+        const mark = touched.has(p.key) ? `<span class="asMark" title="You chose this"></span>` : "";
+        txt.innerHTML = `<b>${esc(p.label)}${mark}</b><small>${esc(valueText(p, recipe!, o.color))}</small>`;
+        b.appendChild(txt);
+
+        const go = document.createElement("span");
+        go.className = "asPartGo";
+        go.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>`;
+        b.appendChild(go);
+
+        b.addEventListener("click", () => { openKey = p.key; void paint(); });
+        grid.appendChild(b);
+      }
+      host.appendChild(sec);
     }
+  }
+
+  // ---- painting: one part -------------------------------------------------
+
+  async function paintDetail(gen: number): Promise<void> {
+    el.classList.remove("picking");
+    const p = parts.find((x) => x.key === openKey);
+    if (!p) { openKey = null; paintParts(); return; }
+
+    panelEl.innerHTML = `
+      <section class="asEditor">
+        <div class="asDetailHead">
+          <button type="button" class="asBack" id="asAllParts">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+            All parts
+          </button>
+          <h3>${esc(p.label)}</h3>
+          <span class="asDetailNow">${esc(valueText(p, recipe!, o.color))}</span>
+          <span class="asGrow"></span>
+          <button type="button" class="asIcon asDice" id="asDice" title="Re-roll ${esc(p.label.toLowerCase())}" aria-label="Re-roll ${esc(p.label.toLowerCase())}">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg>
+          </button>
+        </div>
+        <div id="asDetailBody"></div>
+      </section>`;
+    panelEl.querySelector("#asAllParts")!.addEventListener("click", () => { openKey = null; void paint(); });
+    panelEl.querySelector("#asDice")!.addEventListener("click", () => reroll(p));
+
+    const body = panelEl.querySelector<HTMLElement>("#asDetailBody")!;
+    if (p.kind === "enum") await detailEnum(p, body, gen);
+    else if (p.kind === "color") detailColor(p, body);
+    else if (p.kind === "seg") detailSeg(p, body);
+    else if (p.kind === "slide") detailSlide(p, body);
+    else detailPad(body);
+  }
+
+  async function detailEnum(p: Extract<Part, { kind: "enum" }>, body: HTMLElement, gen: number): Promise<void> {
+    const r = recipe!;
+    const off = isNone(p, r);
+    const cur = off ? "" : (r.choices[p.key] || "");
+    const grid = document.createElement("div");
+    grid.className = "asOptGrid";
     const jobs: Array<{ btn: HTMLElement; uri: Promise<string | null> }> = [];
 
-    for (const f of features.enums) {
-      const cur = recipe.choices[f.key] || "";
-      const { wrap, strip } = row(f.label, cur ? humaniseValue(cur) : "Random");
+    // "Any" means leave it to the seed. It is not the same as None, and
+    // collapsing the two would make a deliberate bald head indistinguishable
+    // from not having decided yet.
+    const any = document.createElement("button");
+    any.type = "button";
+    any.className = `asTile asTxtTile${!cur && !off ? " on" : ""}`;
+    any.textContent = "Any";
+    any.setAttribute("aria-pressed", String(!cur && !off));
+    any.addEventListener("click", () => {
+      commit();
+      delete r.choices[p.key];
+      if (p.toggleKey) delete r.toggles![p.toggleKey];
+      touched.delete(p.key);
+      void paint();
+    });
+    grid.appendChild(any);
 
-      const rnd = tileBtn(`${f.label}: random`, !cur, "asRandom");
-      rnd.textContent = "Any";
-      rnd.addEventListener("click", () => { delete recipe.choices[f.key]; void paint(); });
-      const rndCell = document.createElement("div");
-      rndCell.className = "asCell";
-      rndCell.appendChild(rnd);
-      strip.appendChild(rndCell);
-
-      for (const v of f.values) {
-        const b = tileBtn(`${f.label}: ${humaniseValue(v)}`, v === cur);
-        b.addEventListener("click", () => { recipe.choices[f.key] = v; void paint(); });
-        const cell = document.createElement("div");
-        cell.className = "asCell";
-        cell.appendChild(b);
-        strip.appendChild(cell);
-        jobs.push({ btn: b, uri: variant((r) => { r.choices[f.key] = v; }) });
-      }
-      panelEl.appendChild(wrap);
-    }
-    for (const t of features.toggles) {
-      const set = recipe.toggles?.[t.key];
-      const label = set === undefined ? "Random" : set ? "Yes" : "No";
-      // "Show top" rather than "Top", because the enum row it switches on and
-      // off is also called Top, and two rows with one name is how you end up
-      // changing the wrong one.
-      const { wrap, strip } = row(`Show ${t.label.toLowerCase()}`, label);
-      const opts: Array<[string, boolean | undefined]> = [["Random", undefined], ["No", false], ["Yes", true]];
-      for (const [name, val] of opts) {
-        const b = tileBtn(`${t.label}: ${name}`, set === val);
-        b.addEventListener("click", () => {
-          if (val === undefined) delete recipe.toggles![t.key];
-          else recipe.toggles![t.key] = val;
-          void paint();
-        });
-        const cap = document.createElement("span");
-        cap.className = "asCap";
-        cap.textContent = name;
-        const cell = document.createElement("div");
-        cell.className = "asCell";
-        cell.append(b, cap);
-        strip.appendChild(cell);
-        jobs.push({
-          btn: b,
-          uri: variant((r) => { if (val === undefined) delete r.toggles![t.key]; else r.toggles![t.key] = val; }),
-        });
-      }
-      panelEl.appendChild(wrap);
+    // Only offered where the library actually has a switch for it. Inventing a
+    // None for a part that cannot be absent would be a control that does
+    // nothing, which is the failure this whole screen exists to remove.
+    if (p.toggleKey) {
+      const none = document.createElement("button");
+      none.type = "button";
+      none.className = `asTile asTxtTile${off ? " on" : ""}`;
+      none.textContent = "None";
+      none.setAttribute("aria-pressed", String(off));
+      none.addEventListener("click", () => {
+        commit();
+        r.toggles![p.toggleKey!] = false;
+        touched.add(p.key);
+        void paint();
+      });
+      grid.appendChild(none);
     }
 
+    for (const v of p.values) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = `asTile${v === cur ? " on" : ""}`;
+      b.title = `${p.label}: ${humaniseValue(v)}`;
+      b.setAttribute("aria-label", `${p.label}: ${humaniseValue(v)}`);
+      b.setAttribute("aria-pressed", String(v === cur));
+      b.addEventListener("click", () => {
+        commit();
+        r.choices[p.key] = v;
+        // Picking a variant of an optional part turns it on. Otherwise
+        // choosing glasses after choosing None does nothing visible.
+        if (p.toggleKey) r.toggles![p.toggleKey] = true;
+        touched.add(p.key);
+        void paint();
+      });
+      grid.appendChild(b);
+      jobs.push({
+        btn: b,
+        uri: variant((x) => {
+          x.choices[p.key] = v;
+          if (p.toggleKey) x.toggles![p.toggleKey] = true;
+          // Tiles are drawn square and uncropped so the difference between two
+          // hairstyles is not hidden behind the frame's corner radius.
+          x.frame = { ...(x.frame || {}), radius: 0 };
+        }),
+      });
+    }
+
+    body.appendChild(grid);
     await fill(panelEl, jobs, gen);
   }
 
-  /** A real <input type="color"> laid invisibly over a swatch, so the browser's
-   *  own picker opens and no colour space has to be reimplemented.
-   *
-   *  Dragging inside that picker fires input continuously; only the preview
-   *  follows it. The panel rebuild waits for change, because rebuilding the
-   *  strip mid-drag removes the element the picker is anchored to. */
-  function customColorCell(label: string, initial: string, set: (hex: string) => void): HTMLElement {
-    const cell = document.createElement("label");
-    cell.className = "asCell asCustomColor";
-    cell.title = label;
-    cell.innerHTML = `<span class="asTile asSwatch asAny" aria-hidden="true"></span>
-      <input type="color" value="#${initial.replace("#", "")}" aria-label="${esc(label)}" />
-      <span class="asCap">Custom</span>`;
-    const input = cell.querySelector<HTMLInputElement>("input")!;
-    input.addEventListener("input", () => { set(input.value.replace("#", "")); void paintPreview(); });
-    input.addEventListener("change", () => void paint());
-    return cell;
+  function detailColor(p: Extract<Part, { kind: "color" }>, body: HTMLElement): void {
+    const r = recipe!;
+    const cur = (p.frame === "bg" ? r.frame?.bg : p.frame === "bg2" ? r.frame?.bg2 : r.colors?.[p.key]) || "";
+    const curHex = cur.replace("#", "").toLowerCase();
+
+    const write = (hex: string | null): void => {
+      commit();
+      if (p.frame === "bg") { if (hex) r.frame!.bg = hex; else delete r.frame!.bg; }
+      else if (p.frame === "bg2") { if (hex) r.frame!.bg2 = hex; else delete r.frame!.bg2; }
+      else if (hex) r.colors![p.key] = hex; else delete r.colors![p.key];
+      if (hex) touched.add(p.key); else touched.delete(p.key);
+      void paint();
+    };
+
+    const grid = document.createElement("div");
+    grid.className = "asSwGrid";
+
+    // "Any"/"Profile colour" first. It is the state everything starts in, so
+    // the way back to it should not be at the end of a palette.
+    const auto = document.createElement("button");
+    auto.type = "button";
+    auto.className = `asSw asTxtTile${!curHex ? " on" : ""}`;
+    auto.textContent = p.frame === "bg" ? "Auto" : "Any";
+    auto.title = p.frame === "bg" ? "Follow the profile colour" : `${p.label}: leave to the seed`;
+    auto.setAttribute("aria-pressed", String(!curHex));
+    auto.addEventListener("click", () => write(null));
+    grid.appendChild(auto);
+
+    // A real <input type="color"> laid invisibly over a swatch, so the
+    // browser's own picker opens and no colour space has to be reimplemented.
+    // Dragging fires input continuously; only the preview follows it, because
+    // rebuilding the grid mid-drag removes the element the picker is anchored
+    // to. The undo entry is taken once, on change.
+    const lab = document.createElement("label");
+    lab.className = "asSw asSwCustom";
+    lab.title = `${p.label}, any colour`;
+    lab.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></svg>
+      <input type="color" value="#${curHex || (p.palette[0] || "c5f04e")}" aria-label="${esc(p.label)}, custom colour">`;
+    const input = lab.querySelector<HTMLInputElement>("input")!;
+    input.addEventListener("input", () => {
+      const hex = input.value.replace("#", "");
+      if (p.frame === "bg") r.frame!.bg = hex;
+      else if (p.frame === "bg2") r.frame!.bg2 = hex;
+      else r.colors![p.key] = hex;
+      void paintPreview();
+    });
+    input.addEventListener("change", () => write(input.value.replace("#", "")));
+    grid.appendChild(lab);
+
+    for (const hex of p.palette) {
+      const b = document.createElement("button");
+      b.type = "button";
+      const on = hex.toLowerCase() === curHex;
+      b.className = `asSw${on ? " on" : ""}`;
+      b.style.background = `#${hex}`;
+      b.title = `#${hex}`;
+      b.setAttribute("aria-label", `${p.label}: #${hex}`);
+      b.setAttribute("aria-pressed", String(on));
+      b.addEventListener("click", () => write(hex));
+      grid.appendChild(b);
+    }
+    body.appendChild(grid);
   }
 
-  function paintColors(): void {
-    panelEl.innerHTML = "";
-    if (!features.colors.length) {
-      panelEl.innerHTML = `<p class="asEmpty">This style draws its own colours. The background is on the Frame tab.</p>`;
-      return;
-    }
-    for (const c of features.colors) {
-      const cur = (recipe.colors?.[c.key] || "").replace("#", "");
-      const { wrap, strip } = row(c.label, cur ? `#${cur}` : "Random");
-
-      const rnd = tileBtn(`${c.label}: random`, !cur, "asRandom asSwatch");
-      rnd.textContent = "Any";
-      rnd.addEventListener("click", () => { delete recipe.colors![c.key]; void paint(); });
-      const rc = document.createElement("div"); rc.className = "asCell"; rc.appendChild(rnd);
-      strip.appendChild(rc);
-
-      // Second, not last. These strips scroll, and the palettes long enough to
-      // need scrolling are exactly the ones where a chip parked at the far
-      // right is a control nobody finds.
-      strip.appendChild(customColorCell(`${c.label}, custom color`, cur || c.palette[0]!, (hex) => {
-        recipe.colors![c.key] = hex;
-      }));
-
-      // Solid swatches rather than rendered heads. A colour reads faster as a
-      // colour, and the big preview above is already showing it applied.
-      for (const hex of c.palette) {
-        const b = tileBtn(`${c.label}: #${hex}`, hex.toLowerCase() === cur.toLowerCase(), "asSwatch");
-        b.style.background = `#${hex}`;
-        b.addEventListener("click", () => { recipe.colors![c.key] = hex; void paint(); });
-        const cell = document.createElement("div"); cell.className = "asCell"; cell.appendChild(b);
-        strip.appendChild(cell);
-      }
-
-      panelEl.appendChild(wrap);
-    }
-  }
-
-  function paintFrame(): void {
-    const f = recipe.frame || (recipe.frame = {});
-    const bg = (f.bg || "").replace("#", "");
-    const BG = ["", o.color.replace("#", ""), "c5f04e", "ff5e7e", "06d6a0", "118ab2", "ffd166", "a78bfa", "1a1f2b", "f3f4f6"]
-      .filter((v, i, a) => a.indexOf(v) === i);
-
-    panelEl.innerHTML = "";
-
-    const bgRow = row("Background", bg ? `#${bg}` : "Profile color");
-    for (const hex of BG) {
-      const on = hex === bg || (!hex && !f.bg);
-      const b = tileBtn(hex ? `Background #${hex}` : "Follow the profile color", on, "asSwatch");
-      if (hex) b.style.background = `#${hex}`;
-      else { b.classList.add("asRandom"); b.textContent = "Auto"; }
-      b.addEventListener("click", () => { if (hex) f.bg = hex; else delete f.bg; void paint(); });
-      const cell = document.createElement("div"); cell.className = "asCell"; cell.appendChild(b);
-      bgRow.strip.appendChild(cell);
-    }
-    bgRow.strip.appendChild(customColorCell("Background, custom color", bg || o.color, (hex) => { f.bg = hex; }));
-    panelEl.appendChild(bgRow.wrap);
-
-    const gradOn = f.bgType === "gradientLinear";
-    const typeRow = row("Background style", gradOn ? "Gradient" : "Solid");
-    for (const [name, val] of [["Solid", "solid"], ["Gradient", "gradientLinear"]] as const) {
-      const b = tileBtn(name, (f.bgType || "solid") === val, "asRandom");
+  function detailSeg(p: Extract<Part, { kind: "seg" }>, body: HTMLElement): void {
+    const r = recipe!;
+    const cur = segValue(p, recipe!);
+    const seg = document.createElement("div");
+    seg.className = "asSeg";
+    for (const [val, name] of p.options) {
+      const b = document.createElement("button");
+      b.type = "button";
       b.textContent = name;
-      b.addEventListener("click", () => { f.bgType = val; void paint(); });
-      const cell = document.createElement("div"); cell.className = "asCell"; cell.appendChild(b);
-      typeRow.strip.appendChild(cell);
-    }
-    panelEl.appendChild(typeRow.wrap);
-
-    if (gradOn) {
-      const second = (f.bg2 || "").replace("#", "");
-      const r2 = row("Gradient second color", second ? `#${second}` : "Not set");
-      for (const hex of BG.filter(Boolean)) {
-        const b = tileBtn(`Second color #${hex}`, hex === second, "asSwatch");
-        b.style.background = `#${hex}`;
-        b.addEventListener("click", () => { f.bg2 = hex; void paint(); });
-        const cell = document.createElement("div"); cell.className = "asCell"; cell.appendChild(b);
-        r2.strip.appendChild(cell);
-      }
-      r2.strip.appendChild(customColorCell("Second color, custom", second || o.color, (hex) => { f.bg2 = hex; }));
-      panelEl.appendChild(r2.wrap);
-    }
-
-    const flipRow = row("Mirror", f.flip ? "Flipped" : "Normal");
-    for (const [name, val] of [["Normal", false], ["Flipped", true]] as const) {
-      const b = tileBtn(name, !!f.flip === val, "asRandom");
-      b.textContent = name;
-      b.addEventListener("click", () => { f.flip = val; void paint(); });
-      const cell = document.createElement("div"); cell.className = "asCell"; cell.appendChild(b);
-      flipRow.strip.appendChild(cell);
-    }
-    panelEl.appendChild(flipRow.wrap);
-
-    slider("Corner rounding", "radius", 0, 50, f.radius ?? 0, (v) => { f.radius = v; }, (v) => `${v}%`);
-    slider("Size in frame", "scale", 50, 150, f.scale ?? 100, (v) => { f.scale = v; }, (v) => `${v}%`);
-    slider("Rotation", "rotate", 0, 359, f.rotate ?? 0, (v) => { f.rotate = v; }, (v) => `${v} degrees`);
-
-    function slider(label: string, _key: string, min: number, max: number, val: number,
-                    set: (v: number) => void, fmt: (v: number) => string): void {
-      const wrap = document.createElement("div");
-      wrap.className = "asRow";
-      wrap.innerHTML = `<div class="asRowHead"><span>${esc(label)}</span><span class="asRowVal">${esc(fmt(val))}</span></div>
-        <input class="asSlider" type="range" min="${min}" max="${max}" value="${val}" aria-label="${esc(label)}" />`;
-      const out = wrap.querySelector<HTMLElement>(".asRowVal")!;
-      const input = wrap.querySelector<HTMLInputElement>("input")!;
-      // Dragging repaints the preview only. Rebuilding the whole panel on every
-      // pixel of travel would tear the control out from under the pointer.
-      input.addEventListener("input", () => {
-        const v = Number(input.value);
-        set(v);
-        out.textContent = fmt(v);
-        void paintPreview();
+      b.setAttribute("aria-pressed", String(val === cur));
+      b.addEventListener("click", () => {
+        commit();
+        if (p.key === "frame:bgType") r.frame!.bgType = val as "solid" | "gradientLinear";
+        else if (p.key === "frame:flip") r.frame!.flip = val === "yes";
+        else {
+          const tk = p.key.slice("toggle:".length);
+          if (val === "auto") delete r.toggles![tk];
+          else r.toggles![tk] = val === "yes";
+        }
+        if (val === "auto") touched.delete(p.key); else touched.add(p.key);
+        void paint();
       });
-      panelEl.appendChild(wrap);
+      seg.appendChild(b);
+    }
+    body.appendChild(seg);
+  }
+
+  function detailSlide(p: Extract<Part, { kind: "slide" }>, body: HTMLElement): void {
+    const r = recipe!;
+    const cur = slideValue(p, recipe!);
+    const wrap = document.createElement("div");
+    wrap.className = "asSlide";
+    wrap.innerHTML = `<input type="range" min="${p.min}" max="${p.max}" step="${p.step}" value="${cur}" aria-label="${esc(p.label)}"><span class="asSlideNum">${cur}${p.suffix}</span>`;
+    const input = wrap.querySelector<HTMLInputElement>("input")!;
+    const num = wrap.querySelector<HTMLElement>(".asSlideNum")!;
+
+    let dragged = false;
+    const apply = (v: number): void => {
+      if (p.key === "frame:scale") r.frame!.scale = v;
+      else if (p.key === "frame:rotate") r.frame!.rotate = v;
+      else r.frame!.radius = v;
+    };
+    // Dragging repaints the preview only. Rebuilding the panel on every pixel
+    // of travel would tear the control out from under the pointer, and would
+    // also push forty undo entries for one gesture.
+    input.addEventListener("pointerdown", () => { if (!dragged) { commit(); dragged = true; } });
+    input.addEventListener("input", () => {
+      if (!dragged) { commit(); dragged = true; }
+      const v = Number(input.value);
+      apply(v);
+      num.textContent = `${v}${p.suffix}`;
+      touched.add(p.key);
+      void paintPreview();
+    });
+    input.addEventListener("change", () => { dragged = false; void paint(); });
+    body.appendChild(wrap);
+  }
+
+  function detailPad(body: HTMLElement): void {
+    const r = recipe!;
+    const wrap = document.createElement("div");
+    wrap.className = "asPadWrap";
+    const pad = document.createElement("div");
+    pad.className = "asPad";
+    pad.setAttribute("role", "slider");
+    pad.setAttribute("aria-label", "Position within the frame");
+    const dot = document.createElement("div");
+    dot.className = "asPadDot";
+    pad.appendChild(dot);
+
+    const place = (): void => {
+      dot.style.left = `${50 + (r.frame?.translateX || 0) / 2}%`;
+      dot.style.top = `${50 + (r.frame?.translateY || 0) / 2}%`;
+    };
+    place();
+
+    let dragging = false;
+    const move = (e: PointerEvent): void => {
+      const rc = pad.getBoundingClientRect();
+      const nx = Math.min(1, Math.max(0, (e.clientX - rc.left) / rc.width));
+      const ny = Math.min(1, Math.max(0, (e.clientY - rc.top) / rc.height));
+      r.frame!.translateX = Math.round((nx - 0.5) * 100);
+      r.frame!.translateY = Math.round((ny - 0.5) * 100);
+      touched.add("translate");
+      place();
+      void paintPreview();
+    };
+    pad.addEventListener("pointerdown", (e) => {
+      dragging = true;
+      commit();
+      pad.setPointerCapture(e.pointerId);
+      move(e);
+    });
+    pad.addEventListener("pointermove", (e) => { if (dragging) move(e); });
+    pad.addEventListener("pointerup", () => { dragging = false; void paint(); });
+
+    const reset = document.createElement("button");
+    reset.type = "button";
+    reset.className = "asBtn sm";
+    reset.textContent = "Centre";
+    reset.addEventListener("click", () => {
+      commit();
+      delete r.frame!.translateX;
+      delete r.frame!.translateY;
+      touched.delete("translate");
+      void paint();
+    });
+
+    wrap.append(pad, reset);
+    body.appendChild(wrap);
+  }
+
+  function reroll(p: Part): void {
+    const r = recipe!;
+    commit();
+    if (p.kind === "enum") {
+      r.choices[p.key] = p.values[Math.floor(Math.random() * p.values.length)]!;
+      if (p.toggleKey) r.toggles![p.toggleKey] = true;
+      touched.add(p.key);
+    } else if (p.kind === "color") {
+      const hex = p.palette[Math.floor(Math.random() * p.palette.length)]!;
+      if (p.frame === "bg") r.frame!.bg = hex;
+      else if (p.frame === "bg2") r.frame!.bg2 = hex;
+      else r.colors![p.key] = hex;
+      touched.add(p.key);
+    } else if (p.kind === "seg") {
+      const [val] = p.options[Math.floor(Math.random() * p.options.length)]!;
+      if (p.key === "frame:bgType") r.frame!.bgType = val as "solid" | "gradientLinear";
+      else if (p.key === "frame:flip") r.frame!.flip = val === "yes";
+      else {
+        const tk = p.key.slice("toggle:".length);
+        if (val === "auto") delete r.toggles![tk]; else r.toggles![tk] = val === "yes";
+      }
+      touched.add(p.key);
+    } else if (p.kind === "slide") {
+      const steps = Math.floor((p.max - p.min) / p.step);
+      const v = p.min + Math.round(Math.random() * steps) * p.step;
+      if (p.key === "frame:scale") r.frame!.scale = v;
+      else if (p.key === "frame:rotate") r.frame!.rotate = v;
+      else r.frame!.radius = v;
+      touched.add(p.key);
+    } else {
+      r.frame!.translateX = Math.round(Math.random() * 40 - 20);
+      r.frame!.translateY = Math.round(Math.random() * 40 - 20);
+      touched.add("translate");
+    }
+    void paint();
+  }
+
+  // ---- stage --------------------------------------------------------------
+
+  async function paintPreview(): Promise<void> {
+    if (!recipe) return;
+    const uri = await renderRecipe(recipe, { size: PREVIEW_PX, background: o.color });
+    if (!uri) return;
+    latestUri = uri;
+    heroEl.style.backgroundImage = `url("${uri}")`;
+  }
+
+  function styleLabel(): string {
+    const s = AVATAR_STYLES.find((x) => x.id === recipe?.style);
+    return s ? s.label : (recipe?.style || "");
+  }
+
+  async function paintSlots(): Promise<void> {
+    slotsEl.innerHTML = "";
+    for (let i = 0; i < 2; i++) {
+      const h = held[i];
+      if (!h) {
+        const d = document.createElement("div");
+        d.className = "asSlot empty";
+        d.textContent = "Empty";
+        slotsEl.appendChild(d);
+        continue;
+      }
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "asSlot";
+      b.title = "Go back to this one";
+      b.setAttribute("aria-label", "Go back to this held avatar");
+      const tag = document.createElement("span");
+      tag.className = "asSlotSwap";
+      tag.textContent = "Go back";
+      b.appendChild(tag);
+      b.addEventListener("click", () => {
+        commit();
+        restore(h);
+        openKey = null;
+        void paint();
+      });
+      slotsEl.appendChild(b);
+      void renderRecipe(h.recipe, { size: TILE_PX, background: o.color }).then((uri) => {
+        if (uri && b.isConnected) b.style.backgroundImage = `url("${uri}")`;
+      });
     }
   }
 
   // ---- paint --------------------------------------------------------------
 
-  async function paintPreview(): Promise<void> {
-    const uri = await renderRecipe(recipe, { size: PREVIEW_PX, background: o.color });
-    if (!uri) return;
-    latestUri = uri;
-    previewEl.style.backgroundImage = `url("${uri}")`;
-  }
-
-  function paintTabs(): void {
-    const tabs: Array<[Tab, string, boolean]> = [
-      ["style", "Style", true],
-      ["features", "Features", !!(features.enums.length || features.toggles.length)],
-      ["colors", "Colors", !!features.colors.length],
-      ["frame", "Frame", true],
-    ];
-    if (!tabs.find(([id, , shown]) => id === tab && shown)) tab = "style";
-    tabsEl.innerHTML = "";
-    for (const [id, label, shown] of tabs) {
-      if (!shown) continue;
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = `asTab${id === tab ? " on" : ""}`;
-      b.textContent = label;
-      b.setAttribute("aria-current", id === tab ? "page" : "false");
-      b.addEventListener("click", () => { tab = id; void paint(); });
-      tabsEl.appendChild(b);
-    }
-  }
-
   async function paint(): Promise<void> {
     const gen = ++generation;
+
+    (el.querySelector("#asUndo") as HTMLButtonElement).disabled = !past.length;
+    (el.querySelector("#asRedo") as HTMLButtonElement).disabled = !future.length;
+    el.querySelector("#asMineN")!.textContent = String(touched.size);
+
+    if (!recipe) {
+      el.querySelector("#asHeroName")!.textContent = "";
+      el.querySelector("#asHeroStyle")!.textContent = "";
+      if (browsing) await paintStyles(gen);
+      else await paintOpener(gen);
+      return;
+    }
+
     features = await avatarFeatures(recipe.style);
     if (gen !== generation) return;
+    parts = buildParts(features, recipe);
 
-    const style = AVATAR_STYLES.find((s) => s.id === recipe.style);
-    styleNameEl.textContent = style
-      ? `${style.label}${isPlain(recipe) ? "" : ", customised"}`
-      : recipe.style;
+    el.querySelector("#asHeroName")!.textContent = profileName;
+    el.querySelector("#asHeroStyle")!.textContent = styleLabel() + (isPlain(recipe) ? "" : ", yours");
 
-    paintTabs();
     void paintPreview();
+    void paintSlots();
 
-    if (tab === "style") await panelStyle(gen);
-    else if (tab === "features") await panelFeatures(gen);
-    else if (tab === "colors") paintColors();
-    else paintFrame();
+    if (openKey) await paintDetail(gen);
+    else paintParts();
 
     panelEl.scrollTop = 0;
-    // A strip of 34 hairstyles opens on the first one, and the one that is
-    // actually set can be twenty tiles to the right. Without this, reopening a
-    // customised avatar shows every row as though nothing were chosen.
-    panelEl.querySelectorAll<HTMLElement>(".asStrip .asTile.on").forEach((t) => {
-      const strip = t.closest<HTMLElement>(".asStrip");
-      if (!strip) return;
-      const left = t.offsetLeft - strip.clientWidth / 2 + t.offsetWidth / 2;
-      if (left > 0) strip.scrollLeft = left;
-    });
   }
 
-  // Opening on Style when there is already a customised avatar would put the
-  // one control that discards that work in front of them first.
-  if (o.recipe && !isPlain(opened)) tab = features.enums.length ? "features" : "style";
-  void paint().then(() => {
-    if (o.recipe && !isPlain(opened) && (features.enums.length || features.toggles.length) && tab === "style") {
-      tab = "features";
-      void paint();
-    }
-  });
+  void paint();
 }
