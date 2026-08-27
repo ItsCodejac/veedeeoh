@@ -8,7 +8,25 @@ behaviour as of 22 August 2026. They are **not** verified as legally sufficient 
 jurisdiction, and several clauses a real policy needs are deliberately left as
 `[REVIEW: ...]` placeholders rather than guessed at.
 
-## What a lawyer must confirm before these pages go live
+## Status, 27 August 2026: these pages are already live, placeholders and all
+
+`veedeeoh.com/terms` and `veedeeoh.com/privacy` are serving right now, and the
+`[REVIEW: ...]` markers are **visible text on them** -- eleven on the terms, ten on the
+privacy policy, rendered as notice blocks a customer can read. That is the honest state of
+the documents, but it is also a paid product asking for a card behind terms that openly say
+which clauses have not been settled.
+
+Two things follow, and both are decisions rather than engineering:
+
+- Whether it is acceptable to take payment under terms in this state, or whether the
+  placeholders must be resolved first.
+- Whether the markers should be visible at all. Visible is candid; hidden would misrepresent
+  the documents as finished. The engineering position is that hiding them without resolving
+  them is the one option that should be off the table.
+
+The list below is unchanged and is what counsel needs to settle.
+
+## What a lawyer must confirm
 
 1. The legal entity behind veedeeoh, its form, and a postal address for both documents.
 2. Governing law, venue, and whether arbitration and a class action waiver are wanted.
@@ -35,12 +53,21 @@ Source of truth: `supabase/migrations/*.sql`, `frontend/src/db.ts`, `frontend/sr
 `api/index.ts`, `backend/billing.ts`, `backend/email.ts`, `frontend/src/feedback.ts`,
 `worker/party.ts`.
 
-Note that `profiles`, `household_profiles`, `household_members`, `household_invites`,
-`favorites`, `watch_progress` and `catalog_cache` were created directly against the live
-Supabase project and have **no migration file in the repo**. Their columns below were read out
-of the client code and the later `ALTER TABLE` migrations that extend them, so the list may be
-incomplete. A schema dump from the live database should be taken before this document is relied
-on.
+**RESOLVED, 27 August 2026.** This section previously warned that `profiles`,
+`household_profiles`, `household_members`, `household_invites`, `favorites`, `watch_progress`
+and `catalog_cache` had no migration file, that their columns had been inferred from client
+code, and that a schema dump was needed before the document could be relied on.
+
+That dump has now been taken. Those seven tables, and six functions that were also missing,
+are recorded in `supabase/migrations/20260720000000_baseline_core_schema.sql` and
+`20260826000000_record_live_only_functions.sql`, both read directly out of the live database
+rather than reconstructed. A database built from the repository alone was then diffed against
+production and matches it exactly: 29 tables, 48 functions, 39 policies, 67 indexes, and every
+column, type, default and nullability. `npm run verify:db` reproduces that build and check.
+
+So the inventory below is now derived from the live schema and can be relied on. One correction
+it produced: `watch_progress` stores `position_secs`, `duration_secs` and a `completed` boolean,
+not the `position_sec`/`duration_sec`/`percentage` this document previously listed.
 
 ### Authentication (Supabase managed, `auth.users`)
 
@@ -147,9 +174,26 @@ on every page of `landing.html`, `index.html`, `privacy.html`, `terms.html`).
 - `GET /api/account/export` (`api/index.ts:461`) returns JSON of `household_profiles`,
   `watch_progress`, `favorites`, `collections`, `referrals`, `parties`, using the caller's own
   JWT so RLS scopes it. Wired to Settings > Account > "Download my data".
-- `POST /api/account/delete` (`api/index.ts:495`) requires the caller to retype their email,
-  cancels every Stripe subscription on the customer, deletes the auth user (cascading most
-  tables), then explicitly deletes the `profiles` row, which has no FK to `auth.users`.
+- `POST /api/account/delete` requires the caller to retype their email, cancels every Stripe
+  subscription on the customer, and deletes the auth user, which now cascades every table.
+
+  **CORRECTION, 27 August 2026, material to any erasure analysis.** Until that date this
+  deleted far less than it appeared to. The four hand-created tables had no foreign key to
+  `auth.users`, so deleting the auth user removed only the `parties` row; `household_profiles`
+  (profile names, avatars, PIN hashes, rating limits), `watch_progress`, `favorites` and
+  `household_invites` all survived, and the endpoint explicitly removed only `profiles`.
+  Worse than residue: RLS on those tables keys on `auth.uid()`, so once the auth user was gone
+  no session could ever match them again -- unreadable and undeletable through the product,
+  retained indefinitely, with the erasure request already reported as completed.
+
+  Migration `20260826040000_account_deletion_cascades.sql` added the five missing foreign keys,
+  all `on delete cascade`, after an orphan sweep. Production had no orphans at that point, so
+  no pre-existing data was destroyed by the sweep and none was left behind by it. Check 10 in
+  `npm run verify:db` asserts that nothing of a deleted account survives.
+
+  Counsel should note that any erasure request completed **before** 27 August 2026 did not
+  delete the viewing profiles, watch history, favourites, or the invited third party's email
+  address, and should advise on whether that requires notification or remediation.
 - Sign out everywhere, profile editing, and subscription cancellation via the Stripe portal are
   all in Settings.
 
