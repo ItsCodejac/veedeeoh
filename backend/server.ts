@@ -6,34 +6,23 @@ import * as path from 'path';
 import * as vod from './vod';
 import * as proxy from './proxy';
 import * as store from './store';
-import { createClient } from '@supabase/supabase-js';
 
 const app = new Hono();
 
-const supabaseUrl = process.env.SUPABASE_URL || 'https://placeholder.supabase.co';
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'placeholder_key';
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-// Auth middleware for API and Proxy
-const requireAuth = async (c: any, next: any) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.text('Unauthorized', 401);
-  }
-  const token = authHeader.split(' ')[1];
-  const { data: { user }, error } = await supabase.auth.getUser(token);
-  
-  if (error || !user) {
-    return c.text('Unauthorized', 401);
-  }
-  await next();
-};
+// NO SUPABASE IN THIS FILE, and that is the point of the file.
+//
+// This server IS the self-hosted product: it scrapes the same catalogue, proxies
+// the same streams, and keeps its state in a JSON store on the machine it runs
+// on. It has no accounts, no subscription, no watch parties and no database
+// with anyone -- all of which are the cloud product, which is Vercel plus
+// Supabase and lives in api/index.ts.
+//
+// What was here until now: a module-level Supabase client built from
+// 'https://placeholder.supabase.co' and 'placeholder_key', feeding a requireAuth
+// middleware whose two uses were commented out. Dead, and pointed at nothing,
+// but it made this file look like it needed a cloud to run.
 
 app.use('*', cors());
-
-// Apply auth middleware to protected routes (disabled for now)
-// app.use('/api/*', requireAuth);
-// app.use('/proxy/*', requireAuth);
 
 // Disable caching for all API routes to prevent stale UI state
 app.use('/api/*', async (c, next) => {
@@ -94,17 +83,13 @@ app.post('/api/waitlist', async (c) => {
     if (!email || typeof email !== 'string' || !email.includes('@')) {
       return c.json({ error: 'Please enter a valid email address.' }, 400);
     }
+    // Local only. This used to also insert into the cloud project's waitlist
+    // table whenever credentials happened to be present, which meant somebody
+    // else's self-hosted instance could write rows into our database. The cloud
+    // waitlist is api/index.ts's job and belongs to the deployment that owns it.
     const entry = state.waitlist.add(email);
 
-    if (supabaseUrl && !supabaseUrl.includes('placeholder')) {
-      try {
-        await supabase.from('waitlist').insert({ email: entry.email, created_at: entry.created_at });
-      } catch (e) {
-        // Ignore optional Supabase insert error
-      }
-    }
-
-    return c.json({ ok: true, message: "You're on the waitlist! We'll email you as cloud spots open.", entry });
+    return c.json({ ok: true, message: "Added to the local waitlist.", entry });
   } catch (err: any) {
     return c.json({ error: 'Failed to record waitlist submission.' }, 500);
   }
@@ -206,120 +191,48 @@ app.get('/api/vod/pluto', async (c) => {
   }
 });
 
-// A Supabase client carrying the CALLER's bearer token, so RLS decides what
-// they may touch. Never the service-role key on these routes: the profile id
-// arrives from the client, and service-role would happily read and write
-// somebody else's rows.
-function callerSupabase(c: any) {
-  return createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: c.req.header('authorization') || '' } },
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-}
-
-// Watch progress. The hosted deployment has had these since the beginning; here
-// they returned the SPA's index.html, so the ticks silently never appeared.
-app.get('/api/watched', async (c) => {
-  const profileId = c.req.query('profileId');
-  if (!profileId) return c.json({ watched: [] });
-  try {
-    const { data } = await callerSupabase(c)
-      .from('watch_progress')
-      .select('content_id, position_secs, duration_secs, completed, updated_at')
-      .eq('profile_id', profileId);
-    return c.json({ watched: data || [] });
-  } catch (e: any) {
-    return c.json({ watched: [], error: e?.message });
-  }
+// Watch progress, kept on this machine.
+//
+// SELF-HOST HAS NO ACCOUNTS, so there is no per-profile row in a database to
+// read: state lives in a JSON file next to the rest of it, which is what
+// store.ts has always been for. An earlier pass wired these to Supabase with
+// the caller's token, which quietly made the self-hosted server a client of the
+// cloud one -- the exact coupling this build exists to not have.
+//
+// The profileId the client sends is accepted and ignored. One machine, one
+// store; the parameter is part of the shared contract with the cloud API and
+// costs nothing to tolerate.
+app.get('/api/watched', (c) => {
+  const watched = Array.from(state.watched.ids).sort().map((content_id) => ({
+    content_id,
+    position_secs: 0,
+    duration_secs: null,
+    completed: true,
+    updated_at: null,
+  }));
+  return c.json({ watched });
 });
 
 app.post('/api/watched', async (c) => {
   try {
-    const { profileId, contentId, positionSecs, durationSecs, completed } = await c.req.json();
-    if (!profileId || !contentId) return c.json({ error: 'Missing profileId or contentId' }, 400);
-    // Only send what was provided, so toggling "completed" does not wipe the
-    // saved resume position: an omitted column keeps its value on upsert.
-    const payload: any = { profile_id: profileId, content_id: contentId, updated_at: new Date().toISOString() };
-    if (positionSecs !== undefined) payload.position_secs = positionSecs;
-    if (durationSecs !== undefined) payload.duration_secs = durationSecs;
-    if (completed !== undefined) payload.completed = !!completed;
-
-    const { error } = await callerSupabase(c)
-      .from('watch_progress')
-      .upsert(payload, { onConflict: 'profile_id,content_id' });
-    if (error) throw error;
+    const { contentId, completed } = await c.req.json();
+    if (!contentId) return c.json({ error: 'Missing contentId' }, 400);
+    // Only the completed flag is meaningful here. The local store is a set of
+    // finished items, not a resume ledger, so a position update is a no-op
+    // rather than an error: the client sends both and should not have to know
+    // which server it is talking to.
+    if (completed === true) state.watched.add(contentId);
+    else if (completed === false) state.watched.remove(contentId);
     return c.json({ ok: true });
   } catch (e: any) {
     return c.json({ error: e?.message || 'Failed to update watch progress' }, 500);
   }
 });
 
-app.delete('/api/watched/:id?', async (c) => {
-  try {
-    const profileId = c.req.query('profileId');
-    const contentId = c.req.param('id') || c.req.query('contentId');
-    if (!profileId || !contentId) return c.json({ error: 'Missing profileId or contentId' }, 400);
-    await callerSupabase(c).from('watch_progress').delete()
-      .eq('profile_id', profileId).eq('content_id', contentId);
-    return c.json({ ok: true });
-  } catch (e: any) {
-    return c.json({ error: e?.message || 'Failed to delete watch history' }, 500);
-  }
-});
-
-// Everything this instance holds about the caller. RLS does the scoping, so
-// each select returns only their own rows.
-app.get('/api/account/export', async (c) => {
-  const sb = callerSupabase(c);
-  const { data: { user } } = await sb.auth.getUser();
-  if (!user) return c.json({ error: 'unauthorized' }, 401);
-
-  const grab = async (table: string) => {
-    const { data, error } = await sb.from(table).select('*');
-    return error ? { error: error.message } : data;
-  };
-
-  return c.json({
-    exported_at: new Date().toISOString(),
-    account: { id: user.id, email: user.email },
-    profiles: await grab('household_profiles'),
-    watch_progress: await grab('watch_progress'),
-    favorites: await grab('favorites'),
-    collections: await grab('collections'),
-    parties: await grab('parties'),
-  });
-});
-
-// Deleting the auth user cascades the rest, which is true only from migration
-// 20260826040000 onward -- before it, the viewing profiles and history survived.
-//
-// No Stripe step here, unlike the hosted route: a self-hosted instance has no
-// subscription to cancel. It does need the service-role key, and says so
-// plainly rather than half-deleting an account when it is absent.
-app.post('/api/account/delete', async (c) => {
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-  if (!serviceKey) {
-    return c.json({
-      error: 'account deletion needs SUPABASE_SERVICE_ROLE_KEY to be set on this instance',
-    }, 501);
-  }
-
-  const { data: { user } } = await callerSupabase(c).auth.getUser();
-  if (!user) return c.json({ error: 'unauthorized' }, 401);
-
-  // The caller retypes their email. An accidental click here is unrecoverable,
-  // so it is checked here and not only in the dialog.
-  const body = await c.req.json().catch(() => ({} as any));
-  const confirm = String(body?.confirm || '').trim().toLowerCase();
-  if (!user.email || confirm !== user.email.toLowerCase()) {
-    return c.json({ error: 'confirmation did not match the account email' }, 400);
-  }
-
-  const admin = createClient(supabaseUrl, serviceKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  const { error } = await admin.auth.admin.deleteUser(user.id);
-  if (error) return c.json({ error: error.message }, 500);
+app.delete('/api/watched/:id?', (c) => {
+  const contentId = c.req.param('id') || c.req.query('contentId');
+  if (!contentId) return c.json({ error: 'Missing contentId' }, 400);
+  state.watched.remove(contentId);
   return c.json({ ok: true });
 });
 
@@ -331,7 +244,7 @@ app.post('/api/account/delete', async (c) => {
 app.all('/api/*', (c) =>
   c.json({
     error: 'not available on this instance',
-    detail: 'This endpoint is part of the hosted veedeeoh deployment. A self-hosted instance has no billing, scheduled jobs or transactional email.',
+    detail: 'This endpoint belongs to the hosted veedeeoh deployment. A self-hosted instance has no accounts, billing, scheduled jobs or transactional email, and needs none of them.',
     path: c.req.path,
   }, 501));
 

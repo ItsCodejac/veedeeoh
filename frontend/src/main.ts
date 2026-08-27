@@ -151,8 +151,17 @@ function applyProfileChrome(profile: { name?: string; avatar_color?: string; is_
   if (kidsTab) { if (isKids) kidsTab.setAttribute("hidden", ""); else kidsTab.removeAttribute("hidden"); }
   // Hosting and joining are account-level, never a kids profile: a party link
   // handed to a child would otherwise play whatever the host is playing.
+  //
+  // And never on a self-hosted instance. Parties are a cloud feature end to
+  // end: the relay authenticates callers against the cloud project's JWT
+  // secret, so an instance with no cloud has no identity for it to verify and
+  // could not join even its own party. A tab that cannot work is worse than an
+  // absent one, because the visitor spends the click finding out.
   const partyTab = document.getElementById("tabParty");
-  if (partyTab) { if (isKids) partyTab.setAttribute("hidden", ""); else partyTab.removeAttribute("hidden"); }
+  if (partyTab) {
+    if (isKids || !isCloudMode()) partyTab.setAttribute("hidden", "");
+    else partyTab.removeAttribute("hidden");
+  }
 
   if (profile.name) paintProfileAvatar(document.getElementById("sidebarAvatar"), profile as any);
   const em = document.getElementById("sidebarEmail");

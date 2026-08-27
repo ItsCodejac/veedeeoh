@@ -2,24 +2,26 @@ FROM node:20-slim AS builder
 
 WORKDIR /app
 
-# The frontend's Supabase details are compiled into the bundle, so they have to
-# be present at BUILD time, not run time. They were not passed at all, which is
-# how the image ended up shipping whatever frontend/.env.local happened to hold
-# -- and, before the fallback was removed, our own project's credentials.
+# WHICH PRODUCT THIS IMAGE IS.
 #
-# The build now fails with the name of the missing variable instead:
+# Left empty -- which is the default, and what docker compose does -- these build
+# the SELF-HOST product: local JSON storage, local profiles, no accounts and no
+# database. That is the whole point of this image and needs no configuration.
+#
+# They exist because the same Dockerfile can build the cloud product, whose
+# Supabase details are compiled into the bundle and so must be present at build
+# time rather than run time:
 #
 #   docker build \
 #     --build-arg VITE_SUPABASE_URL=https://YOUR-PROJECT.supabase.co \
 #     --build-arg VITE_SUPABASE_ANON_KEY=eyJ... \
 #     -t veedeeoh .
 #
-# The anon key is public by design -- it is in the JavaScript either way, and
-# row-level security is what actually protects the data. The service role key is
-# NOT passed here and must never be: it bypasses RLS entirely, and a build arg
-# is readable in the image history.
-ARG VITE_SUPABASE_URL
-ARG VITE_SUPABASE_ANON_KEY
+# The anon key is public by design; it is in the JavaScript either way. The
+# service role key is NOT passed here and must never be: it bypasses row-level
+# security, and a build arg is readable in the image history.
+ARG VITE_SUPABASE_URL=""
+ARG VITE_SUPABASE_ANON_KEY=""
 ARG VITE_PARTY_WORKER_URL=""
 ARG VITE_PROXY_URL=""
 ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL \
@@ -57,10 +59,10 @@ RUN npm install -g tsx
 
 WORKDIR /app/backend
 
-# SUPABASE_URL and SUPABASE_ANON_KEY are read at run time by the server, and
-# are supplied by docker-compose or the host rather than baked in. Account
-# deletion additionally needs SUPABASE_SERVICE_ROLE_KEY; without it that one
-# endpoint answers 501 and says why, rather than half-deleting an account.
+# The server reads no Supabase configuration. It keeps favourites, watch
+# progress and the cached catalogue in a JSON store under this path, which
+# docker-compose mounts as a named volume so a rebuild does not discard it.
+ENV XDG_DATA_HOME=/root/.local/share
 ENV PORT=8321
 EXPOSE 8321
 

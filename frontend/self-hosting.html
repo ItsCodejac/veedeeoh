@@ -212,135 +212,97 @@
     <div class="hero">
       <span class="badge">OPEN SOURCE & PRIVATE</span>
       <h1>Self-Host veedeeoh On Your Home Server</h1>
-      <p class="subtitle">Run your own instance with Docker or from source. Free forever, no account with us, and no data of yours passing through anything we operate. You will need your own Supabase project, which is free at this size.</p>
+      <p class="subtitle">Run your own instance with Docker or from source. Standalone: no account with us, no database to set up, and nothing about your viewing passing through anything we operate.</p>
     </div>
 
     <div class="content-grid">
-      <!-- Step 0: the database -->
+      <!-- What it is -->
       <div class="card">
         <div class="card-header">
-          <div class="card-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg></div>
+          <div class="card-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg></div>
           <div>
-            <h2>Step 1: Create your database</h2>
-            <div style="font-size: 14px; color: var(--dim);">Required first, and the step most guides leave out</div>
+            <h2>What you get, and what you do not</h2>
+            <div style="font-size: 14px; color: var(--dim);">Read this first, it saves the questions</div>
           </div>
         </div>
-        <p>veedeeoh keeps accounts, profiles, watch history and watch parties in <a href="https://supabase.com" target="_blank">Supabase</a>. There is no shared or default database: your instance uses a project you own, and nothing you do reaches ours.</p>
-        <p>Create a free project, then apply this repository's migrations to it. They build the whole schema, including the row-level security policies that keep one account's data away from another's.</p>
-        <div class="code-block">git clone https://github.com/ItsCodejac/veedeeoh.git
-cd veedeeoh
-
-# Point the CLI at the project you just created
-npx supabase link --project-ref YOUR-PROJECT-REF
-
-# Create every table, policy and function
-npx supabase db push --include-all</div>
-        <p><code>--include-all</code> matters: the baseline migration is dated ahead of the rest so it runs first, and without the flag the CLI skips it as out of order.</p>
-        <p>To check the result before trusting it, <code>npm run verify:db</code> builds a throwaway database from the migrations alone and asserts that signup, profile isolation, the seat cap, anonymous refusal and account deletion all behave. It needs <code>psql</code> and <code>initdb</code> on your PATH.</p>
-        <p>Then copy the project URL and <b>anon</b> key from Project Settings &rarr; API. The anon key is safe to publish; it ends up in the JavaScript either way, and row-level security is what actually protects the data. The service role key is not needed unless you want account deletion to work.</p>
+        <p><b>Self-hosted veedeeoh is standalone.</b> It needs no account with us, no database, no API key, and no network calls to anything we run. It is the whole catalogue, the whole player, and your own machine.</p>
+        <p>You get the same thing to watch. The catalogue is Pluto, Tubi and the Internet Archive, all free, and the hosted version has no title yours does not.</p>
+        <p><b>What it does not have</b> are the things we built for running it as a service: accounts, syncing your list between devices, household profiles across people, watch parties, subscriptions, referrals. Those are the cloud product, and cloud is sold on access rather than on content: it works on every device you pick up, with nothing to install and nothing to keep running. If that is not a problem you have, self-hosting is not a lesser version. It is the whole thing.</p>
+        <p>Profiles, My List and watch progress all still work here. They live in a JSON store on the machine running the server, not in anybody's cloud.</p>
       </div>
 
-      <!-- Method 1: Docker Compose -->
+      <!-- Docker -->
       <div class="card">
         <div class="card-header">
           <div class="card-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg></div>
           <div>
-            <h2>Step 2, option A: Docker Compose</h2>
-            <div style="font-size: 14px; color: var(--dim);">Any Linux server, NAS, Unraid, or a Raspberry Pi</div>
+            <h2>Option A: Docker Compose</h2>
+            <div style="font-size: 14px; color: var(--dim);">Any Linux box, NAS, Unraid, or a Raspberry Pi</div>
           </div>
         </div>
-        <p>The repository ships a <code>docker-compose.yml</code>. Fill in your database details and bring it up:</p>
-        <div class="code-block">cp .env.example .env
-# edit .env: SUPABASE_URL and SUPABASE_ANON_KEY
+        <div class="code-block">git clone https://github.com/ItsCodejac/veedeeoh.git
+cd veedeeoh
 
 docker compose up --build</div>
-        <p>Your instance is at <code>http://localhost:8321</code>.</p>
-        <p><b>It builds from source rather than pulling an image, and it has to.</b> The database URL and anon key are compiled into the JavaScript bundle, so an image built by somebody else is an image pointed at somebody else's database. That is also why changing either value needs <code>--build</code> and not just a restart.</p>
+        <p>That is the whole setup. Your instance is at <code>http://localhost:8321</code>.</p>
+        <p>There is nothing to configure first. If you want it on a different port, set <code>PORT</code>.</p>
       </div>
 
-      <!-- Method 2: from source -->
+      <!-- Source -->
       <div class="card">
         <div class="card-header">
           <div class="card-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg></div>
           <div>
-            <h2>Step 2, option B: From source</h2>
+            <h2>Option B: From source</h2>
             <div style="font-size: 14px; color: var(--dim);">For development, or hosting without Docker</div>
           </div>
         </div>
-        <div class="code-block">cp frontend/.env.example frontend/.env
-# edit frontend/.env: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
+        <div class="code-block">npm install
+npm run build
 
-npm install
-
-# API and stream proxy on :8321
-cd backend &amp;&amp; npm run dev
-
-# In a second terminal: the app on :5173, proxying to the backend
-cd frontend &amp;&amp; npm run dev</div>
-        <p>For a production build instead, <code>npm run build</code> from the repository root writes the static site to <code>src/tvlc/static/</code>, which <code>backend/server.ts</code> then serves on its own.</p>
-        <p>If the build stops with <code>Cannot build: VITE_SUPABASE_URL is not set</code>, that is deliberate. It used to fall back to veedeeoh.com's own project, which meant a self-hosted instance silently signed its users into our database. A build that stops and names the variable is the better failure.</p>
+cd backend &amp;&amp; npm start</div>
+        <p>The build writes the app into <code>src/tvlc/static/</code> and the server serves it on <code>8321</code>. For development instead, run <code>npm run dev</code> in <code>backend/</code> and again in <code>frontend/</code>; Vite serves on 5173 and proxies the API to the backend.</p>
+        <p>The build prints which of the two products it is making. With no Supabase credentials present it says <code>building SELF-HOST</code>, and that is the one you want. There is no fallback to our project and no way to end up pointed at it by accident.</p>
       </div>
 
-      <!-- Environment Variables -->
+      <!-- Env -->
       <div class="card">
         <div class="card-header">
           <div class="card-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></div>
           <div>
             <h2>Environment variables</h2>
-            <div style="font-size: 14px; color: var(--dim);">Two are required. The rest turn optional things on.</div>
+            <div style="font-size: 14px; color: var(--dim);">All optional</div>
           </div>
         </div>
         <table class="env-table">
-          <thead>
-            <tr><th>Variable</th><th>Required</th><th>Description</th></tr>
-          </thead>
+          <thead><tr><th>Variable</th><th>Default</th><th>What it does</th></tr></thead>
           <tbody>
             <tr>
-              <td><code>SUPABASE_URL</code><br><code>VITE_SUPABASE_URL</code></td>
-              <td>Yes</td>
-              <td>Your Supabase project URL. The <code>VITE_</code> copy is read at build time and compiled into the bundle; the plain one is read by the server at run time. Docker Compose passes one value to both.</td>
-            </tr>
-            <tr>
-              <td><code>SUPABASE_ANON_KEY</code><br><code>VITE_SUPABASE_ANON_KEY</code></td>
-              <td>Yes</td>
-              <td>The project's anonymous key. Public by design and protected by row-level security, which is why applying the migrations matters.</td>
-            </tr>
-            <tr>
-              <td><code>SUPABASE_SERVICE_ROLE_KEY</code></td>
-              <td>No</td>
-              <td>Only used by account deletion, which has to remove a user from <code>auth.users</code>. Unset, that one endpoint answers 501 and says why. <b>Bypasses row-level security</b> — server-side only, and never with a <code>VITE_</code> prefix.</td>
-            </tr>
-            <tr>
-              <td><code>PARTY_WORKER_URL</code></td>
-              <td>No</td>
-              <td>Your own watch party relay, if you run one. See <code>worker/</code>. Left blank, the app works normally and the party screen says parties are not configured on this deployment.</td>
+              <td><code>PORT</code></td>
+              <td><code>8321</code></td>
+              <td>Port the server listens on.</td>
             </tr>
             <tr>
               <td><code>PROXY_URL</code></td>
-              <td>No</td>
-              <td>Absolute base for the stream proxy when it is not served from the same origin as the app.</td>
-            </tr>
-            <tr>
-              <td><code>PORT</code></td>
-              <td>No</td>
-              <td>HTTP port the server listens on. Defaults to <code>8321</code>.</td>
+              <td>this origin</td>
+              <td>Absolute base for the stream proxy, when it is not served from the same origin as the app.</td>
             </tr>
           </tbody>
         </table>
+        <p style="margin-top: 18px;">That is the entire list. Anything you may have seen about Supabase URLs and anon keys belongs to the cloud build and is not needed, or wanted, here.</p>
       </div>
 
-      <!-- What is not here -->
+      <!-- Where state lives -->
       <div class="card">
         <div class="card-header">
-          <div class="card-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg></div>
+          <div class="card-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></div>
           <div>
-            <h2>What a self-hosted instance does not do</h2>
-            <div style="font-size: 14px; color: var(--dim);">So you are not left wondering whether it broke</div>
+            <h2>Where your data lives</h2>
+            <div style="font-size: 14px; color: var(--dim);">On your machine, in files you can read</div>
           </div>
         </div>
-        <p>Browsing, streaming, profiles, My List and resume all work exactly as they do on veedeeoh.com. Three things are part of the hosted deployment and are absent here on purpose: subscription billing, the transactional email that sends confirmation and password-reset messages, and the nightly jobs that warm the catalogue and send trial reminders.</p>
-        <p>Their endpoints answer <code>501</code> with an explanation rather than failing in some less obvious way. Sign-up email still works — it comes from Supabase's own mailer unless you configure otherwise.</p>
-        <p>Watch parties need a relay, which is a Cloudflare Worker in <code>worker/</code>. Deploy your own and set <code>PARTY_WORKER_URL</code>. The relay verifies callers against your project's JWT secret, so it will only accept your own users.</p>
+        <p>Favourites, watch progress and the cached catalogue are JSON files in your platform's normal application data directory: <code>~/.local/share/tvlc</code> on Linux, <code>~/Library/Application Support/tvlc</code> on macOS. Under Docker Compose that directory is a named volume, so it survives a rebuild.</p>
+        <p>Backing up is copying that folder. There is nothing else, and nothing about your viewing leaves the machine except the requests that fetch the video itself.</p>
       </div>
     </div>
 

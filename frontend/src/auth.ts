@@ -3,27 +3,42 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 let _supabase: SupabaseClient | null = null;
 
+const CLOUD_URL = (import.meta.env.VITE_SUPABASE_URL as string) || "";
+const CLOUD_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || "";
+
+/** Is this build wired to a cloud database.
+ *
+ *  THIS IS THE MODE SWITCH, and it is deliberately a fact about configuration
+ *  rather than about the address bar. Two products are built from this repo:
+ *  cloud, which is Vercel plus Supabase for auth, sync and the cached
+ *  catalogue; and self-host, which is the Hono server keeping its state in a
+ *  local JSON store and needing no account with anyone. Self-host has to be
+ *  independent -- no Supabase, no subscription, none of the things built for
+ *  cloud -- so "am I cloud" can only mean "was I given a database".
+ *
+ *  There is no fallback to a default project. There used to be: these two
+ *  constants defaulted to veedeeoh.com's own URL and anon key, and since env
+ *  files are gitignored, every self-hosted build silently signed its users into
+ *  OUR database, against our quota, looking normal from both ends. */
+export function hasCloud(): boolean {
+  return !!CLOUD_URL && !!CLOUD_KEY;
+}
+
 export function getSupabase(): SupabaseClient {
   if (!_supabase) {
-    // NO FALLBACK, ON PURPOSE. These two used to default to the veedeeoh.com
-    // project's URL and anon key. Env files are gitignored, so a fresh clone
-    // had neither -- which meant the default self-hosted build signed its users
-    // into OUR database, against our quota, and looked completely normal from
-    // both ends. "Self-host is the free tier" cannot be true while the free
-    // tier is secretly the hosted one.
-    //
-    // vite.config.ts refuses to build without these, so reaching this branch
-    // means someone bypassed the build. Throwing beats a client pointed at
-    // nothing: a thrown error names the missing variable, whereas an empty URL
-    // fails later as an unexplained network error.
-    const url = import.meta.env.VITE_SUPABASE_URL as string;
-    const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-    if (!url || !key) {
+    // Reaching this without credentials is a bug in the caller, not a
+    // configuration problem: every cloud-only path is behind isCloudMode().
+    // Throwing names the mistake at the call site instead of quietly building a
+    // client pointed at nothing, which fails later as an unexplained network
+    // error somewhere else entirely.
+    if (!hasCloud()) {
       throw new Error(
-        "VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY must be set at build time. " +
-        "See self-hosting.html, or copy frontend/.env.example to frontend/.env.",
+        "No cloud database is configured on this build, so this is a self-hosted " +
+        "instance. Guard cloud-only work with isCloudMode().",
       );
     }
+    const url = CLOUD_URL;
+    const key = CLOUD_KEY;
     _supabase = createClient(url, key, {
       auth: {
         persistSession: true,
@@ -57,11 +72,20 @@ export interface AuthSession {
 
 const AUTH_KEY = 'veedeeoh_cloud_session';
 
+/** Cloud mode is having a cloud, not being on a particular domain.
+ *
+ *  THIS USED TO SNIFF THE HOSTNAME for 'vercel.app' or 'veedeeoh', which got
+ *  both ends wrong. Anyone self-hosting on a domain with our name in it became
+ *  cloud mode and was shown a subscription; a cloud deploy on a custom domain
+ *  stopped being cloud mode and lost its own accounts. Worse, it was decided
+ *  separately from whether a database actually existed, so the two could
+ *  disagree -- which is how a self-hosted instance ended up reading and writing
+ *  the production project.
+ *
+ *  Keyed off the credentials, they cannot disagree: no database, no cloud, and
+ *  nothing to accidentally reach. */
 export function isCloudMode(): boolean {
-  return typeof window !== 'undefined' && (
-    window.location.hostname.includes('vercel.app') ||
-    window.location.hostname.includes('veedeeoh')
-  );
+  return hasCloud();
 }
 
 function setCookie(name: string, value: string, days = 365): void {

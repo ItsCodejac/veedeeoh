@@ -1,16 +1,14 @@
-# Self-hosted veedeeoh.
-#
-# Before this works you need your own Supabase project with supabase/migrations
-# applied to it. See self-hosting.html. There is no shared or default database:
-# the build refuses to run without one, because the previous default was
-# veedeeoh.com's own and that made every self-hosted instance a client of ours.
-#
-# Copy .env.example to .env in this directory, fill it in, then:
+# Self-hosted veedeeoh. Standalone: no account with us, no database, no keys.
 #
 #   docker compose up --build
 #
-# The two VITE_ values are compiled into the frontend bundle, so a change to
-# them needs --build, not just a restart.
+# That is the whole thing. Everything below is optional and the defaults are the
+# ones you want. State lives in a named volume, so a rebuild keeps your
+# favourites and watch progress.
+#
+# The server reads no Supabase configuration at all -- it keeps its state in a
+# JSON store on disk. Supabase is the cloud product's database, and the cloud
+# product is the hosted service. This file builds the other one.
 
 services:
   veedeeoh:
@@ -18,23 +16,26 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        VITE_SUPABASE_URL: ${SUPABASE_URL:?set SUPABASE_URL in .env -- see self-hosting.html}
-        VITE_SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:?set SUPABASE_ANON_KEY in .env}
-        VITE_PARTY_WORKER_URL: ${PARTY_WORKER_URL:-}
+        # Left blank these build the self-host product, which is the point of
+        # this file. They exist only so the same Dockerfile can build cloud.
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-}
+        VITE_PARTY_WORKER_URL: ${VITE_PARTY_WORKER_URL:-}
         VITE_PROXY_URL: ${PROXY_URL:-}
     container_name: veedeeoh
     ports:
-      - "8321:8321"
+      - "${PORT:-8321}:8321"
     environment:
       PORT: 8321
       NODE_ENV: production
-      # Read at run time by the server for the routes that talk to Supabase on
-      # the caller's behalf.
-      SUPABASE_URL: ${SUPABASE_URL}
-      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
-      # Optional, and only used by account deletion, which needs to remove an
-      # auth user. Leave it unset and that endpoint answers 501 explaining why
-      # rather than deleting half an account. It bypasses row-level security,
-      # so it belongs here and never in a build arg.
-      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      # Absolute base for the stream proxy, when it is not served from the same
+      # origin as the app. Blank uses this origin.
+      PROXY_URL: ${PROXY_URL:-}
     restart: unless-stopped
+    volumes:
+      # Favourites, watch progress and the cached catalogue. Named so a rebuild
+      # does not throw them away; back up by copying this volume.
+      - veedeeoh_data:/root/.local/share/tvlc
+
+volumes:
+  veedeeoh_data:
