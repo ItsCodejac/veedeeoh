@@ -187,9 +187,6 @@
       </div>
 
       <!-- Panel 6: Ocean TV View Panel -->
-      <div id="oceanView" class="viewPanel" hidden>
-        <div id="oceanRails"></div>
-      </div>
 
       <!-- veedeeoh.party: join a party by code, and manage the one you host -->
       <div id="partyView" class="viewPanel" hidden>
@@ -300,58 +297,6 @@
 
   <!-- Cinematic VOD Player Overlay -->
   <div id="vodPlayerOverlay" hidden>
-  </div>
-
-  <!-- Party Mode Player Overlay -->
-  <div id="partyPlayerOverlay" hidden>
-    <div class="partyPlayerHeader">
-      <button id="partyPlayerClose" style="display:inline-flex;align-items:center;gap:6px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>Back to Browse</button>
-    </div>
-
-    <canvas id="partyVisualizer"></canvas>
-
-    <div id="partyLayout">
-      <div id="partyControls">
-        <div class="partyHeader">
-          <span class="partyBrand">veedeeoh<span>.</span> party</span>
-          <p class="partySubtitle">continuous music video & visualizer stream</p>
-        </div>
-
-        <div class="moodSelector">
-          <button class="moodChip active" data-mood="chillout" style="display:inline-flex;align-items:center;gap:7px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>Chillout</button>
-          <button class="moodChip" data-mood="high-energy" style="display:inline-flex;align-items:center;gap:7px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>High Energy</button>
-          <button class="moodChip" data-mood="retro" style="display:inline-flex;align-items:center;gap:7px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>Retro</button>
-        </div>
-
-        <div id="partyTrackInfo" class="partyTrackInfo">
-          <h2 id="partyTrackTitle">No Track Playing</h2>
-          <span id="partyTrackGenre">Select a mood to begin</span>
-          <p id="partyTrackSummary"></p>
-        </div>
-
-        <div class="partyButtons">
-          <button id="partyPlayBtn" class="actionBtn primary" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>PLAY</button>
-          <button id="partyNextBtn" class="actionBtn" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4" fill="currentColor"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>NEXT TRACK</button>
-        </div>
-
-        <div class="visualizerSelector">
-          <span>Visualizer:</span>
-          <button id="visStyleBars" class="visStyleBtn active">Bars</button>
-          <button id="visStyleWave" class="visStyleBtn">Wave</button>
-        </div>
-      </div>
-
-      <div id="partyVideoCol">
-        <div id="partyVideoWrapper">
-          <video id="partyVideoA" autoplay playsinline></video>
-          <video id="partyVideoB" autoplay playsinline></video>
-        </div>
-        <div id="partyQueuePanel">
-          <h3>Upcoming Tracklist</h3>
-          <div id="partyQueueList"></div>
-        </div>
-      </div>
-    </div>
   </div>
 
   <script type="module" src="/src/main.ts"></script>
