@@ -113,3 +113,56 @@ select '10. deletion cascades    : ' ||
             ||' favs='||(select count(*) from public.favorites where profile_id='44444444-4444-4444-4444-444444444444')
             ||' invites='||(select count(*) from public.household_invites where owner_id='33333333-3333-3333-3333-333333333333')
        end;
+
+-- 11-15. Gifting credits. The two properties worth asserting are the abuse
+-- ones: a gift must not feed the free-month counters, and it must never destroy
+-- credits by clipping at the cap.
+--
+-- Two traps this hit while being written, both worth the comment. Each gift is
+-- its own statement and every assertion is a LATER statement, because reading
+-- balances in the same select as the call sees the pre-call snapshot. And the
+-- assertions run with `reset role`, because as `authenticated` the RLS policy
+-- correctly hides the recipient's profile row and every subquery about them
+-- returns NULL -- the test fails while the function is perfectly correct.
+reset role;
+update public.profiles set party_credits = 100, party_credits_accrued = 100, party_credits_spent = 0
+ where id = '11111111-1111-1111-1111-111111111111';
+-- 175 of a 180 cap, so there is room for 5 and no more: enough to prove the
+-- overflow path without tripping the sender's balance check first.
+update public.profiles set party_credits = 175, party_credits_accrued = 10
+ where id = '22222222-2222-2222-2222-222222222222';
+
+set role authenticated;
+select set_config('request.jwt.claim.sub','11111111-1111-1111-1111-111111111111',false);
+select public.gift_party_credits('22222222-2222-2222-2222-222222222222', 4) as g1 \gset
+select public.gift_party_credits('22222222-2222-2222-2222-222222222222', 50) as g2 \gset
+select public.gift_party_credits('11111111-1111-1111-1111-111111111111', 5)  as g3 \gset
+select public.gift_party_credits('22222222-2222-2222-2222-222222222222', 5000) as g4 \gset
+reset role;
+
+select '11. gift moves balance   : ' ||
+  case when (select party_credits from public.profiles where id='11111111-1111-1111-1111-111111111111') = 96
+        and (select party_credits from public.profiles where id='22222222-2222-2222-2222-222222222222') = 179
+       then 'PASS 4 moved, both balances correct'
+       else 'FAIL sender='||(select party_credits from public.profiles where id='11111111-1111-1111-1111-111111111111')
+            ||' recipient='||(select party_credits from public.profiles where id='22222222-2222-2222-2222-222222222222') end;
+
+select '12. accrued untouched    : ' ||
+  case when (select party_credits_accrued from public.profiles where id='22222222-2222-2222-2222-222222222222') = 10
+        and (select party_credits_spent   from public.profiles where id='11111111-1111-1111-1111-111111111111') = 0
+       then 'PASS gifts cannot mint free months'
+       else 'FAIL counters moved' end;
+
+select '13. overflow refused     : ' ||
+  case when :'g2'::jsonb ->> 'error' = 'that is more than they can hold'
+        and (:'g2'::jsonb ->> 'headroom') = '1'
+       then 'PASS refused, nothing destroyed' else 'FAIL '||:'g2' end;
+
+select '14. self-gift refused    : ' ||
+  case when :'g3'::jsonb ->> 'error' = 'choose someone else'
+       then 'PASS' else 'FAIL '||:'g3' end;
+
+select '15. overdraft refused    : ' ||
+  case when :'g4'::jsonb ->> 'error' in ('not enough credits','that is more than they can hold')
+        and (select party_credits from public.profiles where id='11111111-1111-1111-1111-111111111111') = 96
+       then 'PASS' else 'FAIL '||:'g4' end;

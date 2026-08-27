@@ -849,10 +849,26 @@ export async function spendPartyCredits(minutes: number, partyId?: string): Prom
   return !!(data as any)?.ok;
 }
 
+/** Give some of your hosting time to somebody else.
+ *
+ *  Returns the error string rather than a boolean, because every way this can
+ *  fail is something the sender can act on: not enough credits, or the
+ *  recipient is close enough to the 30-hour ceiling that the gift would not
+ *  fit. Nothing is clipped or destroyed on a refusal, so the message is the
+ *  whole of the fix. */
+export async function giftPartyCredits(
+  recipient: string, amount: number,
+): Promise<{ ok: true; sent: number; balance: number } | { ok: false; error: string; headroom?: number }> {
+  const { data, error } = await getSupabase()
+    .rpc("gift_party_credits", { recipient, amount });
+  if (error) { console.warn("[credits] gift", error); return { ok: false, error: "Could not send that right now" }; }
+  return data as any;
+}
+
 export interface CreditEntry {
   id: number;
   delta: number;
-  reason: "monthly_grant" | "purchase" | "spend" | "admin";
+  reason: "monthly_grant" | "purchase" | "spend" | "admin" | "gift_sent" | "gift_received";
   party_id: string | null;
   note: string | null;
   created_at: string;

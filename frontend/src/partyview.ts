@@ -786,6 +786,12 @@ function paintLedger(entries: CreditEntry[]): void {
       ? (e.party_title || "A party")
       : e.reason === "monthly_grant" ? "Monthly allowance"
       : e.reason === "purchase" ? "Topped up"
+      // The note on a gift is written by the database, not by the sender, and
+      // it is the only part that names the other person. Falling through to
+      // "Adjustment" would make a gift the one ledger entry that cannot say
+      // where it came from.
+      : e.reason === "gift_received" ? (e.note || "A gift")
+      : e.reason === "gift_sent" ? (e.note || "Gifted")
       : (e.note || "Adjustment");
     const sub = e.reason === "spend" ? `Hosted ${relDay(e.created_at)}` : relDay(e.created_at);
     const amount = `${plus ? "+" : "\u2212"}${hoursMins(Math.abs(e.delta))}`;
