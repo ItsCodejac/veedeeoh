@@ -282,6 +282,13 @@ document.getElementById('pricingTrialBtn')?.addEventListener('click', openAuthSi
 document.getElementById('pricingFreeBtn')?.addEventListener('click', openAuthSignup);
 document.getElementById('heroSignInBtn')?.addEventListener('click', openAuth);
 
+// Both of these sit at the end of a section that has just made a specific
+// promise -- host a party, or get paid for one -- and both need an account
+// before they can do anything. Signup is the honest next step for each; the
+// screen they actually want is behind it either way.
+document.getElementById('wpStartBtn')?.addEventListener('click', openAuthSignup);
+document.getElementById('affStartBtn')?.addEventListener('click', openAuthSignup);
+
 if (authModal) {
   authModal.addEventListener('click', (e) => {
     if (e.target === authModal) closeAuth();

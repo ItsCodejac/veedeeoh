@@ -1623,6 +1623,142 @@
       .about-body p:last-child { margin-bottom: 0; }
       .about-body strong { color: #fff; }
       .about-body a { color: var(--accent); }
+
+      /* ---- Watch party + affiliate ------------------------------------
+         Two sections that carry the pitch, so they get real layout rather
+         than inline styles. Both reuse .section-title, .section-subtitle,
+         .badge and .btn so they stay in step with the rest of the page. */
+      .wp-section, .aff-section {
+        padding: 90px 6%;
+        text-align: center;
+        border-bottom: 1px solid var(--border);
+      }
+      .wp-section {
+        background: radial-gradient(ellipse at 50% 0%, rgba(197, 240, 78, 0.06), transparent 60%);
+      }
+
+      .wp-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 20px;
+        max-width: 1100px;
+        margin: 44px auto 0;
+        text-align: left;
+      }
+      .wp-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 26px;
+        transition: border-color 0.2s ease, transform 0.2s ease;
+      }
+      .wp-card:hover { border-color: rgba(197, 240, 78, 0.4); transform: translateY(-3px); }
+      .wp-icon {
+        width: 44px; height: 44px;
+        border-radius: 12px;
+        background: rgba(197, 240, 78, 0.12);
+        color: var(--accent);
+        display: flex; align-items: center; justify-content: center;
+        margin-bottom: 16px;
+      }
+      .wp-card h3, .aff-step h3 {
+        font-family: var(--display);
+        font-size: 1.12rem;
+        font-weight: 700;
+        margin: 0 0 8px;
+        color: var(--text);
+      }
+      .wp-card p, .aff-step p {
+        margin: 0;
+        color: var(--dim);
+        font-size: 0.95rem;
+        line-height: 1.65;
+      }
+
+      .wp-invite {
+        max-width: 1100px;
+        margin: 26px auto 0;
+        padding: 28px 32px;
+        border-radius: 16px;
+        border: 1px solid rgba(197, 240, 78, 0.3);
+        background: rgba(197, 240, 78, 0.06);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 28px;
+        text-align: left;
+      }
+      .wp-invite-copy h3 {
+        font-family: var(--display);
+        font-size: 1.25rem;
+        font-weight: 700;
+        margin: 0 0 6px;
+      }
+      .wp-invite-copy p { margin: 0; color: var(--dim); font-size: 0.97rem; max-width: 640px; }
+      .wp-invite-actions { display: flex; gap: 12px; flex: none; }
+
+      /* Affiliate */
+      .aff-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 20px;
+        max-width: 1100px;
+        margin: 44px auto 0;
+        text-align: left;
+      }
+      .aff-step {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 26px;
+        position: relative;
+      }
+      .aff-num {
+        width: 34px; height: 34px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: #06070a;
+        font-family: var(--display);
+        font-weight: 800;
+        font-size: 0.95rem;
+        display: flex; align-items: center; justify-content: center;
+        margin-bottom: 16px;
+      }
+
+      .aff-why {
+        max-width: 820px;
+        margin: 40px auto 0;
+        padding: 28px 32px;
+        border-radius: 16px;
+        border: 1px solid var(--border);
+        background: var(--card-bg);
+        text-align: left;
+      }
+      .aff-why h3 {
+        font-family: var(--display);
+        font-size: 1.2rem;
+        font-weight: 700;
+        margin: 0 0 12px;
+      }
+      .aff-why p { color: var(--dim); font-size: 0.97rem; line-height: 1.7; margin: 0 0 12px; }
+      /* The terms. Small, but present on the page making the promise rather
+         than only in a policy the reader has to go and find. */
+      .aff-fine {
+        font-size: 0.86rem !important;
+        color: #6f7a8a !important;
+        border-top: 1px solid var(--border);
+        padding-top: 14px;
+        margin-bottom: 0 !important;
+      }
+      .aff-cta { display: flex; gap: 12px; justify-content: center; margin-top: 32px; flex-wrap: wrap; }
+
+      @media (max-width: 760px) {
+        .wp-section, .aff-section { padding: 60px 5%; }
+        .wp-invite { flex-direction: column; align-items: flex-start; padding: 24px; }
+        .wp-invite-actions { width: 100%; }
+        .wp-invite-actions .btn { flex: 1; justify-content: center; }
+        .aff-why { padding: 24px; }
+      }
     </style>
   </head>
   <body>
@@ -1760,6 +1896,67 @@
       <div class="film-strip-border"></div>
     </section>
 
+    <!-- Watch Party. The headline feature, and the only one nothing else in
+         this category does the same way: same film, same second, no chat. -->
+    <section class="wp-section" id="watch-party">
+      <div class="badge" style="margin-bottom: 16px;">WATCH TOGETHER</div>
+      <h2 class="section-title">Same film. Same second. No chat box.</h2>
+      <p class="section-subtitle">
+        Start a party, send one link, and everyone lands in the same film at the same
+        frame. You control playback: when you pause, everyone pauses. When you skip
+        back because someone missed a line, everyone skips back.
+      </p>
+
+      <div class="wp-grid">
+        <div class="wp-card">
+          <div class="wp-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+          </div>
+          <h3>It stays in sync</h3>
+          <p>Viewers reconcile against the host continuously, so a slow connection catches up instead of drifting a minute behind. If someone falls out of step there is one button to pull them back.</p>
+        </div>
+
+        <div class="wp-card">
+          <div class="wp-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          </div>
+          <h3>You decide who gets in</h3>
+          <p>Set a seat limit and approve people at the door, or leave it open. Removing someone asks why: connection trouble and making room let them return, the other two do not.</p>
+        </div>
+
+        <div class="wp-card">
+          <div class="wp-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>
+          </div>
+          <h3>Reactions, not a chat box</h3>
+          <p>Six reactions float over the film and vanish. There is no free text, on purpose: a reaction cannot be used to say something targeted at somebody, and nothing anyone sends is kept.</p>
+        </div>
+
+        <div class="wp-card">
+          <div class="wp-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          </div>
+          <h3>Kids profiles stay protected</h3>
+          <p>A rating limit is not suspended because the film is somebody else's pick. A kids profile is refused a party playing something outside its limits, rather than quietly let in.</p>
+        </div>
+      </div>
+
+      <div class="wp-invite">
+        <div class="wp-invite-copy">
+          <h3>Your friends do not need a card to join you</h3>
+          <p>
+            A free account can join four watch parties a month. No subscription, no trial
+            countdown, no payment details. It exists so an invitation is something a person
+            can simply accept.
+          </p>
+        </div>
+        <div class="wp-invite-actions">
+          <button class="btn btn-accent" id="wpStartBtn">Start a watch party</button>
+          <a class="btn btn-outline" href="#pricing">See what it costs</a>
+        </div>
+      </div>
+    </section>
+
     <!-- Cloud Plan Pricing -->
     <section class="pricing-section" id="pricing">
       <div class="badge" style="margin-bottom: 16px;">SIMPLE PRICING</div>
@@ -1829,6 +2026,63 @@
         when nobody is paying for it. It exists so you can accept an invitation without
         a card.
       </p>
+    </section>
+
+    <!-- Affiliate. Placed after pricing on purpose: "half of it" only means
+         something once you know what it is. -->
+    <section class="aff-section" id="earn">
+      <div class="badge" style="margin-bottom: 16px;">REFER AND EARN</div>
+      <h2 class="section-title">Half of it is yours. For as long as they stay.</h2>
+      <p class="section-subtitle">
+        Anyone who subscribes after you brought them pays $4 a month. Two of those
+        dollars are yours, every month, for as long as they keep their account.
+        Not for a year, not for three months. For as long as it lasts.
+      </p>
+
+      <div class="aff-grid">
+        <div class="aff-step">
+          <div class="aff-num">1</div>
+          <h3>Host a watch party</h3>
+          <p>Send the link to whoever you want to watch with. They do not need a subscription to join you, and they do not need a card.</p>
+        </div>
+        <div class="aff-step">
+          <div class="aff-num">2</div>
+          <h3>They watch with you, free</h3>
+          <p>A free account joins four parties a month. That is enough to be part of the thing a friend keeps inviting them to, and enough to work out whether they want their own.</p>
+        </div>
+        <div class="aff-step">
+          <div class="aff-num">3</div>
+          <h3>If they subscribe, you are paid</h3>
+          <p>Half of every payment they make, for the life of their account. You are credited whether they signed up from your party, your link or your channel.</p>
+        </div>
+      </div>
+
+      <div class="aff-why">
+        <h3>Why we can give away half</h3>
+        <p>
+          Because the subscription is nearly all margin, and we would rather spend it on
+          you than on advertising. The catalogue is free to carry, and one more person
+          browsing costs us almost nothing to serve.
+        </p>
+        <p>
+          The one thing that does cost us real money is hosting watch parties, which runs
+          on metered infrastructure we are billed for by the minute. So watch party credits
+          are the part we keep, and they are not shared. Everything else splits down the
+          middle.
+        </p>
+        <p class="aff-fine">
+          Half of net revenue, meaning after tax, which is collected for a tax authority and
+          was never ours to divide. Paid for the life of the referred account. Watch party
+          credit top-ups are excluded. Terms are recorded against your code when someone is
+          attributed to you, so a later change to the standard offer cannot reduce what you
+          have already been promised.
+        </p>
+      </div>
+
+      <div class="aff-cta">
+        <button class="btn btn-accent" id="affStartBtn">Get your link</button>
+        <a class="btn btn-outline" href="#watch-party">See how watch parties work</a>
+      </div>
     </section>
 
     <!-- Anti-Netflix Non-Geolocked Family Invites Banner -->
