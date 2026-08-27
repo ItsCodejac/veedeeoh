@@ -212,69 +212,73 @@
     <div class="hero">
       <span class="badge">OPEN SOURCE & PRIVATE</span>
       <h1>Self-Host veedeeoh On Your Home Server</h1>
-      <p class="subtitle">Deploy your own private media server instance using Docker, Unraid, Railway, or Python. 100% free with zero telemetry or central tracking.</p>
+      <p class="subtitle">Run your own instance with Docker or from source. Free forever, no account with us, and no data of yours passing through anything we operate. You will need your own Supabase project, which is free at this size.</p>
     </div>
 
     <div class="content-grid">
+      <!-- Step 0: the database -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg></div>
+          <div>
+            <h2>Step 1: Create your database</h2>
+            <div style="font-size: 14px; color: var(--dim);">Required first, and the step most guides leave out</div>
+          </div>
+        </div>
+        <p>veedeeoh keeps accounts, profiles, watch history and watch parties in <a href="https://supabase.com" target="_blank">Supabase</a>. There is no shared or default database: your instance uses a project you own, and nothing you do reaches ours.</p>
+        <p>Create a free project, then apply this repository's migrations to it. They build the whole schema, including the row-level security policies that keep one account's data away from another's.</p>
+        <div class="code-block">git clone https://github.com/ItsCodejac/veedeeoh.git
+cd veedeeoh
+
+# Point the CLI at the project you just created
+npx supabase link --project-ref YOUR-PROJECT-REF
+
+# Create every table, policy and function
+npx supabase db push --include-all</div>
+        <p><code>--include-all</code> matters: the baseline migration is dated ahead of the rest so it runs first, and without the flag the CLI skips it as out of order.</p>
+        <p>To check the result before trusting it, <code>npm run verify:db</code> builds a throwaway database from the migrations alone and asserts that signup, profile isolation, the seat cap, anonymous refusal and account deletion all behave. It needs <code>psql</code> and <code>initdb</code> on your PATH.</p>
+        <p>Then copy the project URL and <b>anon</b> key from Project Settings &rarr; API. The anon key is safe to publish; it ends up in the JavaScript either way, and row-level security is what actually protects the data. The service role key is not needed unless you want account deletion to work.</p>
+      </div>
+
       <!-- Method 1: Docker Compose -->
       <div class="card">
         <div class="card-header">
           <div class="card-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg></div>
           <div>
-            <h2>Option 1: Docker Compose (Recommended)</h2>
-            <div style="font-size: 14px; color: var(--dim);">Run on any Linux server, NAS, Unraid, or Raspberry Pi</div>
+            <h2>Step 2, option A: Docker Compose</h2>
+            <div style="font-size: 14px; color: var(--dim);">Any Linux server, NAS, Unraid, or a Raspberry Pi</div>
           </div>
         </div>
-        <p>Save the following configuration as <code>docker-compose.yml</code> and start the service with a single command:</p>
-        
-        <div class="code-block">version: '3.8'
-services:
-  veedeeoh:
-    image: ghcr.io/itscodejac/veedeeoh:latest
-    container_name: veedeeoh
-    ports:
-      - "8321:8321"
-    environment:
-      - PORT=8321
-      - REGION=US
-    restart: unless-stopped</div>
+        <p>The repository ships a <code>docker-compose.yml</code>. Fill in your database details and bring it up:</p>
+        <div class="code-block">cp .env.example .env
+# edit .env: SUPABASE_URL and SUPABASE_ANON_KEY
 
-        <p>Launch the container in the background:</p>
-        <div class="code-block">docker compose up -d</div>
-        <p>Your media server will be live immediately at <code>http://localhost:8321</code>.</p>
+docker compose up --build</div>
+        <p>Your instance is at <code>http://localhost:8321</code>.</p>
+        <p><b>It builds from source rather than pulling an image, and it has to.</b> The database URL and anon key are compiled into the JavaScript bundle, so an image built by somebody else is an image pointed at somebody else's database. That is also why changing either value needs <code>--build</code> and not just a restart.</p>
       </div>
 
-      <!-- Method 2: Railway Cloud -->
-      <div class="card">
-        <div class="card-header">
-          <div class="card-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path></svg></div>
-          <div>
-            <h2>Option 2: One-Click Railway Cloud Deploy</h2>
-            <div style="font-size: 14px; color: var(--dim);">Deploy to your personal free/cheap cloud hosting</div>
-          </div>
-        </div>
-        <p>If you prefer cloud deployment without managing local hardware, deploy directly using our Railway configuration:</p>
-        <div style="margin: 20px 0;">
-          <a href="https://railway.app/template" target="_blank" class="btn btn-primary" style="padding: 12px 24px; font-size: 15px;">Deploy on Railway &rarr;</a>
-        </div>
-      </div>
-
-      <!-- Method 3: Local Node/Python Dev -->
+      <!-- Method 2: from source -->
       <div class="card">
         <div class="card-header">
           <div class="card-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg></div>
           <div>
-            <h2>Option 3: Local Node / Python Source Build</h2>
-            <div style="font-size: 14px; color: var(--dim);">For developers and local customization</div>
+            <h2>Step 2, option B: From source</h2>
+            <div style="font-size: 14px; color: var(--dim);">For development, or hosting without Docker</div>
           </div>
         </div>
-        <p>Clone the repository and launch the backend dev server:</p>
-        <div class="code-block">git clone https://github.com/ItsCodejac/veedeeoh.git
-cd veedeeoh
+        <div class="code-block">cp frontend/.env.example frontend/.env
+# edit frontend/.env: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
 
-# Install dependencies and launch
 npm install
-npm run dev</div>
+
+# API and stream proxy on :8321
+cd backend &amp;&amp; npm run dev
+
+# In a second terminal: the app on :5173, proxying to the backend
+cd frontend &amp;&amp; npm run dev</div>
+        <p>For a production build instead, <code>npm run build</code> from the repository root writes the static site to <code>src/tvlc/static/</code>, which <code>backend/server.ts</code> then serves on its own.</p>
+        <p>If the build stops with <code>Cannot build: VITE_SUPABASE_URL is not set</code>, that is deliberate. It used to fall back to veedeeoh.com's own project, which meant a self-hosted instance silently signed its users into our database. A build that stops and names the variable is the better failure.</p>
       </div>
 
       <!-- Environment Variables -->
@@ -282,36 +286,61 @@ npm run dev</div>
         <div class="card-header">
           <div class="card-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></div>
           <div>
-            <h2>Configuration & Environment Variables</h2>
-            <div style="font-size: 14px; color: var(--dim);">Tailor your server settings</div>
+            <h2>Environment variables</h2>
+            <div style="font-size: 14px; color: var(--dim);">Two are required. The rest turn optional things on.</div>
           </div>
         </div>
         <table class="env-table">
           <thead>
-            <tr>
-              <th>Variable</th>
-              <th>Default</th>
-              <th>Description</th>
-            </tr>
+            <tr><th>Variable</th><th>Required</th><th>Description</th></tr>
           </thead>
           <tbody>
             <tr>
+              <td><code>SUPABASE_URL</code><br><code>VITE_SUPABASE_URL</code></td>
+              <td>Yes</td>
+              <td>Your Supabase project URL. The <code>VITE_</code> copy is read at build time and compiled into the bundle; the plain one is read by the server at run time. Docker Compose passes one value to both.</td>
+            </tr>
+            <tr>
+              <td><code>SUPABASE_ANON_KEY</code><br><code>VITE_SUPABASE_ANON_KEY</code></td>
+              <td>Yes</td>
+              <td>The project's anonymous key. Public by design and protected by row-level security, which is why applying the migrations matters.</td>
+            </tr>
+            <tr>
+              <td><code>SUPABASE_SERVICE_ROLE_KEY</code></td>
+              <td>No</td>
+              <td>Only used by account deletion, which has to remove a user from <code>auth.users</code>. Unset, that one endpoint answers 501 and says why. <b>Bypasses row-level security</b> — server-side only, and never with a <code>VITE_</code> prefix.</td>
+            </tr>
+            <tr>
+              <td><code>PARTY_WORKER_URL</code></td>
+              <td>No</td>
+              <td>Your own watch party relay, if you run one. See <code>worker/</code>. Left blank, the app works normally and the party screen says parties are not configured on this deployment.</td>
+            </tr>
+            <tr>
+              <td><code>PROXY_URL</code></td>
+              <td>No</td>
+              <td>Absolute base for the stream proxy when it is not served from the same origin as the app.</td>
+            </tr>
+            <tr>
               <td><code>PORT</code></td>
-              <td><code>8321</code></td>
-              <td>The HTTP port your server listens on.</td>
-            </tr>
-            <tr>
-              <td><code>REGION</code></td>
-              <td><code>US</code></td>
-              <td>Default spoofed FAST catalog region (US, GB, CA, DE, ES, MX, FR).</td>
-            </tr>
-            <tr>
-              <td><code>DATABASE_URL</code></td>
-              <td><code>local.db</code></td>
-              <td>SQLite storage location for multi-room profiles and favorites.</td>
+              <td>No</td>
+              <td>HTTP port the server listens on. Defaults to <code>8321</code>.</td>
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- What is not here -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg></div>
+          <div>
+            <h2>What a self-hosted instance does not do</h2>
+            <div style="font-size: 14px; color: var(--dim);">So you are not left wondering whether it broke</div>
+          </div>
+        </div>
+        <p>Browsing, streaming, profiles, My List and resume all work exactly as they do on veedeeoh.com. Three things are part of the hosted deployment and are absent here on purpose: subscription billing, the transactional email that sends confirmation and password-reset messages, and the nightly jobs that warm the catalogue and send trial reminders.</p>
+        <p>Their endpoints answer <code>501</code> with an explanation rather than failing in some less obvious way. Sign-up email still works — it comes from Supabase's own mailer unless you configure otherwise.</p>
+        <p>Watch parties need a relay, which is a Cloudflare Worker in <code>worker/</code>. Deploy your own and set <code>PARTY_WORKER_URL</code>. The relay verifies callers against your project's JWT secret, so it will only accept your own users.</p>
       </div>
     </div>
 

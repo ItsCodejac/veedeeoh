@@ -5,8 +5,25 @@ let _supabase: SupabaseClient | null = null;
 
 export function getSupabase(): SupabaseClient {
   if (!_supabase) {
-    const url = (import.meta.env.VITE_SUPABASE_URL as string) || "https://fwlbmksxmfzgkazrulgt.supabase.co";
-    const key = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3bGJta3N4bWZ6Z2thenJ1bGd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2NTk5MTQsImV4cCI6MjEwMDIzNTkxNH0.oql8BpFvpCc2tS-e4ETFLonnDZWMU5PlTosp9FMTyAI";
+    // NO FALLBACK, ON PURPOSE. These two used to default to the veedeeoh.com
+    // project's URL and anon key. Env files are gitignored, so a fresh clone
+    // had neither -- which meant the default self-hosted build signed its users
+    // into OUR database, against our quota, and looked completely normal from
+    // both ends. "Self-host is the free tier" cannot be true while the free
+    // tier is secretly the hosted one.
+    //
+    // vite.config.ts refuses to build without these, so reaching this branch
+    // means someone bypassed the build. Throwing beats a client pointed at
+    // nothing: a thrown error names the missing variable, whereas an empty URL
+    // fails later as an unexplained network error.
+    const url = import.meta.env.VITE_SUPABASE_URL as string;
+    const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+    if (!url || !key) {
+      throw new Error(
+        "VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY must be set at build time. " +
+        "See self-hosting.html, or copy frontend/.env.example to frontend/.env.",
+      );
+    }
     _supabase = createClient(url, key, {
       auth: {
         persistSession: true,

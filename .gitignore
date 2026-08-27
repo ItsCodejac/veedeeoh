@@ -14,6 +14,11 @@ nohup.out
 .env.local
 .env.*
 *.env
+# ...except the templates, which exist to be committed. Without this exception
+# the file documenting the required variables is ignored by the rule protecting
+# the file holding their values.
+!.env.example
+!**/.env.example
 emails.txt
 *.spec~
 .vercel

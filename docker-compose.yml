@@ -1,21 +1,40 @@
-version: '3.8'
+# Self-hosted veedeeoh.
+#
+# Before this works you need your own Supabase project with supabase/migrations
+# applied to it. See self-hosting.html. There is no shared or default database:
+# the build refuses to run without one, because the previous default was
+# veedeeoh.com's own and that made every self-hosted instance a client of ours.
+#
+# Copy .env.example to .env in this directory, fill it in, then:
+#
+#   docker compose up --build
+#
+# The two VITE_ values are compiled into the frontend bundle, so a change to
+# them needs --build, not just a restart.
 
 services:
   veedeeoh:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        VITE_SUPABASE_URL: ${SUPABASE_URL:?set SUPABASE_URL in .env -- see self-hosting.html}
+        VITE_SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:?set SUPABASE_ANON_KEY in .env}
+        VITE_PARTY_WORKER_URL: ${PARTY_WORKER_URL:-}
+        VITE_PROXY_URL: ${PROXY_URL:-}
     container_name: veedeeoh
     ports:
       - "8321:8321"
     environment:
-      - PORT=8321
-      - NODE_ENV=production
-      # - SUPABASE_URL=https://your-project.supabase.co
-      # - SUPABASE_ANON_KEY=your-anon-key
-    volumes:
-      - veedeeoh_data:/root/.local/share/tvlc
+      PORT: 8321
+      NODE_ENV: production
+      # Read at run time by the server for the routes that talk to Supabase on
+      # the caller's behalf.
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      # Optional, and only used by account deletion, which needs to remove an
+      # auth user. Leave it unset and that endpoint answers 501 explaining why
+      # rather than deleting half an account. It bypasses row-level security,
+      # so it belongs here and never in a build arg.
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
     restart: unless-stopped
-
-volumes:
-  veedeeoh_data:

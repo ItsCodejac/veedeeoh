@@ -1,0 +1,63 @@
+# Kept out of the build context.
+#
+# There was no .dockerignore at all, and the Dockerfile does COPY . . -- so
+# every build read the repo-root .env (service role key, JWT secret, Stripe
+# secret, Resend key, cron secret), frontend/.env.local, and the keys/
+# directory into the image. The multi-stage build meant those layers were not
+# in the final image, but they were present during the build and one of them,
+# frontend/.env.local, was baked into the static bundle that does ship.
+#
+# Config now arrives as explicit build args and runtime env instead. Nothing
+# secret needs to be in the context, so nothing secret is allowed in it.
+
+# Secrets and local config.
+#
+# The ** forms are load-bearing. Docker matches these against the whole
+# context-relative path, so a bare `.env.*` covers only the repository root --
+# it would NOT have excluded frontend/.env.local, which is the single file that
+# was actually being compiled into the shipped bundle.
+.env
+.env.*
+*.env
+**/.env
+**/.env.*
+**/*.env
+!.env.example
+!**/.env.example
+keys/
+**/keys/
+*.pem
+**/*.pem
+*.key
+**/*.key
+client_secret*.json
+**/client_secret*.json
+
+# Build output and dependencies -- reinstalled and rebuilt inside the image,
+# and copying them in is both slower and a source of host/container mismatch.
+node_modules/
+**/node_modules/
+dist/
+build/
+src/tvlc/static/
+frontend/dist/
+
+# Repository and editor state
+.git/
+.gitignore
+.vercel/
+.claude/
+.playwright-mcp/
+*.log
+
+# Large media that the image does not serve
+*.mp4
+*.mp3
+*.asd
+*.zip
+uploads/
+easter-egg-songs/
+scratch/
+worker/
+docs/
+tests/
