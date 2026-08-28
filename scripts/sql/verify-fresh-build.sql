@@ -217,3 +217,48 @@ exception when others then
   raise notice '18. full household       : PASS refused (%)', left(sqlerrm, 40);
 end $$;
 reset role;
+
+-- 19-21. Opting out of earning. On by default, off is honoured, and off is a
+-- different fact from never having engaged -- which is what the old
+-- `where user_id = host and active` filter collapsed.
+reset role;
+insert into auth.users (id, email) values
+  ('aaaaaaaa-0000-0000-0000-000000000001','host-on@example.com'),
+  ('aaaaaaaa-0000-0000-0000-000000000002','host-off@example.com'),
+  ('aaaaaaaa-0000-0000-0000-000000000003','guest-a@example.com'),
+  ('aaaaaaaa-0000-0000-0000-000000000004','guest-b@example.com');
+insert into public.parties (id, host_user_id, join_code, content_id, title) values
+  ('bbbbbbbb-0000-0000-0000-000000000001','aaaaaaaa-0000-0000-0000-000000000001','ONHOST','tubi:1','On'),
+  ('bbbbbbbb-0000-0000-0000-000000000002','aaaaaaaa-0000-0000-0000-000000000002','OFFHST','tubi:2','Off');
+
+set role authenticated;
+-- host-off switches earning off; host-on never touches it
+select set_config('request.jwt.claim.sub','aaaaaaaa-0000-0000-0000-000000000002',false);
+select public.set_referral_participation(false) as optout \gset
+
+select set_config('request.jwt.claim.sub','aaaaaaaa-0000-0000-0000-000000000003',false);
+select public.attribute_party_join('bbbbbbbb-0000-0000-0000-000000000001') as j1 \gset
+select set_config('request.jwt.claim.sub','aaaaaaaa-0000-0000-0000-000000000004',false);
+select public.attribute_party_join('bbbbbbbb-0000-0000-0000-000000000002') as j2 \gset
+reset role;
+
+select '19. earning on by default: ' ||
+  case when (select count(*) from public.referrals
+              where referrer_user_id='aaaaaaaa-0000-0000-0000-000000000001') = 1
+        and (select rate_bps from public.referrals
+              where referrer_user_id='aaaaaaaa-0000-0000-0000-000000000001') = 5000
+       then 'PASS host who never engaged still earns 50%'
+       else 'FAIL '||:'j1' end;
+
+select '20. opting out is honoured: ' ||
+  case when :'j2'::jsonb ->> 'declined' = 'true'
+        and (select count(*) from public.referrals
+              where referrer_user_id='aaaaaaaa-0000-0000-0000-000000000002') = 0
+       then 'PASS no referral written'
+       else 'FAIL '||:'j2' end;
+
+select '21. off is a real record  : ' ||
+  case when (select active from public.referral_codes
+              where user_id='aaaaaaaa-0000-0000-0000-000000000002') = false
+       then 'PASS stored as active=false, not an absence'
+       else 'FAIL' end;

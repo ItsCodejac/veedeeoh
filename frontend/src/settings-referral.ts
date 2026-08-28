@@ -69,7 +69,11 @@ export async function renderReferral(el: HTMLElement): Promise<void> {
       <div><b>${money(sum?.pending_cents ?? 0)}</b><span>Owed to you</span></div>
       <div><b>${money(sum?.paid_cents ?? 0)}</b><span>Paid out</span></div>
     </div>
-    ${breakdown}`,
+    ${breakdown}
+    <label class="setCheck">
+      <input type="checkbox" id="setRefActive" ${terms?.active === false ? "" : "checked"} />
+      <span>Earn from people I bring</span>
+    </label>`,
     isPartner
       ? "Negotiated partner terms. The rate is snapshotted onto each referral when it is made, so a later change never rewrites what you already earned."
       : "Anyone who joins a watch party you host is credited to you too, without this link. "
@@ -100,6 +104,25 @@ export async function renderReferral(el: HTMLElement): Promise<void> {
       }
     });
   }
+
+  // Earning is on unless this is switched off, including for accounts that have
+  // never opened this screen. Off has to be written down rather than left as an
+  // absence, because an absence is what the default reads as.
+  const activeBox = el.querySelector<HTMLInputElement>("#setRefActive");
+  activeBox?.addEventListener("change", async () => {
+    const want = activeBox.checked;
+    activeBox.disabled = true;
+    const ok = await db.setReferralParticipation(want);
+    activeBox.disabled = false;
+    if (!ok) {
+      activeBox.checked = !want;
+      showToast("Could not change that just now");
+      return;
+    }
+    showToast(want
+      ? "You will earn from people you bring"
+      : "Turned off. Parties you host will not be credited to you.");
+  });
 
   el.querySelector("#setRefCopy")?.addEventListener("click", async () => {
     try {

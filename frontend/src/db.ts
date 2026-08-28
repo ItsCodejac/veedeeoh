@@ -776,11 +776,26 @@ export async function referralSummary(): Promise<ReferralSummary | null> {
   return data as ReferralSummary;
 }
 
+/** Turn earning on or off.
+ *
+ *  Off is written as active = false rather than by deleting the row, because a
+ *  missing row is what the default reads as: attribute_party_join credits a
+ *  host who has never engaged at all. The two states have to be distinguishable
+ *  or the switch does nothing, which is what it did before. */
+export async function setReferralParticipation(on: boolean): Promise<boolean> {
+  const { data, error } = await getSupabase().rpc("set_referral_participation", { participating: on });
+  if (error) { console.warn("[referral] participation", error); return false; }
+  return !!(data as any)?.ok;
+}
+
 export interface ReferralTerms {
   code: string;
   kind: "user" | "partner";
   rate_bps: number;
   duration_months: number;
+  /** Whether this account earns from people it brings. A missing row means the
+   *  default, which is on, so the settings screen treats null as true. */
+  active: boolean;
 }
 
 /** The caller's own affiliate terms. Partners carry a negotiated rate, so the
@@ -788,7 +803,7 @@ export interface ReferralTerms {
 export async function myReferralTerms(): Promise<ReferralTerms | null> {
   const { data, error } = await getSupabase()
     .from("referral_codes")
-    .select("code, kind, rate_bps, duration_months")
+    .select("code, kind, rate_bps, duration_months, active")
     .maybeSingle();
   if (error) { console.warn("[referral] terms", error); return null; }
   return (data as ReferralTerms) ?? null;
