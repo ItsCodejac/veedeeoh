@@ -72,3 +72,12 @@ jobs:
           cd backend
           npm ci
           npx tsc --noEmit
+
+      # The production API. It had no tsconfig and was covered by nobody, so
+      # billing, account deletion, the auth email hook and the crons were never
+      # type checked anywhere before Vercel built them at deploy time.
+      - name: Type check API
+        run: |
+          npm ci
+          cd api
+          npx tsc --noEmit

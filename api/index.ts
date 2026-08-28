@@ -472,20 +472,48 @@ app.get('/account/export', async (c: Context) => {
   if (!user) return c.json({ error: 'unauthorized' }, 401);
   const sb = await callerSupabase(c);
 
-  const grab = async (table: string) => {
-    const { data, error } = await sb.from(table).select('*');
-    return error ? { error: error.message } : data;
-  };
+  // EVERY TABLE THAT HOLDS SOMETHING OF THEIRS, not the six somebody thought of
+  // first. The old list covered profiles, watch progress, favourites,
+  // collections, referrals and parties, and left out eighteen others: the credit
+  // ledger, what they earned, which parties they joined, the problems they
+  // reported, who they follow, who they blocked, their invitations, and more.
+  // An export that quietly omits most of the record is not a copy of what we
+  // hold, which is the only thing it is for.
+  //
+  // Row-level security still decides what comes back, so this cannot become a
+  // way to read somebody else's data by naming their table. A table the caller
+  // has no policy for is reported by name under not_included rather than
+  // silently dropped, because "we hold this and you cannot see it here" is a
+  // fact they are entitled to.
+  const TABLES = [
+    'household_profiles', 'household_members', 'household_invites',
+    'watch_progress', 'favorites', 'collections', 'collection_items',
+    'profile_exclusions',
+    'parties', 'party_joins', 'party_credit_ledger', 'party_blocks',
+    'party_reminders', 'party_block_appeals',
+    'referrals', 'referral_codes', 'referral_earnings', 'free_month_grants',
+    'host_follows', 'host_suggestions', 'public_picks',
+    'feedback', 'profile_reports', 'beta_invites',
+  ];
+
+  const data: Record<string, unknown> = {};
+  const notIncluded: Array<{ table: string; reason: string }> = [];
+  await Promise.all(TABLES.map(async (table) => {
+    const { data: rows, error } = await sb.from(table).select('*');
+    if (error) notIncluded.push({ table, reason: error.message });
+    else data[table] = rows ?? [];
+  }));
+
+  // The account row itself, which is the one thing not reachable by listing a
+  // table the caller owns rows in.
+  const { data: profile } = await sb.from('profiles').select('*').eq('id', user.id).maybeSingle();
 
   return c.json({
     exported_at: new Date().toISOString(),
     account: { id: user.id, email: user.email },
-    profiles: await grab('household_profiles'),
-    watch_progress: await grab('watch_progress'),
-    favorites: await grab('favorites'),
-    collections: await grab('collections'),
-    referrals: await grab('referrals'),
-    parties: await grab('parties'),
+    profile: profile ?? null,
+    data,
+    not_included: notIncluded,
   });
 });
 

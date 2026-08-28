@@ -1,0 +1,24 @@
+{
+  "//": [
+    "The Vercel API had no tsconfig and was not covered by backend's, whose",
+    "include is relative to itself. So the entire production API -- billing,",
+    "account deletion, the auth email hook, the crons -- was never type checked,",
+    "locally or in CI. Vercel builds it with its own defaults at deploy time,",
+    "which is the last place you want to find out.",
+    "Matches backend/tsconfig.json apart from the module resolution Vercel's",
+    "bundler expects."
+  ],
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["**/*.ts", "../backend/**/*.ts"],
+  "exclude": ["node_modules"]
+}
