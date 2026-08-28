@@ -8,23 +8,23 @@ behaviour as of 22 August 2026. They are **not** verified as legally sufficient 
 jurisdiction, and several clauses a real policy needs are deliberately left as
 `[REVIEW: ...]` placeholders rather than guessed at.
 
-## Status, 27 August 2026: these pages are already live, placeholders and all
+## Status, 28 August 2026
 
-`veedeeoh.com/terms` and `veedeeoh.com/privacy` are serving right now, and the
-`[REVIEW: ...]` markers are **visible text on them** -- eleven on the terms, ten on the
-privacy policy, rendered as notice blocks a customer can read. That is the honest state of
-the documents, but it is also a paid product asking for a card behind terms that openly say
-which clauses have not been settled.
+`veedeeoh.com/terms` and `veedeeoh.com/privacy` are live. The `[REVIEW: ...]`
+notes are in the HTML but **not rendered**: `.review-note { display: none }`,
+shown only with `?review=1`, with a comment in the file saying why. Twenty-one
+blocks in the source, zero visible. Checked in a browser, not by grepping the
+source, after this document briefly claimed the opposite.
 
-Two things follow, and both are decisions rather than engineering:
+So a visitor sees a finished-looking document. That is its own thing to weigh:
+the published terms read as settled while several clauses are not, which is
+better than showing customers a list of what counsel has not signed off, and
+worse than the clauses actually being settled.
 
-- Whether it is acceptable to take payment under terms in this state, or whether the
-  placeholders must be resolved first.
-- Whether the markers should be visible at all. Visible is candid; hidden would misrepresent
-  the documents as finished. The engineering position is that hiding them without resolving
-  them is the one option that should be off the table.
-
-The list below is unchanged and is what counsel needs to settle.
+There is no lawyer on this. The approach is best effort: state accurately what
+the software does, take the conservative option wherever a choice exists, and
+leave the few facts that cannot be invented as clearly marked blanks rather than
+guesses.
 
 ## What a lawyer must confirm
 
