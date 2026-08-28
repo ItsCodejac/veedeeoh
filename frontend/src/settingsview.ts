@@ -10,6 +10,7 @@
 // managing everyone else, Playback is per-viewer. A kids profile gets Playback
 // and nothing else.
 
+import { isCloudMode } from "./auth";
 import { escapeHtml, showToast } from "./util";
 import { getStoredProfiles, openProfileEditor, getActiveProfile, profileFace, canAddProfile } from "./profiles";
 import { card, row } from "./settings-ui";
@@ -22,6 +23,9 @@ interface Section {
   label: string;
   icon: string;
   kidsSafe: boolean;
+  /** Needs a cloud database. Absent on a self-hosted instance, which has no
+   *  account to configure, no public handle and nothing to refer anyone to. */
+  cloudOnly?: boolean;
   render: (el: HTMLElement) => void | Promise<void>;
 }
 
@@ -51,7 +55,7 @@ function renderHousehold(el: HTMLElement): void {
         </div>`).join("")}
     </div>
     <div class="setBtnRow"><button class="setBtn primary" id="setAddProfile">Add a profile</button></div>`)
-    ;
+    + `<div id="setPeople"></div>`;
 
   el.querySelectorAll<HTMLElement>("[data-edit]").forEach((b) => {
     b.addEventListener("click", () => {
@@ -65,6 +69,137 @@ function renderHousehold(el: HTMLElement): void {
     if (!(await canAddProfile())) return;
     openProfileEditor(undefined, () => openSettings("household"));
   });
+
+  // Cloud only. A member is somebody with their own login sharing a
+  // subscription, and a self-hosted instance has neither logins nor a
+  // subscription. Rendering it there would ask a database that does not exist
+  // and offer to share something nobody is paying for.
+  const people = el.querySelector<HTMLElement>("#setPeople");
+  if (people && isCloudMode()) void renderPeople(people);
+}
+
+/** Inviting another PERSON, which is not the same as adding a profile.
+ *
+ *  A profile is an avatar on this account. A member is somebody with their own
+ *  login sharing the subscription, and until now there was no way to make one.
+ *  The whole redeem half worked: household_invites, accept_household_invite and
+ *  the code in main.ts that reads ?invite= all shipped months ago. Nothing ever
+ *  called createInvite, so no link could exist to redeem. Seats are sold at $2
+ *  each beyond the first three, which meant an account could buy capacity it had
+ *  no way to fill.
+ *
+ *  Rendered separately from the profiles list above because it needs the
+ *  database: seat usage is read from seat_usage() rather than counted locally,
+ *  for the reason db.ts gives, and pending invites are per account rather than
+ *  per device. */
+async function renderPeople(host: HTMLElement): Promise<void> {
+  const db = await import("./db");
+
+  const draw = async (): Promise<void> => {
+    let invites: Awaited<ReturnType<typeof db.listInvites>> = [];
+    let seats: Awaited<ReturnType<typeof db.seatUsage>> = null;
+    try {
+      [invites, seats] = await Promise.all([db.listInvites(), db.seatUsage()]);
+    } catch {
+      host.innerHTML = card("People", `<p class="setHint">Could not load invitations right now.</p>`);
+      return;
+    }
+
+    const pending = invites.filter((i) => i.status === "pending");
+    const seatLine = seats
+      ? `${seats.used} of ${seats.cap} seats used`
+      : "Seat count unavailable";
+
+    host.innerHTML = card("People", `
+      <p class="setHint">
+        Someone you invite gets their own sign-in and their own profiles, sharing this
+        subscription. This is different from adding a profile, which is another avatar
+        on your account.
+      </p>
+      <div class="setRow"><span class="setRowLabel">Seats</span><span class="setRowValue">${escapeHtml(seatLine)}</span></div>
+
+      ${pending.length ? `<div class="setInvites">${pending.map((i) => `
+        <div class="setInvite">
+          <span class="setInviteWho">
+            <b>${escapeHtml(i.invited_email)}</b>
+            <span class="setDim">Invited, not yet accepted</span>
+          </span>
+          <button class="setBtn small" data-copy="${escapeHtml(i.token)}">Copy link</button>
+          <button class="setBtn small" data-revoke="${escapeHtml(i.id)}">Cancel</button>
+        </div>`).join("")}</div>` : ""}
+
+      <div class="setInviteNew">
+        <input id="setInviteEmail" type="email" placeholder="Their email address"
+               autocomplete="off" spellcheck="false" />
+        <button class="setBtn primary" id="setInviteGo">Create invite link</button>
+      </div>
+      <p class="setHint">
+        This makes a link for you to send them yourself. No email goes out from here,
+        and anyone who has the link can use it, so pass it to them directly rather than
+        posting it somewhere.
+      </p>`);
+
+    host.querySelectorAll<HTMLElement>("[data-copy]").forEach((b) => {
+      b.addEventListener("click", async () => {
+        const link = `${location.origin}/?invite=${b.dataset.copy}`;
+        try {
+          await navigator.clipboard.writeText(link);
+          showToast("Invite link copied");
+        } catch {
+          // Clipboard access is refused in plenty of ordinary situations, and
+          // the link is the entire point of the button, so it is shown rather
+          // than lost to a permission prompt nobody saw.
+          window.prompt("Copy this invite link", link);
+        }
+      });
+    });
+
+    host.querySelectorAll<HTMLElement>("[data-revoke]").forEach((b) => {
+      b.addEventListener("click", async () => {
+        const id = b.dataset.revoke!;
+        (b as HTMLButtonElement).disabled = true;
+        try {
+          await db.revokeInvite(id);
+          showToast("Invitation cancelled");
+          await draw();
+        } catch (e: any) {
+          (b as HTMLButtonElement).disabled = false;
+          showToast(e?.message || "Could not cancel that invitation");
+        }
+      });
+    });
+
+    const go = host.querySelector<HTMLButtonElement>("#setInviteGo");
+    const email = host.querySelector<HTMLInputElement>("#setInviteEmail");
+    go?.addEventListener("click", async () => {
+      const value = (email?.value || "").trim();
+      // The address is a label on the invitation, not a lock on it, so it is
+      // checked for shape only. Claiming to verify it would be a promise the
+      // redeem path does not keep: the token is what grants access.
+      if (!value || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value)) {
+        showToast("Enter their email address");
+        email?.focus();
+        return;
+      }
+      // Checked before creating, so a full household finds out now rather than
+      // after sending somebody a link that cannot work.
+      if (seats && !seats.can_add) {
+        showToast(`All ${seats.cap} seats are in use. Free one up or add a seat first.`);
+        return;
+      }
+      go.disabled = true;
+      try {
+        await db.createInvite(value);
+        showToast("Invitation created. Copy the link and send it to them.");
+        await draw();
+      } catch (e: any) {
+        go.disabled = false;
+        showToast(e?.message || "Could not create that invitation");
+      }
+    });
+  };
+
+  await draw();
 }
 
 // THE RATING MATRIX IS GONE. It was a grid of every profile against every
@@ -169,14 +304,14 @@ async function renderCredits(box: HTMLElement | null): Promise<void> {
 }
 
 const SECTIONS: Section[] = [
-  { id: "account",   label: "Account",   icon: ICON.user, kidsSafe: false, render: renderAccount },
+  { id: "account",   label: "Account",   icon: ICON.user, kidsSafe: false, cloudOnly: true, render: renderAccount },
   { id: "household", label: "Profiles",  icon: ICON.home, kidsSafe: false, render: renderHousehold },
   // Its own section rather than buried in Account. Someone on partner terms
   // opens the app to share a link and check what it earned; making that the
   // fifth thing down inside another page is the wrong shape for the person
   // whose entire relationship with the product is this.
-  { id: "public",    label: "Public profile", icon: ICON.badge, kidsSafe: false, render: renderPublicPage },
-  { id: "refer",     label: "Refer and earn", icon: ICON.share, kidsSafe: false, render: renderReferSection },
+  { id: "public",    label: "Public profile", icon: ICON.badge, kidsSafe: false, cloudOnly: true, render: renderPublicPage },
+  { id: "refer",     label: "Refer and earn", icon: ICON.share, kidsSafe: false, cloudOnly: true, render: renderReferSection },
   { id: "playback",  label: "Playback",  icon: ICON.play, kidsSafe: true,  render: renderPlayback },
   { id: "about",     label: "About",     icon: ICON.info, kidsSafe: true,  render: renderAbout },
 ];
@@ -187,7 +322,12 @@ let currentSection: SectionId = "account";
 
 export function settingsSections(): Section[] {
   const kids = !!getActiveProfile()?.is_kids;
-  return SECTIONS.filter((s) => !kids || s.kidsSafe);
+  const cloud = isCloudMode();
+  // Three of these ask a database that a self-hosted instance does not have.
+  // They were shown anyway, so opening Settings there threw on the way in:
+  // "Your public profile failed", twice, before anything rendered. Profiles,
+  // Playback and About are the whole of Settings when there is no account.
+  return SECTIONS.filter((s) => (!kids || s.kidsSafe) && (cloud || !s.cloudOnly));
 }
 
 /** Open the settings page at a section. Called by the router, so it must not

@@ -166,3 +166,54 @@ select '15. overdraft refused    : ' ||
   case when :'g4'::jsonb ->> 'error' in ('not enough credits','that is more than they can hold')
         and (select party_credits from public.profiles where id='11111111-1111-1111-1111-111111111111') = 96
        then 'PASS' else 'FAIL '||:'g4' end;
+
+-- 16-18. The household invite path, now that the UI can reach it.
+-- accept_household_invite has shipped for months with nothing able to create an
+-- invitation for it to accept, so this is its first test.
+reset role;
+insert into auth.users (id, email) values
+  ('55555555-5555-5555-5555-555555555555','owner@example.com'),
+  ('66666666-6666-6666-6666-666666666666','guest@example.com'),
+  ('77777777-7777-7777-7777-777777777777','spare@example.com');
+update public.profiles set seats = 2 where id = '55555555-5555-5555-5555-555555555555';
+insert into public.household_invites (id, owner_id, invited_email, token)
+values ('88888888-8888-8888-8888-888888888888',
+        '55555555-5555-5555-5555-555555555555', 'guest@example.com', 'tok-guest'),
+       ('99999999-9999-9999-9999-999999999999',
+        '55555555-5555-5555-5555-555555555555', 'spare@example.com', 'tok-spare');
+
+set role authenticated;
+select set_config('request.jwt.claim.sub','66666666-6666-6666-6666-666666666666',false);
+select public.accept_household_invite('tok-guest') as a1 \gset
+select public.accept_household_invite('tok-guest') as a2 \gset
+reset role;
+
+select '16. invite seats a member: ' ||
+  case when :'a1' = '55555555-5555-5555-5555-555555555555'
+        and (select count(*) from public.household_members
+              where owner_id='55555555-5555-5555-5555-555555555555'
+                and member_user_id='66666666-6666-6666-6666-666666666666') = 1
+        and (select status from public.household_invites
+              where id='88888888-8888-8888-8888-888888888888') = 'accepted'
+       then 'PASS joined and the invite is spent'
+       else 'FAIL' end;
+
+select '17. re-accept is a no-op : ' ||
+  case when :'a2' = '55555555-5555-5555-5555-555555555555'
+        and (select count(*) from public.household_members
+              where owner_id='55555555-5555-5555-5555-555555555555') = 1
+       then 'PASS no second seat taken'
+       else 'FAIL duplicated the membership' end;
+
+-- Owner plus one member fills two seats, so the next invitation must be refused
+-- rather than seating somebody the profile trigger would later reject.
+set role authenticated;
+select set_config('request.jwt.claim.sub','77777777-7777-7777-7777-777777777777',false);
+do $$
+begin
+  perform public.accept_household_invite('tok-spare');
+  raise notice '18. full household       : FAIL third person was seated';
+exception when others then
+  raise notice '18. full household       : PASS refused (%)', left(sqlerrm, 40);
+end $$;
+reset role;

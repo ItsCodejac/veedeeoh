@@ -3845,6 +3845,28 @@ body.zzz-mode  { --brand-accent: #7cc7ff; --brand-glow: 124, 199, 255; }
 .setProfileMeta b { font-size: 14.5px; }
 .setProfileMeta > span { font-size: 12px; color: rgba(255,255,255,0.5); }
 
+/* People: household members, which are other people rather than more avatars.
+   Deliberately built from .setProfile's shape so the two lists on this page
+   read as siblings, because they are answering neighbouring questions. */
+.setInvites { display: flex; flex-direction: column; gap: 9px; margin-top: 14px; }
+.setInvite { display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.28);
+  border: 1px solid rgba(255,255,255,0.07); border-radius: 11px; padding: 11px 14px; }
+.setInviteWho { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.setInviteWho b { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.setInviteWho .setDim { font-size: 12px; }
+
+.setInviteNew { display: flex; gap: 9px; margin-top: 14px; }
+.setInviteNew input { flex: 1; min-width: 0; background: rgba(0,0,0,0.35);
+  border: 1px solid rgba(255,255,255,0.14); border-radius: 9px; color: #fff;
+  padding: 10px 12px; font: inherit; font-size: 14px; }
+.setInviteNew input:focus { outline: none; border-color: var(--accent); }
+
+@media (max-width: 560px) {
+  .setInvite { flex-wrap: wrap; }
+  .setInviteWho { flex-basis: 100%; }
+  .setInviteNew { flex-direction: column; }
+}
+
 .setTable { display: flex; flex-direction: column; }
 .setTableRow { display: flex; justify-content: space-between; gap: 16px; align-items: center;
   padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 14px; }
