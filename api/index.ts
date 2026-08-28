@@ -539,6 +539,17 @@ app.post('/account/delete', async (c: Context) => {
     return c.json({ error: 'confirmation did not match the account email' }, 400);
   }
 
+  // Read BEFORE anything is deleted. Once the auth user is gone the earnings
+  // rows have a null referrer and there is nobody left to pay, so this is the
+  // last moment the number exists. Reported back rather than acted on: refusing
+  // to delete an account over an unpaid balance would be holding it hostage.
+  let unpaidEarningsCents = 0;
+  try {
+    const sb = await callerSupabase(c);
+    const { data } = await sb.rpc('unpaid_earnings_cents');
+    unpaidEarningsCents = Number(data) || 0;
+  } catch { /* a missing balance must never block a deletion request */ }
+
   // Uses the module-level import. A dynamic import('../backend/billing') here
   // resolved fine locally and threw ERR_MODULE_NOT_FOUND on Vercel, because the
   // extensionless specifier is not traced into the serverless bundle -- so the
@@ -573,6 +584,10 @@ app.post('/account/delete', async (c: Context) => {
     subscriptionCanceled: cancel.canceled,
     billingError: cancel.error ?? null,
     profileRemoved: !profErr,
+    // Non-zero means they closed an account with commission owed. The ledger
+    // entry survives for accounting, but its link to them does not, so this is
+    // the only record they will get that it existed.
+    unpaidEarningsCents,
   });
 });
 

@@ -262,3 +262,36 @@ select '21. off is a real record  : ' ||
               where user_id='aaaaaaaa-0000-0000-0000-000000000002') = false
        then 'PASS stored as active=false, not an absence'
        else 'FAIL' end;
+
+-- 22-23. Earned commission survives the deletion of either account.
+-- Both sides used to cascade, so a customer closing their account destroyed the
+-- referrer's record of what they had already earned from everybody else.
+reset role;
+insert into auth.users (id, email) values
+  ('cccccccc-0000-0000-0000-000000000001','earner@example.com'),
+  ('cccccccc-0000-0000-0000-000000000002','payer@example.com');
+insert into public.referral_earnings
+  (referrer_user_id, referred_user_id, stripe_invoice_id, gross_cents, rate_bps, commission_cents)
+values
+  ('cccccccc-0000-0000-0000-000000000001','cccccccc-0000-0000-0000-000000000002','in_test_1', 400, 5000, 200);
+
+-- The customer closes their account.
+delete from auth.users where id = 'cccccccc-0000-0000-0000-000000000002';
+
+select '22. earnings outlive payer: ' ||
+  case when (select count(*) from public.referral_earnings where stripe_invoice_id='in_test_1') = 1
+        and (select referred_user_id from public.referral_earnings where stripe_invoice_id='in_test_1') is null
+        and (select referrer_user_id from public.referral_earnings where stripe_invoice_id='in_test_1')
+            = 'cccccccc-0000-0000-0000-000000000001'
+       then 'PASS commission kept, payer unlinked'
+       else 'FAIL the referrer lost earned money' end;
+
+-- And the affiliate closes theirs.
+delete from auth.users where id = 'cccccccc-0000-0000-0000-000000000001';
+
+select '23. ledger survives earner: ' ||
+  case when (select count(*) from public.referral_earnings where stripe_invoice_id='in_test_1') = 1
+        and (select referrer_user_id from public.referral_earnings where stripe_invoice_id='in_test_1') is null
+        and (select commission_cents from public.referral_earnings where stripe_invoice_id='in_test_1') = 200
+       then 'PASS accounting record intact, identity gone'
+       else 'FAIL' end;
