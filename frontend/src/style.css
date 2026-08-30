@@ -3848,6 +3848,19 @@ body.zzz-mode  { --brand-accent: #7cc7ff; --brand-glow: 124, 199, 255; }
 /* People: household members, which are other people rather than more avatars.
    Deliberately built from .setProfile's shape so the two lists on this page
    read as siblings, because they are answering neighbouring questions. */
+/* Giving hours away. Folded out of the billing card rather than given its own
+   section: it is the same balance the row above it is reporting. */
+.setGift { margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.07); }
+.setGiftRow { display: flex; gap: 9px; margin-top: 10px; }
+.setGiftRow input {
+  background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 9px; color: #fff; padding: 10px 12px; font: inherit; font-size: 14px;
+}
+.setGiftRow #setGiftHandle { flex: 1; min-width: 0; }
+.setGiftRow #setGiftHours { width: 82px; flex: none; }
+.setGiftRow input:focus { outline: none; border-color: var(--accent); }
+@media (max-width: 560px) { .setGiftRow { flex-wrap: wrap; } .setGiftRow #setGiftHours { width: 100%; } }
+
 .setInvites { display: flex; flex-direction: column; gap: 9px; margin-top: 14px; }
 .setInvite { display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.28);
   border: 1px solid rgba(255,255,255,0.07); border-radius: 11px; padding: 11px 14px; }

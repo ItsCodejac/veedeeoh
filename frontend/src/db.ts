@@ -788,6 +788,17 @@ export async function setReferralParticipation(on: boolean): Promise<boolean> {
   return !!(data as any)?.ok;
 }
 
+/** What this account has earned and not been paid.
+ *
+ *  Read before account deletion, which is the last moment it can be reported:
+ *  the ledger row survives for accounting but its link to the person does not,
+ *  so afterwards there is nobody to tell and nobody to pay. */
+export async function unpaidEarningsCents(): Promise<number> {
+  const { data, error } = await getSupabase().rpc("unpaid_earnings_cents");
+  if (error) { console.warn("[referral] unpaid", error); return 0; }
+  return Number(data) || 0;
+}
+
 export interface ReferralTerms {
   code: string;
   kind: "user" | "partner";

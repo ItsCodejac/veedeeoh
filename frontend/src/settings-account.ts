@@ -166,10 +166,25 @@ async function exportData(e: Event): Promise<void> {
  *  account. The server checks the same string, so the friction is real rather
  *  than cosmetic. */
 async function confirmDelete(email: string): Promise<void> {
+  // Asked BEFORE the prompt, because after deletion there is no account to tell
+  // and no way to pay it. Commission rows survive the account for accounting,
+  // but their link to a person does not, so this is the last moment anyone can
+  // be told the balance exists.
+  let owed = "";
+  try {
+    const { unpaidEarningsCents } = await import("./db");
+    const cents = await unpaidEarningsCents();
+    if (cents > 0) {
+      owed = `\nYou have $${(cents / 100).toFixed(2)} of referral earnings that have not been paid out. `
+           + `Deleting your account means we can no longer pay it. Contact support first if you want it.\n`;
+    }
+  } catch { /* never block a deletion request on this */ }
+
   const typed = prompt(
     `This permanently deletes your account, every profile, and all watch history.\n\n`
-    + `Any active subscription is cancelled first.\n\n`
-    + `Type ${email} to confirm:`
+    + `Any active subscription is cancelled first.\n`
+    + owed
+    + `\nType ${email} to confirm:`
   );
   if (typed === null) return;
   if (typed.trim().toLowerCase() !== email.toLowerCase()) {
@@ -248,8 +263,65 @@ async function renderCredits(el: HTMLElement): Promise<void> {
       10 hours are added every month and roll over. ${escapeHtml(label)}.
     </p>
     <div class="setBtnRow">
-      <button class="setBtn" id="setBuyCredits">Add 4 hours &mdash; $1</button>
+      <button class="setBtn" id="setBuyCredits">Add 4 hours for $1</button>
+      <button class="setBtn" id="setGiftToggle">Give hours to someone</button>
+    </div>
+    <div class="setGift" id="setGiftBox" hidden>
+      <p class="setHint">
+        Hours you give become theirs to host with. Nothing is charged, and a gift that
+        would take them over their limit is refused rather than trimmed, so nothing is
+        lost in the giving.
+      </p>
+      <div class="setGiftRow">
+        <input id="setGiftHandle" placeholder="Their @handle" autocomplete="off" spellcheck="false" />
+        <input id="setGiftHours" type="number" min="1" step="1" value="1" aria-label="Hours to give" />
+        <button class="setBtn primary" id="setGiftSend">Give</button>
+      </div>
     </div>`;
+
+  const giftBox = el.querySelector<HTMLElement>("#setGiftBox");
+  el.querySelector("#setGiftToggle")?.addEventListener("click", () => {
+    if (giftBox) giftBox.hidden = !giftBox.hidden;
+    if (giftBox && !giftBox.hidden) el.querySelector<HTMLInputElement>("#setGiftHandle")?.focus();
+  });
+
+  // Credits are counted in ten-minute units and shown as hours everywhere else,
+  // so the field asks for hours and converts. Asking for "6 credits" would be
+  // the only place in the product that speaks in credits.
+  el.querySelector("#setGiftSend")?.addEventListener("click", async (e) => {
+    const btn = e.currentTarget as HTMLButtonElement;
+    const handleEl = el.querySelector<HTMLInputElement>("#setGiftHandle");
+    const hoursEl = el.querySelector<HTMLInputElement>("#setGiftHours");
+    const handle = (handleEl?.value || "").trim().replace(/^@/, "");
+    const hours = Math.floor(Number(hoursEl?.value || 0));
+
+    if (!handle) { showToast("Who is it for?"); handleEl?.focus(); return; }
+    if (!hours || hours < 1) { showToast("Give at least one hour"); hoursEl?.focus(); return; }
+
+    btn.disabled = true;
+    try {
+      const db = await import("./db");
+      const { publicProfile } = await import("./party");
+      const who = await publicProfile(handle);
+      if (!who.ok || !who.userId) { showToast(`No account with the handle @${handle}`); return; }
+
+      const res = await db.giftPartyCredits(who.userId, hours * 6);
+      if (res.ok) {
+        showToast(`Sent ${hours === 1 ? "an hour" : `${hours} hours`} to @${handle}`);
+        if (handleEl) handleEl.value = "";
+        void renderCredits(el);          // balances moved, so redraw them
+      } else {
+        // The refusals name what to do: not enough, or they are near the cap.
+        showToast(res.headroom
+          ? `They can only take ${Math.floor(res.headroom / 6)} more hours`
+          : res.error);
+      }
+    } catch {
+      showToast("Could not send that just now");
+    } finally {
+      btn.disabled = false;
+    }
+  });
 
   el.querySelector("#setBuyCredits")?.addEventListener("click", async (e) => {
     const b = e.currentTarget as HTMLButtonElement;
