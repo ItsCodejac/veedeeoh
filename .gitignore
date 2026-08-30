@@ -54,3 +54,7 @@ veedeeohkids.mp3
 
 # Debris from Playwright MCP browser sessions, not part of the app.
 .playwright-mcp/
+
+# Session transcript dumps. These land in the working tree from tooling and are
+# not part of the project.
+*-this-session-is-being-continued-from-a-previous-c.txt
