@@ -79,5 +79,4 @@ jobs:
       - name: Type check API
         run: |
           npm ci
-          cd api
-          npx tsc --noEmit
+          npx tsc -p api/tsconfig.check.json --noEmit
