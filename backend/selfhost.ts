@@ -77,14 +77,14 @@ export function createSelfHostApp(options: SelfHostOptions = {}) {
     } catch (e) {
       console.error("Pluto VOD error:", e);
     }
-    
+
     try {
       const archive = await providers.archiveMovies(30);
       rails.push({ name: "🏛️ Archive Classics", items: archive });
     } catch (e) {
       console.error("Archive VOD error:", e);
     }
-    
+
 
     console.log(`[GET /api/vod] Returning ${rails.length} rails to frontend.`);
     return c.json({ rails, stats });

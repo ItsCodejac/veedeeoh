@@ -125,6 +125,7 @@ export async function toggleWatched(episodeId: string, force?: boolean): Promise
     throw error;
   }
 }
+
 /** Refresh one local shelf without letting an older profile request overwrite a newer selection. */
 export async function refreshLocalLibrary(): Promise<void> {
   if (isCloudMode()) return;
