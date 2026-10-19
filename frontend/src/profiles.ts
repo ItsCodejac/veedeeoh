@@ -1,6 +1,6 @@
 import { HouseholdProfile } from './types';
 import * as db from './db';
-import { getSession, signOut } from './auth';
+import { getSession, signOut, isCloudMode } from './auth';
 import { RATING_GROUPS, allowedRatingsFor } from './db';
 import { fixSvgDataUri } from './util';
 import { registerOverlay } from './overlay';
@@ -38,7 +38,7 @@ export function saveProfiles(profiles: HouseholdProfile[]): void {
   localStorage.setItem('veedeeoh_household_profiles', JSON.stringify(profiles));
 }
 
-const cloudEnabled = () => !!getSession()?.access_token;
+const cloudEnabled = () => isCloudMode() && !!getSession()?.access_token;
 
 /** Pull the real household_profiles from Supabase into the local cache. Best
  *  effort — on failure (self-host / offline) the local cache is left intact. */
@@ -137,7 +137,7 @@ export async function createProfileEverywhere(fields: {
   avatar_recipe?: AvatarRecipe | null; is_kids?: boolean; max_rating?: string | null;
   allowed_ratings?: string[] | null; pin?: string | null;
 }): Promise<void> {
-  const local = getStoredProfiles().filter((p) => p.id !== 'default_main');
+  const local = getStoredProfiles().filter((p) => !isCloudMode() || p.id !== 'default_main');
   if (cloudEnabled()) {
     try {
       const row = await db.createProfile({
@@ -441,6 +441,7 @@ export async function requireAdultAuth(): Promise<boolean> {
  *  chosen an avatar, rather than after. */
 export async function canAddProfile(): Promise<boolean> {
   if (!(await requireAdultAuth())) return false;
+  if (!isCloudMode()) return true;
 
   let used = getStoredProfiles().length;
   let cap = 3;
@@ -672,6 +673,7 @@ export function openProfileSwitcher(
     });
   }
 
+  if (!isCloudMode()) modal.querySelector('#signOutBtn')?.remove();
   const signOutBtn = modal.querySelector('#signOutBtn');
   if (signOutBtn) {
     signOutBtn.addEventListener('click', async () => {

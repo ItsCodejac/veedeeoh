@@ -1,3 +1,4 @@
+import { isCloudMode } from "./auth";
 import { fetchArchiveStream, fetchPlutoStream, fetchTubiStream, fetchVod, fetchVodSeries, toggleWatched } from "./api";
 import { state } from "./state";
 import type { Stream, VodItem, VodEpisode, VodRail } from "./types";
@@ -9,6 +10,7 @@ import { openVodPlayer } from "./vodplayer";
 // The active profile's real Supabase id (null for local/unsynced placeholders).
 function activeProfileUuid(): string | null {
   const id = getActiveProfile().id;
+  if (!isCloudMode()) return id || "default_main";
   return id && !id.startsWith("default_") && !id.startsWith("profile_") ? id : null;
 }
 
@@ -319,6 +321,7 @@ export function asChannel(item: VodItem, streams: Stream[]): any {
 // chokepoint and beat every automatic rule. Allowances only become visible when
 // the collections gate is switched on; until then they are being banked.
 function setupParentControls(item: VodItem): void {
+  if (!isCloudMode()) return;
   const existing = document.getElementById("vdParentBtn");
   existing?.remove();
   document.getElementById("vdParentMenu")?.remove();
@@ -393,6 +396,7 @@ function setupParentControls(item: VodItem): void {
 // kids profiles rather than merely hidden -- and the server checks again.
 async function setupWatchPartyButton(item: VodItem): Promise<void> {
   document.getElementById("vdPartyBtn")?.remove();
+  if (!isCloudMode()) return;
   // Rendered OPTIMISTICALLY and withdrawn if the check says no, rather than
   // awaited first. canHost() calls auth.getUser(), which is a round trip to
   // Supabase and not something the account cache covers, so awaiting it left a
@@ -600,7 +604,10 @@ function setupMyListButton(item: VodItem): void {
     try {
       if (nowIn) await addFavorite(pid, { content_id: id, title: item.title, poster: item.poster ?? null });
       else await removeFavorite(pid, id);
-    } catch { /* keep optimistic state */ }
+    } catch {
+      if (nowIn) state.favorites.delete(id); else state.favorites.add(id);
+      render(); showToast("Could not save My List. Check your server connection.");
+    }
   };
 }
 
@@ -640,17 +647,12 @@ export async function renderFavorites(): Promise<void> {
   }
 
   const rail = document.createElement("div");
-  rail.className = "rail";
+  rail.className = "rail myList";
   rail.innerHTML = `<div class="railHead"><div class="railHeadTitle"><h2>My List</h2><span class="railTag">${items.length} saved</span></div></div>`;
-  const scroller = document.createElement("div");
-  // "railScroll" and the shared vodCard() helper, matching every other rail.
-  // This built its own markup with classes that exist nowhere in style.css
-  // (railScroller / vodCardArt / vodCardTitle), so the cards fell back to
-  // unstyled blocks: full-width posters stacked one per row.
-  scroller.className = "railScroll";
-  for (const it of items) scroller.append(vodCard(it));
-  rail.append(scroller);
-  setupHorizontalScroll(scroller, rail);
+  const grid = document.createElement("div");
+  grid.className = "myListGrid";
+  for (const it of items) grid.append(vodCard(it));
+  rail.append(grid);
   container.append(rail);
 }
 
@@ -1006,8 +1008,8 @@ const PARTY_ICON = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" 
 const QUICK_ACTIONS = `
   <span class="vodQuick">
     <span class="vodQuickBtn" data-act="fav" title="Add to My List">${HEART}</span>
-    <span class="vodQuickBtn" data-act="add" title="Add to a section">${PLUS}</span>
-    <span class="vodQuickBtn partyAct" data-act="party" title="Start a watch party">${PARTY_ICON}</span>
+    ${isCloudMode() ? `<span class="vodQuickBtn" data-act="add" title="Add to a section">${PLUS}</span>
+    <span class="vodQuickBtn partyAct" data-act="party" title="Start a watch party">${PARTY_ICON}</span>` : ""}
   </span>`;
 
 /** The block, sitting on the tile.
@@ -1039,6 +1041,7 @@ const LOCK_OVERLAY = `
  *  answers: an account can be entitled to watch and still unable to host (a
  *  kids profile), and the free tier is the reverse of neither. */
 export async function refreshHostingAffordance(): Promise<void> {
+  if (!isCloudMode()) { document.body.classList.remove("locked-free", "can-host"); return; }
   try {
     const { hasActiveAccess } = await import("./db");
     document.body.classList.toggle("locked-free", !(await hasActiveAccess()));
@@ -1148,7 +1151,10 @@ async function toggleFavorite(item: VodItem): Promise<void> {
   try {
     if (nowIn) await addFavorite(pid, { content_id: item.id, title: item.title, poster: item.poster ?? null });
     else await removeFavorite(pid, item.id);
-  } catch { /* optimistic: the list is rebuilt from state on next render */ }
+  } catch {
+    if (nowIn) state.favorites.delete(item.id); else state.favorites.add(item.id);
+    showToast("Could not save My List. Check your server connection.");
+  }
 }
 
 /** "Add to" menu: the household's own sidebar sections, plus a way to make one.
@@ -1690,6 +1696,7 @@ export async function renderHome(): Promise<void> {
           const localItem = resumeHistory.find((x: any) => x.itemId === cloudRow.content_id);
           if (localItem) {
             localItem.time = cloudRow.position_secs;
+            if (cloudRow.stream_idx != null) localItem.streamIdx = cloudRow.stream_idx;
             if (cloudRow.duration_secs) {
               localItem.percentage = (cloudRow.position_secs / cloudRow.duration_secs) * 100;
             }
@@ -1720,7 +1727,8 @@ export async function renderHome(): Promise<void> {
             duration: cloudRow.duration_secs,
             percentage: pct,
             updatedAt: cloudRow.updated_at,
-            streamIdx: 0,
+            streamIdx: cloudRow.stream_idx ?? 0,
+            episodeTitle: cloudRow.episode_title,
             streams: null,
             vodItem: item,
           });

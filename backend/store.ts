@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 function getUserDataDir(appName: string): string {
+  if (process.env.VEEDEEOH_DATA_DIR) return path.resolve(process.env.VEEDEEOH_DATA_DIR);
   if (process.env.VERCEL) {
     return '/tmp';
   }
@@ -30,17 +31,39 @@ export class JsonStore<T> {
     try {
       const data = fs.readFileSync(this.path, 'utf8');
       return JSON.parse(data);
-    } catch {
-      return JSON.parse(JSON.stringify(this.defaultData));
+    } catch (error: any) {
+      // The hosted waitlist uses an ephemeral, best-effort cache as before.
+      if (process.env.VERCEL) return structuredClone(this.defaultData);
+      if (error.code === 'ENOENT' && !fs.existsSync(this.path + '.bak')) return structuredClone(this.defaultData);
+      // Keep the damaged file for diagnosis and recover the last good snapshot.
+      try {
+        const recovered = JSON.parse(fs.readFileSync(this.path + '.bak', 'utf8'));
+        console.warn(`[store] Recovered ${this.path} from its backup; keep both files until repaired.`);
+        return recovered;
+      } catch {
+        throw new Error(`Could not read local data: ${this.path}`, { cause: error });
+      }
     }
   }
 
   save(data: T): void {
+    fs.mkdirSync(path.dirname(this.path), { recursive: true });
+    const temp = `${this.path}.${process.pid}.tmp`;
     try {
-      fs.mkdirSync(path.dirname(this.path), { recursive: true });
-      fs.writeFileSync(this.path, JSON.stringify(data));
-    } catch {
-      // Ignore write errors in serverless environments
+      fs.writeFileSync(temp, JSON.stringify(data), { mode: 0o600 });
+      const fd = fs.openSync(temp, 'r');
+      try { fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+      if (fs.existsSync(this.path)) {
+        // Never replace a good backup with a corrupt primary file.
+        const previous = fs.readFileSync(this.path, 'utf8');
+        try { JSON.parse(previous); fs.copyFileSync(this.path, this.path + '.bak'); }
+        catch (error) { if (!(error instanceof SyntaxError)) throw error; }
+      }
+      fs.renameSync(temp, this.path);
+    } catch (error) {
+      if (!process.env.VERCEL) throw error;
+    } finally {
+      if (fs.existsSync(temp)) fs.unlinkSync(temp);
     }
   }
 }

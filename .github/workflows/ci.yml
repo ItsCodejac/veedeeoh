@@ -14,10 +14,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js 20
+      - name: Set up Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Install frontend dependencies
         run: cd frontend && npm ci
@@ -28,12 +28,14 @@ jobs:
       - name: Build self-host
         env:
           VEEDEEOH_TARGET: selfhost
+          VITE_SUPABASE_URL: https://selfhost-must-ignore.supabase.co
+          VITE_SUPABASE_ANON_KEY: selfhost-must-ignore
         run: cd frontend && npm run build
 
       - name: Self-host build must contain no Supabase
         run: |
           cd frontend
-          if grep -rlE "https://[a-z0-9]{15,}\.supabase\.co" ../src/tvlc/static/assets/*.js; then
+          if grep -rlE "https://[a-z0-9-]+\.supabase\.co" ../src/tvlc/static/assets/*.js; then
             echo "::error::A Supabase project URL is compiled into the self-host build."
             echo "Self-host is standalone. Something reintroduced a credential default."
             exit 1
@@ -80,3 +82,29 @@ jobs:
         run: |
           npm ci
           npx tsc -p api/tsconfig.check.json --noEmit
+
+      - name: Self-host runtime and persistence regression tests
+        run: npm run test:selfhost
+
+      - name: Build the Docker image from a clean checkout
+        run: docker build -t veedeeoh-selfhost:ci .
+
+      - name: Container startup, routing and persisted library
+        run: |
+          docker run -d --name veedeeoh-ci -p 8321:8321 -v veedeeoh_ci:/data veedeeoh-selfhost:ci
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://localhost:8321/api/health; then break; fi
+            sleep 1
+          done
+          curl -fsS http://localhost:8321/home > /dev/null
+          curl -fsS http://localhost:8321/settings/playback > /dev/null
+          curl -fsS -X POST http://localhost:8321/api/favorites -H 'Content-Type: application/json' -d '{"content_id":"test-item","title":"Saved item"}'
+          docker restart veedeeoh-ci
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://localhost:8321/api/health; then break; fi
+            sleep 1
+          done
+          curl -fsS http://localhost:8321/api/favorites | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{if(JSON.parse(s).favorites[0]?.content_id!=="test-item")process.exit(1)})'
+          docker logs veedeeoh-ci
+          docker rm -f veedeeoh-ci
+          docker volume rm veedeeoh_ci

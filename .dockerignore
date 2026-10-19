@@ -61,3 +61,13 @@ scratch/
 worker/
 docs/
 tests/
+
+# Local verification output and persistent state
+outputs/
+**/outputs/
+*.test.cjs
+*.test.ts
+*.bak
+*.tmp
+**/*.test.cjs
+**/*.test.ts

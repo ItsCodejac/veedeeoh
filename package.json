@@ -8,7 +8,9 @@
     "warm": "node scripts/warm.mjs",
     "verify:db": "bash scripts/verify-fresh-build.sh",
     "veedeeoh": "node scripts/veedeeoh.mjs",
-    "stripe:sync": "bash scripts/sync-stripe-env.sh"
+    "stripe:sync": "bash scripts/sync-stripe-env.sh",
+    "build:selfhost": "node scripts/build-selfhost.mjs",
+    "test:selfhost": "node --test backend/selfhost.test.cjs frontend/tests/selfhost.test.cjs"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",

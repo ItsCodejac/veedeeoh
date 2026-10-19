@@ -1,41 +1,16 @@
-# Self-hosted veedeeoh. Standalone: no account with us, no database, no keys.
-#
-#   docker compose up --build
-#
-# That is the whole thing. Everything below is optional and the defaults are the
-# ones you want. State lives in a named volume, so a rebuild keeps your
-# favourites and watch progress.
-#
-# The server reads no Supabase configuration at all -- it keeps its state in a
-# JSON store on disk. Supabase is the cloud product's database, and the cloud
-# product is the hosted service. This file builds the other one.
-
+# Standalone veedeeoh: docker compose up -d --build
 services:
   veedeeoh:
     build:
       context: .
       dockerfile: Dockerfile
       args:
-        # Left blank these build the self-host product, which is the point of
-        # this file. They exist only so the same Dockerfile can build cloud.
-        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-}
-        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-}
-        VITE_PARTY_WORKER_URL: ${VITE_PARTY_WORKER_URL:-}
         VITE_PROXY_URL: ${PROXY_URL:-}
-    container_name: veedeeoh
     ports:
       - "${PORT:-8321}:8321"
-    environment:
-      PORT: 8321
-      NODE_ENV: production
-      # Absolute base for the stream proxy, when it is not served from the same
-      # origin as the app. Blank uses this origin.
-      PROXY_URL: ${PROXY_URL:-}
     restart: unless-stopped
     volumes:
-      # Favourites, watch progress and the cached catalogue. Named so a rebuild
-      # does not throw them away; back up by copying this volume.
-      - veedeeoh_data:/root/.local/share/tvlc
-
+      # Retains the existing named volume; only its mount point changes.
+      - veedeeoh_data:/data
 volumes:
   veedeeoh_data:
