@@ -5,7 +5,7 @@
 // and which bundle they were running. All of that is captured here so a tester
 // only has to describe what they saw.
 
-import { getSupabase, getSession } from "./auth";
+import { getSupabase, getSession, isCloudMode } from "./auth";
 import { getActiveProfile } from "./profiles";
 
 // Ring buffer of recent console errors/warnings, installed at boot. A pasted
@@ -122,6 +122,7 @@ async function submit(kind: "bug" | "feature", title: string, body: string): Pro
 export async function reportPlaybackFailure(ctx: {
   title?: string; contentId?: string; provider?: string; detail?: string;
 }): Promise<void> {
+  if (!isCloudMode()) return;
   const body = [
     ctx.contentId ? `content: ${ctx.contentId}` : null,
     ctx.provider ? `provider: ${ctx.provider}` : null,
@@ -193,6 +194,7 @@ function openForm(): void {
 
 /** Quiet sidebar row above the profile, matching the install prompt. */
 export function mountFeedbackEntry(): void {
+  if (!isCloudMode()) { document.getElementById("fbEntry")?.remove(); return; }
   if (document.getElementById("fbEntry")) return;
   const anchor = document.getElementById("sidebarUser");
   if (!anchor?.parentElement) return;

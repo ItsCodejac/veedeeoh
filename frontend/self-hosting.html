@@ -241,7 +241,7 @@
         <div class="code-block">git clone https://github.com/ItsCodejac/veedeeoh.git
 cd veedeeoh
 
-docker compose up --build</div>
+docker compose up -d --build</div>
         <p>That is the whole setup. Your instance is at <code>http://localhost:8321</code>.</p>
         <p>There is nothing to configure first. If you want it on a different port, set <code>PORT</code>.</p>
       </div>
@@ -255,12 +255,12 @@ docker compose up --build</div>
             <div style="font-size: 14px; color: var(--dim);">For development, or hosting without Docker</div>
           </div>
         </div>
-        <div class="code-block">npm install
-npm run build
-
-cd backend &amp;&amp; npm start</div>
+        <div class="code-block">npm ci --prefix frontend
+npm ci --prefix backend
+npm run build:selfhost
+npm start --prefix backend</div>
         <p>The build writes the app into <code>src/tvlc/static/</code> and the server serves it on <code>8321</code>. For development instead, run <code>npm run dev</code> in <code>backend/</code> and again in <code>frontend/</code>; Vite serves on 5173 and proxies the API to the backend.</p>
-        <p>The build prints which of the two products it is making. With no Supabase credentials present it says <code>building SELF-HOST</code>, and that is the one you want. There is no fallback to our project and no way to end up pointed at it by accident.</p>
+        <p>The build prints which of the two products it is making. The explicit self-host build ignores cloud credentials and says <code>building SELF-HOST</code>, and that is the one you want. There is no fallback to our project and no way to end up pointed at it by accident.</p>
       </div>
 
       <!-- Env -->
@@ -281,6 +281,11 @@ cd backend &amp;&amp; npm start</div>
               <td>Port the server listens on.</td>
             </tr>
             <tr>
+              <td><code>VEEDEEOH_DATA_DIR</code></td>
+              <td>platform default</td>
+              <td>Directory for local server data. Docker uses its persistent volume at <code>/data</code>.</td>
+            </tr>
+            <tr>
               <td><code>PROXY_URL</code></td>
               <td>this origin</td>
               <td>Absolute base for the stream proxy, when it is not served from the same origin as the app.</td>
@@ -299,8 +304,13 @@ cd backend &amp;&amp; npm start</div>
             <div style="font-size: 14px; color: var(--dim);">On your machine, in files you can read</div>
           </div>
         </div>
-        <p>Favourites, watch progress and the cached catalogue are JSON files in your platform's normal application data directory: <code>~/.local/share/tvlc</code> on Linux, <code>~/Library/Application Support/tvlc</code> on macOS. Under Docker Compose that directory is a named volume, so it survives a rebuild.</p>
-        <p>Backing up is copying that folder. There is nothing else, and nothing about your viewing leaves the machine except the requests that fetch the video itself.</p>
+        <p>My List, watched history and exact resume positions are saved per local profile in <code>library.json</code> on the server. The default directory is <code>~/.local/share/tvlc</code> on Linux or <code>~/Library/Application Support/tvlc</code> on macOS. Docker mounts the persistent named volume at <code>/data</code>. The catalogue cache is rebuilt in memory when needed.</p>
+        <p>Profile names, avatars, PINs and playback preferences remain in each browser. Exporting or backing up the server folder does not include those browser settings. Existing instance-wide favourites and watched files are preserved and imported into Main Profile.</p>
+        <p>Stop the service before copying or restoring its data. Keep the <code>.bak</code> files: writes are atomic, and the server can recover the previous snapshot if a JSON file is damaged.</p>
+        <div class="code-block">docker compose stop
+docker compose cp veedeeoh:/data ./veedeeoh-backup
+docker compose start</div>
+        <p>To restore, stop the service, copy <code>./veedeeoh-backup/.</code> back to <code>veedeeoh:/data</code> with <code>docker compose cp</code>, then start it. Keep a separate copy of the current folder before restoring. See the repository README for update and source-install instructions.</p>
       </div>
     </div>
 

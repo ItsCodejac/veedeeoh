@@ -1,5 +1,5 @@
 import "./style.css";
-import { fetchCatalog, fetchWatched, getActiveRegion } from "./api";
+import { fetchCatalog, fetchWatched, getActiveRegion, refreshLocalLibrary } from "./api";
 import { state } from "./state";
 import { $, showToast, escapeHtml, fixSvgDataUri } from "./util";
 import { closeTopOverlay, registerOverlay } from "./overlay";
@@ -396,11 +396,14 @@ async function enterAsProfile(
   atBoot = false,
 ): Promise<void> {
   applyProfileChrome(profile);
+  if (!isCloudMode()) await refreshLocalLibrary().catch(() => showToast("Could not load your saved library."));
   const vod = await import("./vod");
   // Warm the VOD catalog WHILE the branded bump plays, so Home is already built
   // by the time the bump ends — no plain "loading" screen between them.
   const railsReady = vod.getVodRails().catch(() => {});
   playIdent(!!profile.is_kids, async () => {
+    if (dataReady) await dataReady;
+    await railsReady;
     // SWITCHING profiles starts at Home: the hash in the bar belongs to the
     // profile being left, and honouring it could drop a kids profile onto a
     // panel it is not supposed to reach.
@@ -422,10 +425,8 @@ async function enterAsProfile(
       await applyRoute().finally(() => { applyingRoute = false; });
     } else {
       goHome();
+      void vod.renderHome();
     }
-    if (dataReady) await dataReady;
-    await railsReady;
-    void vod.renderHome();
   });
 }
 
@@ -540,7 +541,7 @@ async function boot(): Promise<void> {
 
   // Kick off catalog + watched in the BACKGROUND — the profile gate + bump mask
   // this latency, so the home is fully loaded by the time the user lands on it.
-  const dataReady = Promise.all([fetchCatalog(), fetchWatched()]).then(([data, watchedList]) => {
+  const dataReady = !isCloudMode() ? refreshLocalLibrary().catch(() => showToast("Could not load your saved library.")) : Promise.all([fetchCatalog(), fetchWatched()]).then(([data, watchedList]) => {
     state.region = data.region;
     state.favorites = new Set(data.favorites);
     state.watched = new Set(watchedList);
@@ -952,7 +953,7 @@ function wireSidebar(): void {
     item("Account and profiles", ICON.user, forward("#sidebarUser"));
     if (document.getElementById("fbEntry")) item("Report something", ICON.chat, forward("#fbEntry"));
     if (document.getElementById("pwaInstallEntry")) item("Install app", ICON.down, forward("#pwaInstallEntry .sidebar-install-main"));
-    item("Sign out", ICON.out, forward("#logoutBtn"), true);
+    if (isCloudMode()) item("Sign out", ICON.out, forward("#logoutBtn"), true);
 
     document.body.appendChild(sheet);
     return sheet;
@@ -1126,6 +1127,7 @@ function wireHeader(): void {
           </div>
         `;
 
+        if (!isCloudMode()) modal.querySelector("#menuSignOutBtn")?.remove();
         document.body.appendChild(modal);
         const ov = registerOverlay(modal, { dismissOn: modal });
         modal.querySelector("#menuCloseBtn")?.addEventListener("click", () => ov.close());

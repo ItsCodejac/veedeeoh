@@ -1,3 +1,4 @@
+import { isCloudMode } from "./auth";
 // Vidstack-based VOD player.
 //
 // One instance per open, owning every piece of state it touches. The previous
@@ -89,6 +90,7 @@ function toSource(rawUrl: string): string | { src: string; type: "application/x-
 
 function activeProfileUuid(): string | null {
   const id = getActiveProfile().id;
+  if (!isCloudMode()) return id || "default_main";
   return id && !id.startsWith("default_") && !id.startsWith("profile_") ? id : null;
 }
 
@@ -102,9 +104,8 @@ function resumeHistoryKey(): string {
 
 function markWatched(epId?: string): void {
   if (epId && !state.watched.has(epId)) {
-    state.watched.add(epId);
     document.querySelector(`.episodeCard[data-ep-id="${CSS.escape(epId)}"]`)?.classList.add("watched");
-    void toggleWatched(epId, true);
+    void toggleWatched(epId, true).catch(() => showToast("Could not save watched history."));
   }
 }
 
@@ -145,7 +146,6 @@ class VodPlayer {
       created = await VidstackPlayer.create({
         target: this.stage!,
         title: this.titleFor(first),
-        src: toSource(first.url),
         autoplay: true,
         currentTime: this.startTime,
         // THE ROOT OF "REACTIONS DO NOT WORK ON MOBILE". Vidstack defaults
@@ -184,6 +184,8 @@ class VodPlayer {
     this.applyPrefs(created);
     this.style();
     this.wire();
+    // Register provider hooks before source selection starts asynchronous setup.
+    created.src = toSource(first.url);
     this.showBump();
   }
 
@@ -697,6 +699,8 @@ class VodPlayer {
     on("provider-change", (e: any) => {
       const p = e.detail;
       if (p?.type !== "hls") return;
+      // Standalone installations must not depend on a third-party script CDN.
+      if (!isCloudMode()) p.library = () => import("hls.js");
       p.onInstance((hls: any) => {
         hls.on("hlsError", (_ev: any, data: any) => {
           if (data?.fatal && data?.type === "networkError") {
@@ -781,6 +785,8 @@ class VodPlayer {
   // Mirrors progress to BOTH stores. The localStorage write is what makes a
   // title appear in Continue Watching at all; the Supabase row only refines the
   // timecode of an entry that already exists locally.
+  private saveWarningShown = false;
+
   private saveResume(time: number, duration: number, pct: number): void {
     if (Date.now() - this.lastSave < 5000) return;
     this.lastSave = Date.now();
@@ -830,7 +836,14 @@ class VodPlayer {
         title: ch.name,
         position_secs: time,
         duration_secs: duration,
-      }).catch(() => {});
+        stream_idx: this.idx,
+        episode_title: stream.source,
+      }).catch(() => {
+        if (!this.saveWarningShown) {
+          this.saveWarningShown = true;
+          showToast("Could not save progress to your server. This browser keeps a local copy.");
+        }
+      });
     }
   }
 }

@@ -1231,6 +1231,25 @@ select { max-width: 190px; }
   cursor: pointer;
   text-align: left;
 }
+/* My List is a full collection; saved titles wrap instead of forming a rail. */
+.myList .railHead { cursor: default; }
+.myListGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 144px), 1fr));
+  gap: 24px 16px;
+  padding: 12px 18px 24px;
+}
+.myListGrid > .vodCard {
+  width: 100%;
+  min-width: 0;
+}
+@media (max-width: 768px) {
+  .myListGrid {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 112px), 1fr));
+    gap: 20px 12px;
+    padding: 8px 12px 20px;
+  }
+}
 .vodCard.loading { opacity: .5; }
 .vodPoster {
   display: flex;
@@ -5345,3 +5364,6 @@ body.no-element-fullscreen .vds-fullscreen-button { display: none !important; }
   color: var(--accent-ink);
 }
 .nfBtn.primary:hover { background: #d3f76a; border-color: #d3f76a; }
+
+/* Cloud-only controls must honor hidden even when nav styles set display. */
+#tabParty[hidden], #fbEntry[hidden] { display: none !important; }

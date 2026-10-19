@@ -72,9 +72,16 @@ function resolveTarget(mode: string): "cloud" | "selfhost" {
 }
 
 export default defineConfig(({ mode }) => {
-  resolveTarget(mode);
+  const target = resolveTarget(mode);
 
   return {
+    define: {
+      ...(target === 'selfhost' ? {
+        'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(''),
+        'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(''),
+        'import.meta.env.VITE_PARTY_WORKER_URL': JSON.stringify(''),
+      } : {}),
+    },
     build: {
       outDir: "../src/tvlc/static",
       // Clean the output each build so stale hashed chunks don't pile up. Every

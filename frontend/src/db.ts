@@ -12,7 +12,16 @@
 // helpers never check ownership themselves — the database does. A caller with
 // no valid session simply reads/writes nothing.
 
-import { getSupabase } from "./auth";
+import { getSupabase, isCloudMode } from "./auth";
+
+async function localData(path: string, profileId: string, method = "GET", body?: unknown): Promise<any> {
+  const response = await fetch(`/api/${path}?profileId=${encodeURIComponent(profileId)}`, {
+    method, headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!response.ok) throw new Error("Could not save or load local data. Check the self-host server and its data folder.");
+  return response.json();
+}
 
 async function uid(): Promise<string | null> {
   const { data } = await getSupabase().auth.getUser();
@@ -362,6 +371,7 @@ export interface Favorite {
 }
 
 export async function listFavorites(profileId: string): Promise<Favorite[]> {
+  if (!isCloudMode()) return (await localData("favorites", profileId)).favorites;
   const sb = getSupabase();
   const { data, error } = await sb
     .from("favorites")
@@ -372,6 +382,7 @@ export async function listFavorites(profileId: string): Promise<Favorite[]> {
 }
 
 export async function addFavorite(profileId: string, fav: Favorite): Promise<void> {
+  if (!isCloudMode()) { await localData("favorites", profileId, "POST", fav); return; }
   const sb = getSupabase();
   const { error } = await sb
     .from("favorites")
@@ -380,6 +391,7 @@ export async function addFavorite(profileId: string, fav: Favorite): Promise<voi
 }
 
 export async function removeFavorite(profileId: string, contentId: string): Promise<void> {
+  if (!isCloudMode()) { await localData(`favorites/${encodeURIComponent(contentId)}`, profileId, "DELETE"); return; }
   const sb = getSupabase();
   const { error } = await sb
     .from("favorites")
@@ -402,6 +414,7 @@ export interface WatchRow {
 }
 
 export async function listProgress(profileId: string): Promise<WatchRow[]> {
+  if (!isCloudMode()) return (await localData("progress", profileId)).progress;
   const sb = getSupabase();
   const { data, error } = await sb
     .from("watch_progress")
@@ -417,7 +430,10 @@ export async function saveProgress(profileId: string, row: {
   title?: string | null;
   position_secs: number;
   duration_secs?: number | null;
+  stream_idx?: number;
+  episode_title?: string | null;
 }): Promise<void> {
+  if (!isCloudMode()) { await localData("progress", profileId, "POST", row); return; }
   const sb = getSupabase();
   const completed = !!row.duration_secs && row.position_secs >= row.duration_secs - 60;
   const { error } = await sb.from("watch_progress").upsert(
@@ -436,6 +452,7 @@ export async function saveProgress(profileId: string, row: {
 }
 
 export async function getWatchHistory(profileId: string): Promise<any[]> {
+  if (!isCloudMode()) return (await localData("progress", profileId)).progress;
   const sb = getSupabase();
   const { data, error } = await sb
     .from("watch_progress")
